@@ -9,7 +9,7 @@
 - [Калькулятор стоимости услуг в Telegram Mini App](packages/telegram-mini-app-service-calculator.json)
 - [Каталог товаров для Telegram-бота из Google Таблиц](packages/telegram-bot-google-sheets-catalog.json)
 
-[Команды импорта и ссылки на локальные страницы](../../README.md#два-дополнительных-руководства). После импорта обоих пакетов опубликовано 16 статей. Обе статьи ссылаются на исходники примеров в [botgate-examples](https://github.com/Alexby8/botgate-examples).
+После импорта обоих пакетов опубликовано 16 статей. Обе статьи ссылаются на исходники примеров в [botgate-examples](https://github.com/Alexby8/botgate-examples).
 
 ## Каталог для подбора тем
 
