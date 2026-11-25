@@ -28,12 +28,12 @@ node $npmCli ci
 Pop-Location
 ./llm-wiki/tools/setup-qmd.ps1
 $qmd = 'llm-wiki/tools/qmd/node_modules/@tobilu/qmd/bin/qmd'
-node $qmd pull
+node --use-system-ca $qmd pull
 node $qmd embed
 codex mcp get qmd --json
 ```
 
-Скрипт создаёт индекс в `.qmd/`, регистрирует коллекции и добавляет QMD как stdio-сервер в локальный `.codex/config.toml`. Открой новый чат в учебном проекте после установки. Веса моделей QMD хранятся в кеше пользователя. Для обновления индекса после изменения материалов выполни `node $qmd update` и `node $qmd embed`.
+Скрипт создаёт индекс в `.qmd/`, регистрирует коллекции и добавляет QMD как stdio-сервер в локальный `.codex/config.toml`. Открой новый чат в учебном проекте после установки. Три модели QMD загружаются при первоначальной установке и затем работают из кеша пользователя. Параметр --use-system-ca подключает доверенные корневые сертификаты Windows для загрузки через Node.js. Для обновления индекса после изменения материалов выполни `node $qmd update` и `node $qmd embed`.
 
 | Коллекция | Что можно найти |
 | --- | --- |
