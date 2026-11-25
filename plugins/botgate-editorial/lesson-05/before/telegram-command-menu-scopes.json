@@ -1,0 +1,410 @@
+[
+  {
+    "slug": "telegram-command-menu-scopes",
+    "title": "Как настроить разные команды Telegram-бота для личного чата и группы",
+    "seo_title": "Команды Telegram-бота для личного чата и группы — области меню",
+    "description": "Какие области команд выбрать, чтобы показывать /order в личном чате и /rules в группе, и где ограничить выполнение /order.",
+    "card_description": "Настройте отдельные списки команд для личного чата и группы и определите, как бот обработает /order, введённую вручную.",
+    "category": "Telegram Bot API",
+    "topics": "Telegram Bot API, команды бота",
+    "reading_time": "2 минуты",
+    "published_at": "2026-11-25",
+    "is_published": true,
+    "sort_order": 83,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Если заказы оформляются в личном чате, покажите там "
+            },
+            {
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ],
+              "type": "text",
+              "text": "/order"
+            },
+            {
+              "type": "text",
+              "text": ", а в группе предложите "
+            },
+            {
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ],
+              "type": "text",
+              "text": "/rules"
+            },
+            {
+              "type": "text",
+              "text": " для просмотра правил. Для этого задайте отдельный список команд для каждого типа чата."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для настройки нужен бот, которым вы управляете. Если он работает в конструкторе, проверьте, позволяет ли тот выбирать область команд и задавать условия их выполнения."
+            }
+          ]
+        }
+      ]
+    },
+    "sections": [
+      {
+        "id": "choose-scopes",
+        "label": "Какие области команд выбрать",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Какие области команд выбрать"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задайте два списка методом "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ],
+                  "type": "text",
+                  "text": "setMyCommands"
+                },
+                {
+                  "type": "text",
+                  "text": ". В каждом укажите свой тип области в параметре "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ],
+                  "type": "text",
+                  "text": "scope"
+                },
+                {
+                  "type": "text",
+                  "text": " и описание команды, которое увидит пользователь. "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#setmycommands"
+                      }
+                    }
+                  ],
+                  "type": "text",
+                  "text": "Документация метода"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Для личных чатов выберите "
+                        },
+                        {
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ],
+                          "type": "text",
+                          "text": "all_private_chats"
+                        },
+                        {
+                          "type": "text",
+                          "text": " и укажите команду "
+                        },
+                        {
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ],
+                          "type": "text",
+                          "text": "order"
+                        },
+                        {
+                          "type": "text",
+                          "text": " с описанием «Оформить заказ»."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Для групп и супергрупп выберите "
+                        },
+                        {
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ],
+                          "type": "text",
+                          "text": "all_group_chats"
+                        },
+                        {
+                          "type": "text",
+                          "text": " и укажите команду "
+                        },
+                        {
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ],
+                          "type": "text",
+                          "text": "rules"
+                        },
+                        {
+                          "type": "text",
+                          "text": " с описанием «Посмотреть правила»."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если отдельные переводы не нужны, оставьте "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ],
+                  "type": "text",
+                  "text": "language_code"
+                },
+                {
+                  "type": "text",
+                  "text": " пустым. Telegram показывает первый подходящий список целиком. Если список для конкретной группы, участника, администраторов или языка уже настроен, проверьте его приоритет. "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#determining-list-of-commands"
+                      }
+                    }
+                  ],
+                  "type": "text",
+                  "text": "Порядок выбора списка в Telegram"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "manual-command",
+        "label": "Что произойдёт, если в группе ввести /order",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что произойдёт, если в группе ввести /order"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Участник может отправить "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ],
+                  "type": "text",
+                  "text": "/order"
+                },
+                {
+                  "type": "text",
+                  "text": " вручную, даже если её нет в подсказках. При включённом режиме приватности доставка команды без адресата зависит от условий в группе. Для проверки можно явно адресовать команду боту, например "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ],
+                  "type": "text",
+                  "text": "/order@your_bot"
+                },
+                {
+                  "type": "text",
+                  "text": ", подставив его имя. Если сообщение дойдёт до бота, результат определит обработчик. "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/faq#what-messages-will-my-bot-get"
+                      }
+                    }
+                  ],
+                  "type": "text",
+                  "text": "Правила доставки сообщений в группах"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "enforce-in-handler",
+        "label": "Где ограничить оформление заказа",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Где ограничить оформление заказа"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если заказ разрешён только в личном чате, настройте обработчик "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ],
+                  "type": "text",
+                  "text": "/order"
+                },
+                {
+                  "type": "text",
+                  "text": " так, чтобы он запускал оформление только при типе чата "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ],
+                  "type": "text",
+                  "text": "private"
+                },
+                {
+                  "type": "text",
+                  "text": ". Проверяйте тип входящего чата до начала оформления, в том числе для команды с именем бота. В группе обработчик может предложить перейти в личный чат. "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/features#command-scopes"
+                      }
+                    }
+                  ],
+                  "type": "text",
+                  "text": "Области команд и проверка доступа"
+                },
+                {
+                  "type": "text",
+                  "text": " · "
+                },
+                {
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#chat"
+                      }
+                    }
+                  ],
+                  "type": "text",
+                  "text": "Типы чатов в Bot API"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]
