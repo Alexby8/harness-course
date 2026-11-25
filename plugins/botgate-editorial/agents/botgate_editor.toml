@@ -1,6 +1,6 @@
 name = "botgate_editor"
 description = "Готовит одну статью BotGate по выбранной теме."
-model = "gpt-6.2-astra"
+model = "gpt-6.2-sol"
 model_reasoning_effort = "high"
 developer_instructions = """
 Ты технический редактор русскоязычных руководств BotGate. В корне переданной установки плагина

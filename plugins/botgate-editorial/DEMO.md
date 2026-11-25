@@ -57,7 +57,7 @@ php artisan guides:import content/guides/packages/telegram-messageentity-utf16-p
 
 ## Проверка после разделения команды и рабочего скилла
 
-В версии 1.1.1 команда [guide-package](skills/guide-package/SKILL.md) передаёт выбранную тему [редактору](agents/botgate_editor.toml). Редактор открывает [write-guide](skills/write-guide/SKILL.md) с правилами подготовки статьи. В профиле закреплены те же модель и уровень рассуждения, что у основного агента проверочного запуска, — `gpt-6.2-astra` и `high`.
+В версии 1.1.1 команда [guide-package](skills/guide-package/SKILL.md) передаёт выбранную тему [редактору](agents/botgate_editor.toml). Редактор открывает [write-guide](skills/write-guide/SKILL.md) с правилами подготовки статьи. В этом прогоне редактор работал на `gpt-6.2-astra` с уровнем рассуждения `high`.
 
 На готовой ветке можно повторить проверку в режиме чтения:
 
