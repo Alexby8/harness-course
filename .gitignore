@@ -32,3 +32,6 @@ Thumbs.db
 .augment
 .codex
 .opencode
+
+# Local QMD search index and machine-specific collection paths
+/.qmd/
