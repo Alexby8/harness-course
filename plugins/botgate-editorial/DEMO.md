@@ -22,13 +22,13 @@ codex exec --ephemeral -s read-only '$botgate-editorial:guide-topics Предл�
 
 ## Второй вызов — подготовить статью
 
-В отдельном вызове `$botgate-editorial:guide-package` передали выбранную тему. Codex прочитал установленный скилл и профиль, создал субагента `botgate_editor` (`gpt-6.2-sol`, `medium`) и дождался результата. Ниже сокращённая команда из прогона.
+В первом прогоне статью заказали отдельной командой `$botgate-editorial:guide-package`. Codex прочитал установленный скилл и профиль, создал субагента `botgate_editor` (`gpt-6.2-sol`, `medium`) и дождался результата. Ниже сокращённая команда из прогона.
 
 ```powershell
 codex --search exec --ephemeral -s workspace-write '$botgate-editorial:guide-package Подготовь руководство о том, как на PHP извлечь текст MessageEntity из входящего сообщения Telegram, если перед ним есть эмодзи. Вызови редактора по профилю плагина, проверь пример и выполни dry-run.'
 ```
 
-**[Открыть статью в формате BotGate](../../content/guides/packages/telegram-messageentity-utf16-php.json)**. В ней один самодостаточный файл `entity-text.php`. Такому примеру отдельный репозиторий не нужен. Для многофайловых решений [скилл](skills/guide-package/SKILL.md) описывает оформление ссылки на версию примера в `botgate-examples`.
+**[Открыть статью в формате BotGate](../../content/guides/packages/telegram-messageentity-utf16-php.json)**. В ней один самодостаточный файл `entity-text.php`. Такому примеру отдельный репозиторий не нужен. Для многофайловых решений [рабочий скилл редактора](skills/write-guide/SKILL.md) описывает оформление ссылки на версию примера в `botgate-examples`.
 
 Telegram передаёт границы выделения в кодовых единицах UTF-16. В примере строка «😺 Привет @bot и 🚀 старт!» проверяет сразу два случая. Первая сущность начинается после эмодзи, вторая включает эмодзи. [Определение MessageEntity в Telegram Bot API](https://core.telegram.org/bots/api#messageentity).
 
@@ -54,3 +54,15 @@ php artisan guides:import content/guides/packages/telegram-messageentity-utf16-p
 ```
 
 Результат — `Validated: 1; changed: 1.`, код завершения 0. При итоговой проверке добавили блоки `heading`: Blade берёт из `section.label` название пункта оглавления, а сам раздел выводит из документа редактора. Штатный рендер сформировал четыре заголовка `h2`, каждый совпал с подписью в оглавлении. После dry-run в SQLite по-прежнему 16 опубликованных записей, записей с новым slug — 0. Проверялся разбор полученного текста на локальных данных. Обмен с реальным ботом для этого примера не требуется.
+
+## Проверка после разделения команды и рабочего скилла
+
+В версии 1.1.1 команда [guide-package](skills/guide-package/SKILL.md) передаёт выбранную тему [редактору](agents/botgate_editor.toml). Редактор открывает [write-guide](skills/write-guide/SKILL.md) с правилами подготовки статьи. В профиле закреплены те же модель и уровень рассуждения, что у основного агента проверочного запуска, — `gpt-6.2-astra` и `high`.
+
+На готовой ветке можно повторить проверку в режиме чтения:
+
+```powershell
+codex exec --ephemeral -s read-only '$botgate-editorial:guide-package Подготовь руководство по теме «Как на PHP извлечь текст MessageEntity из входящего сообщения Telegram с эмодзи».'
+```
+
+Редактор нашёл существующий пакет и вернул slug `telegram-messageentity-utf16-php`. Второй файл не появился. При повторной проверке этого же JSON штатный импортёр вывел `Validated: 1; changed: 1.`, а PHP-фрагмент вернул обе строки, приведённые выше.
