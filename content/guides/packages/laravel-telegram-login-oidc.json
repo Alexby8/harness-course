@@ -1,0 +1,782 @@
+[
+  {
+    "slug": "laravel-telegram-login-oidc",
+    "title": "Как добавить вход через Telegram на сайт с Laravel",
+    "seo_title": "Как добавить вход через Telegram на сайт с Laravel",
+    "description": "Вход через Telegram OpenID Connect на Laravel: кнопка, PKCE, проверка JWT, создание аккаунта, безопасная привязка и пользовательская сессия.",
+    "card_description": "Вход через Telegram OpenID Connect на Laravel: кнопка, PKCE, проверка JWT, создание аккаунта, безопасная привязка и пользовательская сессия.",
+    "category": "Практика",
+    "topics": "Laravel · Telegram Login · OpenID Connect · Авторизация",
+    "reading_time": "29 минут",
+    "published_at": "2026-11-16",
+    "is_published": true,
+    "sort_order": 60,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера добавим на сайт кнопку «Войти через Telegram». Посетитель подтвердит вход в Telegram, вернётся на сайт и окажется в личном кабинете. При первом входе создадим аккаунт, при следующих найдём тот же аккаунт по проверенному идентификатору. Отдельно разберём привязку к уже существующему пользователю сайта, чтобы случайно не объединить чужие учётные записи."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "flow",
+        "label": "Выберем актуальный способ авторизации",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выберем актуальный способ авторизации"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Используем серверный Authorization Code Flow с PKCE. Кнопка отправляет пользователя на страницу Telegram, callback получает короткоживущий код, а Laravel обменивает его на ID token. Подпись проверяет JWT-библиотека; сайт дополнительно проверяет назначение и параметры токена. Декодированный JSON без проверки подписи не даёт права войти."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это Telegram Login для обычного сайта. Здесь не используется HMAC из старого iframe-виджета и не подходит проверка initData от Mini App. У Telegram Login есть также JavaScript-библиотека с popup, но серверный redirect позволяет показать весь путь без зависимости от связи окон браузера."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "state связывает возврат с браузерной сессией, начавшей вход."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "PKCE связывает код авторизации с секретным verifier, который остался на сервере."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "nonce связывает ID token с конкретной попыткой входа."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Пара issuer + subject определяет внешнюю учётную запись. Username, имя и телефон для автоматического объединения аккаунтов не подходят."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Настроим Telegram и Laravel",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настроим Telegram и Laravel"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример рассчитан на Laravel 13, PHP 8.3+, стандартную модель User и сессии Laravel. Понадобятся OpenSSL и mbstring. На существующем сайте встроите маршруты в текущую форму входа; не создавайте вторые /login и /logout. Для привязки к аккаунту с паролем ниже используется уже настроенный экран подтверждения пароля password.confirm, например из starter kit."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В Mini App BotFather выберите своего бота и раздел Login Widget. Добавьте Allowed URLs: origin сайта и точный callback. Для dev и production укажите отдельные адреса. Получите Client ID и Client Secret именно из настроек Login: это не токен Bot API. Оставьте алгоритм подписи RS256, поскольку код ниже принимает только его."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Allowed URLs · пример",
+                  "code": "https://example.com\nhttps://example.com/auth/telegram/callback\nhttps://dev.example.com\nhttps://dev.example.com/auth/telegram/callback"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · зависимость и миграция",
+                  "code": "composer require firebase/php-jwt\nphp artisan make:migration create_telegram_identities_table"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Laravel · .env",
+                  "code": "TELEGRAM_LOGIN_CLIENT_ID=CLIENT_ID_FROM_BOTFATHER\nTELEGRAM_LOGIN_CLIENT_SECRET=CLIENT_SECRET_FROM_BOTFATHER\nTELEGRAM_LOGIN_REDIRECT_URI=https://example.com/auth/telegram/callback\nSESSION_DRIVER=database\nCACHE_STORE=database\nSESSION_SECURE_COOKIE=true\nSESSION_HTTP_ONLY=true\nSESSION_SAME_SITE=lax"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · добавить в массив config/services.php",
+                  "code": "'telegram_login' => [\n    'client_id' => env('TELEGRAM_LOGIN_CLIENT_ID'),\n    'client_secret' => env('TELEGRAM_LOGIN_CLIENT_SECRET'),\n    'redirect_uri' => env('TELEGRAM_LOGIN_REDIRECT_URI'),\n],"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Таблицы sessions, cache и cache_locks должны существовать; они есть в стандартных миграциях нового Laravel-проекта. Блокировка сессии нужна, чтобы два callback одной попытки не выполнились одновременно. Не используйте cookie как драйвер сессии для этого примера. SameSite=Lax позволяет сессии вернуться при верхнеуровневом GET-переходе с Telegram."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Callback задаётся конфигурацией, а не заголовком Host и не return_url из браузера. Адрес должен совпасть с зарегистрированным, включая схему и путь. После настройки конфигурации в обычном процессе развёртывания обновите её кэш."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity",
+        "label": "Подготовим связь с аккаунтом сайта",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовим связь с аккаунтом сайта"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · database/migrations/..._create_telegram_identities_table.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nuse Illuminate\\Database\\Migrations\\Migration;\nuse Illuminate\\Database\\Schema\\Blueprint;\nuse Illuminate\\Support\\Facades\\Schema;\n\nreturn new class extends Migration {\n    public function up(): void\n    {\n        // Telegram Login does not provide an email address.\n        Schema::table('users', function (Blueprint $table): void {\n            $table->string('email')->nullable()->change();\n        });\n        Schema::create('telegram_identities', function (Blueprint $table): void {\n            $table->id();\n            $table->foreignId('user_id')->constrained()->cascadeOnDelete();\n            $table->string('issuer', 64);\n            $table->string('subject', 255);\n            $table->char('subject_hash', 64)->unique();\n            $table->unique('user_id');\n            $table->timestamps();\n        });\n    }\n    public function down(): void\n    {\n        Schema::dropIfExists('telegram_identities');\n        // Keep email nullable: existing Telegram-only users may have no email.\n    }\n};"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · применить миграцию учебного приложения",
+                  "code": "php artisan migrate"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Telegram не выдаёт email в этом потоке, поэтому для новой учётной записи он остаётся NULL. Не придумывайте адрес вида telegram-id@example.com: его можно ошибочно использовать для восстановления пароля. Если на сайте email обязателен, отправьте нового пользователя на отдельный шаг ввода и подтверждения адреса; доступ к разделам с verified должен зависеть от этого шага."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Уникальный subject хранится строкой. Для поиска и ограничения UNIQUE используем SHA-256 от issuer и subject с разделителем: так регистронезависимая сортировка строк в MySQL не объединит разные внешние идентификаторы. Subject не обязан совпадать с Telegram user id из profile, и превращать его в chat_id для sendMessage нельзя. В этом сценарии одного Telegram достаточно для одного аккаунта сайта; уникальность user_id также запрещает незаметно заменить привязанный Telegram другим."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Services/TelegramAccount.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nnamespace App\\Services;\n\nuse App\\Models\\User;\nuse Illuminate\\Database\\UniqueConstraintViolationException;\nuse Illuminate\\Support\\Facades\\DB;\nuse Illuminate\\Support\\Facades\\Hash;\nuse Illuminate\\Support\\Str;\n\nfinal class TelegramAccount\n{\n    public function resolve(string $subject, string $name, ?int $linkTo): User\n    {\n        $subjectHash = hash('sha256', TelegramOidc::ISSUER.\"\\0\".$subject);\n        try {\n            return DB::transaction(function () use ($subject, $subjectHash, $name, $linkTo): User {\n                $identity = DB::table('telegram_identities')->where('subject_hash', $subjectHash)->lockForUpdate()->first();\n                if ($identity !== null) {\n                    abort_if($linkTo !== null && (int) $identity->user_id !== $linkTo, 409, 'Telegram уже связан с другим аккаунтом');\n                    return User::query()->whereKey($identity->user_id)->firstOrFail();\n                }\n                if ($linkTo !== null) {\n                    $user = User::query()->lockForUpdate()->findOrFail($linkTo);\n                    abort_if(DB::table('telegram_identities')->where('user_id', $linkTo)->exists(), 409, 'У аккаунта уже есть Telegram');\n                } else {\n                    $user = new User();\n                    $user->forceFill(['name' => $name, 'email' => null,\n                        'password' => Hash::make(Str::random(64))])->save();\n                }\n                DB::table('telegram_identities')->insert([\n                    'user_id' => $user->getKey(), 'issuer' => TelegramOidc::ISSUER,\n                    'subject' => $subject, 'subject_hash' => $subjectHash, 'created_at' => now(), 'updated_at' => now(),\n                ]);\n                return $user;\n            });\n        } catch (UniqueConstraintViolationException) {\n            // A concurrent callback may have created the identity first.\n            // The losing transaction (including a new User) has rolled back.\n            $identity = DB::table('telegram_identities')->where('subject_hash', $subjectHash)->first();\n            abort_if($identity === null || ($linkTo !== null && (int) $identity->user_id !== $linkTo), 409, 'Конфликт привязки');\n            return User::query()->whereKey($identity->user_id)->firstOrFail();\n        }\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Транзакция сохраняет пользователя и внешнюю идентичность вместе. Если два независимых входа одновременно создают одну связь, ограничение UNIQUE отклонит второй, его новая запись User откатится, а код найдёт уже существующую связь. Имя обновлять при каждом входе необязательно: в примере локальное имя существующего аккаунта не перезаписывается."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "tokens",
+        "label": "Обменяем код и проверим ID token",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обменяем код и проверим ID token"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Services/TelegramOidc.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nnamespace App\\Services;\n\nuse Firebase\\JWT\\JWK;\nuse Firebase\\JWT\\JWT;\nuse Illuminate\\Support\\Facades\\Http;\nuse RuntimeException;\n\nfinal class TelegramOidc\n{\n    public const ISSUER = 'https://oauth.telegram.org';\n\n    private function setting(string $name): string\n    {\n        $value = config('services.telegram_login.'.$name);\n        if (!is_string($value) || $value === '') {\n            throw new RuntimeException('Missing Telegram Login setting');\n        }\n        return $value;\n    }\n\n    public static function base64url(string $bytes): string\n    {\n        return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');\n    }\n\n    public function authorizationUrl(string $state, string $nonce, string $verifier): string\n    {\n        return self::ISSUER.'/auth?'.http_build_query([\n            'client_id' => $this->setting('client_id'),\n            'redirect_uri' => $this->setting('redirect_uri'),\n            'response_type' => 'code', 'scope' => 'openid profile',\n            'state' => $state, 'nonce' => $nonce,\n            'code_challenge' => self::base64url(hash('sha256', $verifier, true)),\n            'code_challenge_method' => 'S256',\n        ], '', '&', PHP_QUERY_RFC3986);\n    }\n\n    /** @return array{sub:string,name:string} */\n    public function exchange(string $code, string $verifier, string $nonce): array\n    {\n        $client = $this->setting('client_id');\n        $response = Http::asForm()->acceptJson()->connectTimeout(3)->timeout(10)\n            ->withBasicAuth($client, $this->setting('client_secret'))\n            ->post(self::ISSUER.'/token', [\n                'grant_type' => 'authorization_code', 'code' => $code,\n                'client_id' => $client, 'code_verifier' => $verifier,\n                'redirect_uri' => $this->setting('redirect_uri'),\n            ]);\n        // Do not throw an HTTP exception containing a token response body.\n        if (!$response->successful() || !is_string($response->json('id_token'))) {\n            throw new RuntimeException('Telegram token exchange failed');\n        }\n        $keys = Http::acceptJson()->connectTimeout(3)->timeout(5)\n            ->get(self::ISSUER.'/.well-known/jwks.json');\n        if (!$keys->successful() || !is_array($keys->json('keys'))) {\n            throw new RuntimeException('Telegram keys unavailable');\n        }\n        $allowed = [];\n        foreach ($keys->json('keys') as $key) {\n            if (is_array($key) && ($key['kty'] ?? '') === 'RSA'\n                && ($key['alg'] ?? 'RS256') === 'RS256' && ($key['use'] ?? 'sig') === 'sig') {\n                $allowed[] = $key;\n            }\n        }\n        // Algorithm is fixed to the RS256 setting chosen in BotFather.\n        $claims = JWT::decode($response->json('id_token'), JWK::parseKeySet(['keys' => $allowed], 'RS256'));\n        $now = time();\n        if (($claims->iss ?? null) !== self::ISSUER || ($claims->aud ?? null) !== $client\n            || !is_int($claims->exp ?? null) || $claims->exp <= $now\n            || !is_int($claims->iat ?? null) || $claims->iat > $now + 30 || $claims->iat < $now - 600\n            || !is_string($claims->nonce ?? null) || !hash_equals($nonce, $claims->nonce)\n            || !is_string($claims->sub ?? null) || $claims->sub === '' || strlen($claims->sub) > 255) {\n            throw new RuntimeException('Invalid Telegram identity claims');\n        }\n        return ['sub' => $claims->sub,\n            'name' => is_string($claims->name ?? null) ? mb_substr($claims->name, 0, 100) : 'Пользователь Telegram'];\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP-запрос к /token идёт с Basic Authorization и form-urlencoded; Client Secret остаётся на сервере. JWKS загружается только с фиксированного адреса Telegram. Алгоритм ограничен RS256: значение alg из неподтверждённого токена не выбирает алгоритм проверки за нас. Библиотека проверяет подпись и временные ограничения, затем код проверяет iss, aud, nonce и sub."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В этом примере принимается одна строка aud, равная Client ID, как в документированном ответе Telegram. Максимальный возраст iat — десять минут, независимо от более долгого exp. Поддерживайте время сервера через синхронизацию часов. Ключи загружаются при каждом входе, поэтому их ротация не требует перезапуска; при большом трафике добавьте небольшой кэш JWKS с обновлением по неизвестному kid."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отдельного запроса UserInfo здесь нет: Telegram возвращает профиль в ID token. Access token не сохраняется, потому что для входа он дальше не нужен. Не логируйте код, Client Secret, ID token и тело ответа /token. Если обмен завершился таймаутом, начните новую попытку входа, а не повторяйте код авторизации бесконечно."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "routes",
+        "label": "Свяжем кнопку, callback и сессию",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Свяжем кнопку, callback и сессию"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Http/Controllers/TelegramLoginController.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nnamespace App\\Http\\Controllers;\n\nuse App\\Services\\TelegramAccount;\nuse App\\Services\\TelegramOidc;\nuse Illuminate\\Http\\RedirectResponse;\nuse Illuminate\\Http\\Request;\nuse Illuminate\\Support\\Facades\\Auth;\nuse Illuminate\\Support\\Facades\\Log;\n\nfinal class TelegramLoginController extends Controller\n{\n    public function start(Request $request, TelegramOidc $oidc): RedirectResponse\n    {\n        $linkTo = $request->routeIs('telegram.link') ? (int) Auth::id() : null;\n        $flow = ['state' => bin2hex(random_bytes(32)), 'nonce' => bin2hex(random_bytes(32)),\n            'verifier' => TelegramOidc::base64url(random_bytes(32)), 'created' => time(), 'link_to' => $linkTo];\n        $request->session()->put('telegram_login', $flow);\n        return redirect()->away($oidc->authorizationUrl($flow['state'], $flow['nonce'], $flow['verifier']));\n    }\n\n    public function callback(Request $request, TelegramOidc $oidc, TelegramAccount $accounts): RedirectResponse\n    {\n        $flow = $request->session()->pull('telegram_login');\n        $state = $request->query('state');\n        if (!is_array($flow) || !is_string($state) || !is_string($flow['state'] ?? null)\n            || !is_string($flow['nonce'] ?? null) || !is_string($flow['verifier'] ?? null)\n            || !is_int($flow['created'] ?? null) || !array_key_exists('link_to', $flow)\n            || ($flow['link_to'] !== null && !is_int($flow['link_to']))\n            || !hash_equals($flow['state'], $state) || $flow['created'] < time() - 600) {\n            abort(419, 'Начните вход заново');\n        }\n        if ($request->has('error')) {\n            return redirect('/login')->with('status', 'Вход через Telegram отменён');\n        }\n        $code = $request->query('code');\n        if (!is_string($code) || $code === '' || strlen($code) >= 4096) {\n            abort(422);\n        }\n        $linkTo = $flow['link_to'];\n        abort_if($linkTo !== null && (int) Auth::id() !== $linkTo, 403);\n        abort_if($linkTo === null && Auth::check(), 409, 'Сессия изменилась. Начните заново');\n        try {\n            $identity = $oidc->exchange($code, $flow['verifier'], $flow['nonce']);\n        } catch (\\Throwable) {\n            Log::warning('Telegram login could not be verified');\n            return redirect('/login')->withErrors(['telegram' => 'Вход не подтверждён. Попробуйте ещё раз.']);\n        }\n        $user = $accounts->resolve($identity['sub'], $identity['name'], $linkTo);\n        // Apply your existing suspended/deleted-account policy here before login.\n        Auth::login($user);\n        $request->session()->regenerate();\n        $request->session()->regenerateToken();\n        return redirect('/account');\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · routes/web.php",
+                  "code": "<?php\n// Add to routes/web.php; do not put these routes in stateless api.php.\nuse App\\Http\\Controllers\\TelegramLoginController;\nuse Illuminate\\Http\\Request;\nuse Illuminate\\Support\\Facades\\Auth;\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::view('/login', 'auth.login')->middleware('guest')->name('login');\nRoute::post('/auth/telegram', [TelegramLoginController::class, 'start'])\n    ->middleware(['guest', 'throttle:10,1'])->block(30, 10)->name('telegram.start');\nRoute::post('/account/telegram', [TelegramLoginController::class, 'start'])\n    ->middleware(['auth', 'password.confirm', 'throttle:10,1'])->block(30, 10)->name('telegram.link');\nRoute::get('/auth/telegram/callback', [TelegramLoginController::class, 'callback'])\n    ->middleware('throttle:20,1')->block(30, 10)->name('telegram.callback');\nRoute::view('/account', 'account')->middleware('auth');\nRoute::post('/logout', function (Request $request) {\n    Auth::logout();\n    $request->session()->invalidate();\n    $request->session()->regenerateToken();\n    return redirect('/login');\n})->middleware('auth')->name('logout');"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Blade · resources/views/auth/login.blade.php",
+                  "code": "<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Вход</title><h1>Войти в кабинет</h1>\n@if (session('status')) <p>{{ session('status') }}</p> @endif\n@error('telegram') <p role=\"alert\">{{ $message }}</p> @enderror\n<form method=\"post\" action=\"{{ route('telegram.start') }}\">\n    @csrf\n    <button type=\"submit\">Войти через Telegram</button>\n</form>\n</html>"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Blade · resources/views/account.blade.php",
+                  "code": "<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\">\n<title>Кабинет</title><h1>Здравствуйте, {{ auth()->user()->name }}</h1>\n<p>Вы вошли в аккаунт сайта.</p>\n<form method=\"post\" action=\"{{ route('logout') }}\">@csrf <button>Выйти</button></form>\n</html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Начало входа — POST с обычной CSRF-защитой Laravel. Callback — GET от Telegram; ему не нужен CSRF-токен формы, его проверка — state плюс одноразовая серверная попытка. После успеха regenerate меняет идентификатор сессии, а regenerateToken обновляет CSRF. Выход удаляет сессию и выполняется только POST."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После входа перенаправляем на фиксированный /account. Если нужно возвращать посетителя к заказу, заранее сохраните разрешённый внутренний путь в сессии и проверьте доступ к заказу после авторизации. Не перенаправляйте на произвольный URL из callback."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В демонстрации один браузер хранит одну активную попытку: новая кнопка входа заменяет предыдущую. Поэтому старый callback получит 419. Для нескольких вкладок можно хранить ограниченный набор попыток по state, но каждой всё равно нужны срок действия и однократное потребление."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "existing",
+        "label": "Привяжем Telegram к существующему аккаунту",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Привяжем Telegram к существующему аккаунту"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если человек уже зарегистрирован через email, сначала предложите войти обычным способом и подтвердить пароль. Затем разместите в настройках аккаунта следующую форму. Она запускает тот же OIDC-поток, но сохраняет в сессии конкретный локальный user_id. На возврате проверяется, что пользователь всё ещё вошёл именно в него."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Blade · форма в настройках аккаунта",
+                  "code": "<form method=\"post\" action=\"{{ route('telegram.link') }}\">\n    @csrf\n    <button>Привязать Telegram к этому аккаунту</button>\n</form>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если внешний subject уже связан с другим локальным аккаунтом, верните конфликт и предложите разбор через поддержку. Совпадение имени, username или номера телефона не разрешает перенос привязки. Для смены Telegram создайте отдельный сценарий с повторной проверкой личности, а не удаляйте старую связь в callback автоматически."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед Auth::login примените действующую политику блокировки аккаунтов сайта. Если у вас есть suspended_at, запрет входа или обязательная двухфакторная проверка, Telegram не должен их обходить. У стандартной учебной модели этих полей нет, поэтому место применения собственной политики отмечено в контроллере."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверим успешный и ошибочные сценарии",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверим успешный и ошибочные сценарии"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Первый вход создаёт одну строку users и одну telegram_identities. Повторный вход возвращает того же User."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Неверные state, nonce, issuer, audience, подпись и истёкший exp не создают аккаунт и не авторизуют пользователя."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторный callback уже завершённой попытки отклоняется; ошибка пользователя error возвращает сообщение об отмене."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Попытка привязать Telegram, занятый другим аккаунтом, даёт 409 и не меняет связи."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Одинаковый username у локального и Telegram-пользователя не объединяет их автоматически."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "После успешного входа ID сессии меняется, после logout кабинет недоступен."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Недоступность /token или JWKS даёт понятную ошибку и не приводит к входу по неподтверждённым данным."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Автотесты удобно строить через Http::fake: подпишите тестовый JWT отдельным RSA-ключом и отдайте соответствующий JWKS. Это проверяет реальную криптографическую валидацию, не обращаясь к Telegram и не создавая аккаунты посетителей. Настройку Allowed URLs, cookies и возврат между доменами дополнительно проверьте в браузере на своём тестовом аккаунте."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Где нужен BotGate и что читать дальше",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Где нужен BotGate и что читать дальше"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "OIDC-запросы отправляются к oauth.telegram.org и не подменяются Bot API-шлюзом. BotGate может понадобиться позже для сообщений бота пользователю. Право написать ему запрашивается отдельно: сам успешный вход не означает согласие на любую рассылку. Настройки сообщений разобраны в "
+                },
+                {
+                  "type": "text",
+                  "text": "статье об уведомлениях",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-notification-settings"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Источники: "
+                },
+                {
+                  "type": "text",
+                  "text": "актуальный Telegram Login",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/telegram-login"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "PHP-JWT",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/googleapis/php-jwt"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "авторизация Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/docs/13.x/authentication"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "сессии и блокировки",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/docs/13.x/session"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Для уже существующей связи сайта с ботом см. "
+                },
+                {
+                  "type": "text",
+                  "text": "отдельный сценарий привязки",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-link-website-account"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

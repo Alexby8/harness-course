@@ -1,0 +1,757 @@
+[
+  {
+    "slug": "telegram-bot-send-photo-album",
+    "title": "Как отправить несколько фотографий одним альбомом через Telegram-бота",
+    "seo_title": null,
+    "description": "Отправляем фотоальбом на PHP: sendMediaGroup, подпись, URL, file_id и локальные JPEG через multipart. Отдельный пример для BotGate SDK.",
+    "card_description": "Отправляем фотоальбом на PHP: sendMediaGroup, подпись, URL, file_id и локальные JPEG через multipart. Отдельный пример для BotGate SDK.",
+    "category": "Практика",
+    "topics": "PHP · Фотоальбомы · Multipart",
+    "reading_time": "12 минут",
+    "published_at": "2026-10-26",
+    "is_published": true,
+    "sort_order": 20,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера возьмём карточку товара с двумя фотографиями: общий вид и крупная деталь. Отправим их в тестовый чат одним альбомом, добавим подпись и сохраним идентификаторы сообщений. Разберём прямой запрос к Telegram и такой же запрос через BotGate SDK."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "structure",
+        "label": "Как описать альбом",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как описать альбом"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В sendMediaGroup передают массив media из 2–10 элементов. У каждой фотографии есть type: photo и media с адресом файла. Подпись задаётся у элемента альбома; в примере она есть только у первого фото. Результат метода — массив сообщений, а не один message_id."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · описание двух фотографий по URL",
+                  "code": "{\n  \"chat_id\": \"YOUR_TEST_CHAT_ID\",\n  \"media\": [\n    {\n      \"type\": \"photo\",\n      \"media\": \"https://example.com/photos/front.jpg\",\n      \"caption\": \"Тестовый товар: общий вид и деталь.\"\n    },\n    {\n      \"type\": \"photo\",\n      \"media\": \"https://example.com/photos/detail.jpg\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "example.com и YOUR_TEST_CHAT_ID — placeholders: замените их своими данными. URL должен отдавать именно доступное Telegram изображение, а не HTML-страницу, форму авторизации или локальный адрес вашего компьютера. Сначала проверьте доступность тестовых изображений."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Вместо URL можно использовать file_id фотографии, ранее полученный тем же ботом. file_unique_id для отправки не подходит. Для одной фотографии используйте sendPhoto; большую подборку заранее разделите на группы допустимого размера."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подробная диагностика URL, file_id и загрузки файлов",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-files-not-sending"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "prepare",
+        "label": "Готовим локальные фотографии",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Готовим локальные фотографии"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Основной пример загружает два локальных JPEG, поэтому доступный из интернета сервер картинок не нужен. Требуются PHP 8.2+, cURL и fileinfo. Положите подготовленные небольшие фотографии в photos/front.jpg и photos/detail.jpg рядом со скриптами. Возьмите обычные изображения, например 1200 × 900 пикселей и менее 1 МБ каждое."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это заранее подготовленные серверные файлы. Если путь или файл приходит от посетителя, до отправки нужны отдельная проверка загрузки, размера и типа и хранение вне публичного каталога. Не подставляйте произвольный пользовательский путь в CURLFile."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задайте TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID в окружении процесса. Для личного тестового чата сначала начните диалог с ботом. .env без загрузчика не читается. Для канала отдельно проверьте право публикации."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка бота и канала перед отправкой",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-publish-to-channel#check-access"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "client",
+        "label": "Создаём клиент для запроса",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создаём клиент для запроса"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните следующий код как telegram.php. Это общий помощник для JSON и multipart: передача массива с CURLFile включает загрузку файлов, а заголовок multipart с boundary создаёт cURL. Автоматических повторов нет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · telegram.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction requiredEnv(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Не задана переменная '.$name);\n    }\n    return $value;\n}\n\n/** @param array<string, mixed> $params\n *  @return array<string, mixed>|list<array<string, mixed>>\n */\nfunction telegram(string $method, array $params, bool $multipart = false): array\n{\n    if (!preg_match('/\\A[a-zA-Z]+\\z/', $method)) {\n        throw new InvalidArgumentException('Некорректный метод');\n    }\n    $body = $multipart ? $params : json_encode($params, JSON_THROW_ON_ERROR);\n    $curl = curl_init('https://api.telegram.org/bot'.requiredEnv('TELEGRAM_BOT_TOKEN').'/'.$method);\n    if ($curl === false) {\n        throw new RuntimeException('Не удалось создать запрос');\n    }\n    curl_setopt_array($curl, [\n        CURLOPT_POST => true,\n        CURLOPT_POSTFIELDS => $body,\n        CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 10,\n        CURLOPT_TIMEOUT => 60,\n        CURLOPT_HTTPHEADER => $multipart ? [] : ['Content-Type: application/json'],\n    ]);\n    $raw = curl_exec($curl);\n    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    if ($raw === false) {\n        // Не выводим URL: он содержит токен бота.\n        throw new RuntimeException('Сетевой сбой; результат отправки может быть неизвестен');\n    }\n    $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);\n    if (!is_array($data) || ($data['ok'] ?? false) !== true) {\n        $error = is_array($data) ? (int) ($data['error_code'] ?? 0) : 0;\n        $wait = is_array($data) ? ($data['parameters']['retry_after'] ?? null) : null;\n        throw new RuntimeException('Telegram: HTTP '.$status.', error_code '.$error\n            .(is_int($wait) ? ', retry_after '.$wait.' с' : ''));\n    }\n    if ($status < 200 || $status >= 300 || !is_array($data['result'] ?? null)) {\n        throw new RuntimeException('Неожиданный ответ; автоматический повтор отключён');\n    }\n    return $data['result'];\n}"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "upload",
+        "label": "Отправляем два файла через multipart",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправляем два файла через multipart"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Значение attach://photo_0 ссылается на файловое поле photo_0 того же запроса. Оно не является путём на диске. Поле media отправляем JSON-строкой, а байты изображений — отдельными полями."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · album.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/telegram.php';\n\n$paths = [__DIR__.'/photos/front.jpg', __DIR__.'/photos/detail.jpg'];\n$media = [];\n$fields = ['chat_id' => requiredEnv('TELEGRAM_CHAT_ID')];\nforeach ($paths as $index => $path) {\n    if (!is_file($path) || !is_readable($path)) {\n        throw new RuntimeException('Не найден подготовленный файл №'.($index + 1));\n    }\n    if ((new finfo(FILEINFO_MIME_TYPE))->file($path) !== 'image/jpeg') {\n        throw new RuntimeException('В этом примере нужны JPEG-фотографии');\n    }\n    $name = 'photo_'.$index;\n    $item = ['type' => 'photo', 'media' => 'attach://'.$name];\n    if ($index === 0) {\n        $item['caption'] = 'Тестовый товар: общий вид и деталь.';\n    }\n    $media[] = $item;\n    $fields[$name] = new CURLFile($path, 'image/jpeg', basename($path));\n}\n$fields['media'] = json_encode($media, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);\n$messages = telegram('sendMediaGroup', $fields, true);\nif (!array_is_list($messages) || count($messages) !== count($paths)) {\n    throw new RuntimeException('Неожиданный результат альбома; проверьте чат до повтора');\n}\nforeach ($messages as $message) {\n    echo json_encode(['chat_id' => $message['chat']['id'],\n        'message_id' => $message['message_id'], 'media_group_id' => $message['media_group_id'] ?? null],\n        JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), PHP_EOL;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash / PowerShell · отправка в тестовый чат",
+                  "code": "php album.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Один запуск отправляет альбом. Ожидайте две фотографии в одной группе и подпись к первому элементу. Скрипт выводит идентификаторы каждого сообщения. Сохраните их вместе с ID чата и бота; media_group_id полезен для группировки, но не заменяет message_id при дальнейших операциях."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не задавайте Content-Type: application/json для этого запроса и не собирайте multipart boundary вручную. Простая строка с локальным путём внутри JSON не передаёт файл Telegram."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "caption",
+        "label": "Подпись, порядок и кнопки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подпись, порядок и кнопки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Массив media формируйте в нужном порядке. Короткую общую подпись поместите у первого фото. Для InputMediaPhoto действует ограничение подписи 1024 символа после разбора разметки; большой текст лучше отправить отдельным сообщением."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Начните с обычного текста без parse_mode. Если позже добавите HTML, экранируйте пользовательские значения перед включением в подпись. Не переносите готовую HTML-разметку сайта в Telegram без обработки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Правила HTML и MarkdownV2 для Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-cant-parse-entities"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "У sendMediaGroup нет параметра reply_markup. Если нужна кнопка «Открыть товар», отправьте отдельное сообщение с клавиатурой после подтверждённого результата альбома. У этих двух операций отдельные результаты: при сбое отправки кнопки не нужно повторять весь альбом."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как обрабатывать нажатия на inline-кнопки",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-inline-buttons-not-working"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Отправляем альбом через BotGate SDK",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправляем альбом через BotGate SDK"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это альтернативный вариант той же отправки. Установите composer require botgate/sdk; SDK работает на PHP 8.2+. Задайте BOTGATE_API_KEY, BOTGATE_BOT_ID и TELEGRAM_CHAT_ID в окружении. Фотографии остаются в той же папке photos."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · botgate.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nrequire __DIR__.'/vendor/autoload.php';\n\nuse BotGate\\Client;\nuse BotGate\\Config;\n\n$apiKey = getenv('BOTGATE_API_KEY');\n$botId = getenv('BOTGATE_BOT_ID');\nif (!is_string($apiKey) || $apiKey === '' || !is_string($botId) || $botId === '') {\n    throw new RuntimeException('Задайте BOTGATE_API_KEY и BOTGATE_BOT_ID');\n}\n$bot = Client::fromConfig(new Config(\n    apiKey: $apiKey,\n    timeout: 60.0,\n    maxRetries: 0,\n))->bot($botId);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В MultipartField::file передаём открытый поток с содержимым файла. Строка пути в этом аргументе будет содержимым, поэтому здесь нужен fopen. finally закрывает все уже открытые потоки и при успешном ответе, и при исключении."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · album-botgate.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/botgate.php';\n\nuse BotGate\\Http\\MultipartField;\n\n$chatId = getenv('TELEGRAM_CHAT_ID');\nif (!is_string($chatId) || $chatId === '') {\n    throw new RuntimeException('Задайте TELEGRAM_CHAT_ID');\n}\n$streams = [];\ntry {\n    $fields = [MultipartField::field('chat_id', $chatId)];\n    $media = [];\n    foreach (['front.jpg', 'detail.jpg'] as $index => $filename) {\n        $path = __DIR__.'/photos/'.$filename;\n        if (!is_file($path) || !is_readable($path)\n            || (new finfo(FILEINFO_MIME_TYPE))->file($path) !== 'image/jpeg') {\n            throw new RuntimeException('Проверьте подготовленный JPEG-файл');\n        }\n        $stream = fopen($path, 'rb');\n        if ($stream === false) {\n            throw new RuntimeException('Не удалось открыть файл');\n        }\n        $streams[] = $stream;\n        $name = 'photo_'.$index;\n        $media[] = ['type' => 'photo', 'media' => 'attach://'.$name];\n        $fields[] = MultipartField::file($name, $stream, $filename, 'image/jpeg');\n    }\n    $media[0]['caption'] = 'Тестовый товар: общий вид и деталь.';\n    $fields[] = MultipartField::field('media', json_encode($media,\n        JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));\n    $response = $bot->callMultipart('sendMediaGroup', $fields);\n    echo json_encode($response->result, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), PHP_EOL;\n} finally {\n    foreach ($streams as $stream) {\n        if (is_resource($stream)) {\n            fclose($stream);\n        }\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запустите php album-botgate.php только если хотите выполнить ещё одну тестовую отправку. maxRetries: 0 выбран для явного контроля повторов; эта настройка не отменяет ограничений Telegram и BotGate."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Документация BotGate",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "errors",
+        "label": "Если альбом не отправился",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если альбом не отправился"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ошибка media или attach: сравните имена photo_0 и photo_1 в JSON и файловых полях; проверьте JSON-кодирование media."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ошибка файла: проверьте реальное содержимое JPEG, доступность пути и допустимые параметры фотографии."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ошибка доступа: проверьте адрес чата и права того же бота."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ответ 429: используйте указанную задержку и ограниченное число попыток на одном уровне очереди."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Таймаут или потерянный ответ: сначала проверьте чат и состояние задания. Безусловный повтор может отправить второй альбом."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не добавляйте кнопку или запись об успешной доставке, пока sendMediaGroup не вернул подтверждённый результат. Для фоновых заданий сохраняйте отдельно состояние отправки альбома и последующего сообщения с кнопкой."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разбор ограничений и retry_after",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-api-error-429"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verification",
+        "label": "Что проверить на тестовом чате",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что проверить на тестовом чате"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Порядок фотографий соответствует массиву, подпись не повторяется под каждым фото."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ответ содержит два message_id, и они сохранены с правильным chat_id."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "При отсутствующем втором файле запрос вообще не отправляется."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "При исключении SDK открытые потоки закрываются."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторное событие приложения не запускает тот же альбом без проверки состояния."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Источники",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Источники"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Telegram: sendMediaGroup",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#sendmediagroup"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Telegram: InputMediaPhoto",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#inputmediaphoto"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PHP: CURLFile",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/en/class.curlfile.php"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate SDK",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://packagist.org/packages/botgate/sdk"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,2540 @@
+[
+  {
+    "slug": "telegram-mini-app-service-calculator",
+    "title": "Как сделать калькулятор стоимости услуг в Telegram Mini App",
+    "seo_title": "Как сделать калькулятор стоимости услуг в Telegram Mini App",
+    "description": "Как устроен калькулятор в Telegram Mini App: форма, формула на PHP, проверка цены на сервере, запуск в Telegram и сохранение предложения для менеджера.",
+    "card_description": "Собираем калькулятор из трёх файлов: форма, расчёт на PHP и запуск в Telegram. Затем добавляем сохранение предложения и передачу заявки менеджеру.",
+    "category": "Практика",
+    "topics": "Mini Apps · PHP · Расчёт стоимости",
+    "reading_time": "20 минут",
+    "published_at": "2026-11-23",
+    "is_published": true,
+    "sort_order": 76,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Клиент выбирает параметры услуги и сразу узнаёт предварительную стоимость, не дожидаясь ответа менеджера. Разберём, когда для этого подходит Telegram Mini App, из каких частей состоит калькулятор и как собрать его на HTML, JavaScript и PHP. Сначала получим работающую форму с серверным расчётом, затем разберём сохранение предложения и передачу заявки."
+            }
+          ]
+        },
+        {
+          "type": "customBlock",
+          "attrs": {
+            "id": "guide-example",
+            "config": {
+              "title": "Калькулятор стоимости услуг",
+              "description": "Форма, серверный расчёт на PHP, сохранение предложения и заявка менеджеру.",
+              "language": "PHP",
+              "url": "https://github.com/Alexby8/botgate-examples/tree/main/examples/telegram-mini-app-service-calculator"
+            }
+          }
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "rules",
+        "label": "Когда калькулятору нужен Mini App",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда калькулятору нужен Mini App"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Калькулятор в Telegram можно сделать и обычным ботом: задать несколько вопросов, предложить кнопки и прислать сумму сообщением. Такой вариант удобен, если клиент последовательно выбирает две-три простые вещи. Например, тип уборки и количество комнат. Если у вас именно такой сценарий, посмотрите "
+                },
+                {
+                  "type": "text",
+                  "text": "пошаговую анкету на PHP",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-step-by-step-form"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Mini App — веб-страница, которая открывается внутри Telegram. На ней можно разместить привычную форму: поля, переключатели, список услуг и результат расчёта. Пользователь видит параметры вместе и может изменить любой из них, не возвращаясь на несколько сообщений назад. Это полезно для расчёта ремонта, печати, доставки или комплекта услуг."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если калькулятор уже есть на сайте, часто можно адаптировать его мобильную форму для запуска из Telegram, сохранив серверную формулу. Если интерфейса ещё нет, начнём с небольшой самостоятельной страницы. Подробнее о выборе формата — в "
+                },
+                {
+                  "type": "text",
+                  "text": "сравнении Mini App и чат-бота",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-or-chatbot"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Бот даёт точку входа, а ваш сайт показывает форму и выполняет расчёт. Telegram не хранит тарифы и не вычисляет цену. В этом примере интерфейс будет на HTML и JavaScript, а проверка параметров и формула — на PHP."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "quickstart",
+        "label": "Что увидит пользователь и как пойдёт запрос",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что увидит пользователь и как пойдёт запрос"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Путь клиента простой: открыть кнопку бота → выбрать параметры → нажать «Рассчитать стоимость» → увидеть предварительную сумму. После изменения полей прежняя сумма перестаёт считаться актуальной: форму нужно рассчитать заново. Когда результат устраивает клиента, можно предложить сохранить его и передать менеджеру."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера возьмём печать документов: количество, формат, цвет, срочность и получение заказа. Это небольшой набор, на котором видны основные виды расчёта — цена за единицу, фиксированная сумма и процентная надбавка. Дальше отдельно разберём, как заменить их параметрами своей услуги."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-mini-app-service-calculator/service-calculator.jpg",
+                  "alt": "Форма калькулятора печати: 100 чёрно-белых A4, срочность и курьер, предварительная цена 2037,50 рубля.",
+                  "caption": "Форма из статьи на учебных данных: срочность и курьер дают 2037,50 ₽. Для иллюстрации подставлен ответ PHP-формулы; это не снимок клиента Telegram.",
+                  "width": 650,
+                  "height": 771,
+                  "mobile_src": "/images/guides/telegram-mini-app-service-calculator/service-calculator-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 829
+                }
+              }
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Часть решения"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что она делает"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Форма в Mini App"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Собирает параметры и показывает результат или понятную ошибку."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "PHP-обработчик на вашем сервере"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Проверяет допустимые значения, считает сумму по своим тарифам и возвращает JSON."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "База и уведомление — следующий этап"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Хранят согласованное предложение и связывают заявку с клиентом. Для первого расчёта не нужны."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В основной версии цена приходит только с сервера. Поэтому не придётся поддерживать две копии формулы на PHP и JavaScript. Мгновенную оценку прямо при изменении полей можно добавить позже, если она действительно нужна интерфейсу."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовьте три файла и PHP-хостинг",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте три файла и PHP-хостинг"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для основной части нужны PHP 8.3+, базовое знание HTML и JavaScript и хостинг, который выполняет PHP и доступен по HTTPS. Laravel, Composer и база данных здесь не требуются. Бота создадим или выберем на этапе подключения к Telegram; сначала проверим сам калькулятор в браузере."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте папку calculator с такой структурой. Ниже приведён весь код этих трёх файлов. pricing.php находится выше публичного каталога: его подключает PHP, посетитель сайта напрямую к нему не обращается."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура минимального примера",
+                  "code": "calculator/\n  pricing.php             # проверка параметров и формула\n  public/\n    calculator.html       # форма и обработчик на JavaScript\n    calculate.php         # HTTP-запрос к формуле"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Все три файла относятся к отдельному учебному приложению, а не к коду сайта BotGate. На сервере корнем этого приложения должна быть папка public. Если настройка Mini App для вас новая, рядом есть "
+                },
+                {
+                  "type": "text",
+                  "text": "руководство по первой форме на HTML и PHP",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-html-php-form"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "; здесь сосредоточимся на расчёте стоимости."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "form",
+        "label": "Сделайте форму с параметрами услуги",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сделайте форму с параметрами услуги"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте public/calculator.html и вставьте разметку ниже. Атрибуты name — имена параметров, которые получит PHP. Подпись «Чёрно-белая» предназначена для человека, а значение bw — для кода. При переводе или переименовании подписи это значение менять не нужно."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ограничения min, max и step помогают человеку заполнить форму. Сервер повторит проверку: запрос можно отправить и без браузерной формы. Пока кнопка ещё не считает; обработчик добавим после PHP-части."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "HTML · public/calculator.html",
+                  "code": "<!doctype html>\n<html lang=\"ru\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>Калькулятор стоимости печати</title>\n  <script src=\"https://telegram.org/js/telegram-web-app.js\"></script>\n  <style>\n    * { box-sizing: border-box; }\n    body { margin: 0; font: 17px/1.5 system-ui; background: var(--tg-theme-bg-color, #f3f6fa); color: var(--tg-theme-text-color, #182b44); }\n    main { max-width: 580px; margin: auto; padding: 24px; }\n    h1 { font-size: 26px; line-height: 1.25; }\n    fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }\n    label { display: block; margin: 14px 0; }\n    input, select, button { width: 100%; padding: 12px; font: inherit; border: 1px solid #8b9bb0; border-radius: 8px; }\n    button { background: var(--tg-theme-button-color, #315fd2); color: var(--tg-theme-button-text-color, white); border: 0; cursor: pointer; }\n    button:disabled { opacity: .6; }\n    #result { font-size: 22px; font-weight: 650; }\n  </style>\n</head>\n<body>\n<main>\n  <h1>Калькулятор стоимости печати</h1>\n  <p>Выберите параметры. Итоговую смету подтвердит менеджер.</p>\n  <form id=\"calculator\">\n    <fieldset id=\"fields\">\n      <label>Количество, шт.<input name=\"qty\" type=\"number\" min=\"1\" max=\"1000\" step=\"1\" value=\"100\" required></label>\n      <label>Формат<select name=\"size\"><option>A4</option><option>A3</option></select></label>\n      <label>Печать<select name=\"color\"><option value=\"bw\">Чёрно-белая</option><option value=\"color\">Цветная</option></select></label>\n      <label>Срок<select name=\"urgent\"><option value=\"no\">Обычный</option><option value=\"yes\">Срочно (+25%)</option></select></label>\n      <label>Получение<select name=\"delivery\"><option value=\"pickup\">Самовывоз</option><option value=\"courier\">Курьер (+350 ₽)</option></select></label>\n      <button>Рассчитать стоимость</button>\n    </fieldset>\n  </form>\n  <p id=\"result\" role=\"status\" aria-live=\"polite\">Здесь появится предварительная цена.</p>\n</main>\n<!-- Здесь будет скрипт из шага «Покажите ответ сервера» -->\n</body>\n</html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "У результата есть aria-live: обновление может быть озвучено программой экранного доступа. Цвета используют переменные темы Telegram с запасными значениями для обычного браузера. При этом главный смысл интерфейса остаётся в подписях полей, сообщении об ошибке и ясно обозначенной предварительной цене."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "formula",
+        "label": "Опишите тариф и проверьте параметры на PHP",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Опишите тариф и проверьте параметры на PHP"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "До кода зафиксируйте правила словами: что оплачивается за единицу, что добавляется один раз и к какой части применяется процент. Иначе две внешне похожие формулы могут выдавать разные суммы. Для учебного примера используем такие тарифы; к реальному прайсу типографии они не относятся."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Параметр"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Правило примера"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Подготовка заказа"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "150 ₽ один раз"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Чёрно-белый A4"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "12 ₽ за экземпляр"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Цветной A4"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "28 ₽ за экземпляр"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Формат A3"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Цена экземпляра удваивается; подготовка не меняется"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Срочность"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "+25% к подготовке и печати"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Курьер"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "350 ₽ после надбавки за срочность; самовывоз — 0 ₽"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В pricing.php сначала добавьте options: она принимает необработанные поля, отклоняет неизвестные варианты и возвращает проверенный набор. Не заменяйте неизвестный тариф нулём или самым дешёвым вариантом — это будет правдоподобная, но неверная цена."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · pricing.php · начало файла",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @param  array<string, mixed>  $input\n * @return array{qty:int, size:string, color:string, urgent:string, delivery:string}\n */\nfunction options(array $input): array\n{\n    $raw = $input['qty'] ?? null;\n    $qty = is_int($raw) || is_string($raw)\n        ? filter_var($raw, FILTER_VALIDATE_INT)\n        : false;\n    if ($qty === false || $qty < 1 || $qty > 1000) {\n        throw new DomainException('Количество должно быть целым числом от 1 до 1000');\n    }\n    $choices = [\n        'size' => ['A4', 'A3'],\n        'color' => ['bw', 'color'],\n        'urgent' => ['no', 'yes'],\n        'delivery' => ['pickup', 'courier'],\n    ];\n    $values = [];\n    foreach ($choices as $name => $allowed) {\n        $value = $input[$name] ?? null;\n        if (! is_string($value) || ! in_array($value, $allowed, true)) {\n            throw new DomainException('Недопустимое значение поля '.$name);\n        }\n        $values[$name] = $value;\n    }\n\n    return ['qty' => $qty, 'size' => $values['size'], 'color' => $values['color'],\n        'urgent' => $values['urgent'], 'delivery' => $values['delivery']];\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В этот же файл ниже добавьте price. Денежные значения храним в целых копейках: 15000 — это 150 ₽. Так правила округления видны в формуле, а не зависят от отображения числа в браузере."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · pricing.php · продолжение того же файла",
+                  "code": "/** @param array{qty:int, size:string, color:string, urgent:string, delivery:string} $p */\nfunction price(array $p): int\n{\n    $unit = ($p['color'] === 'color' ? 2800 : 1200)\n        * ($p['size'] === 'A3' ? 2 : 1);\n    $production = 15000 + $p['qty'] * $unit;\n    if ($p['urgent'] === 'yes') {\n        $production = intdiv($production * 125 + 50, 100);\n    }\n\n    return $production + ($p['delivery'] === 'courier' ? 35000 : 0);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для 100 чёрно-белых A4 без срочности и доставки получится 150 + 100 × 12 = 1350 ₽. Если добавить срочность и курьера: 1350 × 1,25 + 350 = 2037,50 ₽. Доставка не входит в базу процентной надбавки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В выражении с intdiv добавление 50 перед делением на 100 округляет положительную сумму до ближайшей копейки; половина копейки округляется вверх. Если в вашем бизнесе округляют до рубля, применяют минимальную стоимость или скидку за объём, это нужно явно описать и реализовать в этой функции."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "api",
+        "label": "Верните рассчитанную цену из PHP-обработчика",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Верните рассчитанную цену из PHP-обработчика"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте public/calculate.php. Он принимает POST с JSON, вызывает options и price и возвращает total_minor — итог в копейках. Клиент передаёт характеристики заказа, а не тариф или готовую стоимость. Даже если добавить в запрос поле total_minor со значением 1, обработчик его не использует."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Этот endpoint намеренно публичный: общая цена не связана с личностью, данные не сохраняются и сообщения никому не отправляются. Если ваши тарифы персональные, авторизацию нужно добавить уже здесь; для общего прайса она понадобится на этапе сохранения заявки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/calculate.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nrequire dirname(__DIR__).'/pricing.php';\nheader('Content-Type: application/json; charset=utf-8');\nheader('Cache-Control: no-store');\nif (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {\n    header('Allow: POST');\n    http_response_code(405);\n    echo '{\"error\":\"Используйте POST\"}';\n    exit;\n}\ntry {\n    $raw = file_get_contents('php://input', false, null, 0, 8193);\n    if ($raw === false || strlen($raw) > 8192) {\n        throw new DomainException('Слишком большой запрос');\n    }\n    $input = json_decode($raw, true, 16, JSON_THROW_ON_ERROR);\n    if (! is_array($input) || array_is_list($input)) {\n        throw new DomainException('Ожидается объект с параметрами');\n    }\n    /** @var array<string, mixed> $input */\n    $params = options($input);\n    echo json_encode(['total_minor' => price($params), 'currency' => 'RUB'], JSON_THROW_ON_ERROR);\n} catch (DomainException|JsonException $e) {\n    http_response_code(422);\n    echo json_encode(['error' => $e->getMessage()], JSON_THROW_ON_ERROR);\n} catch (Throwable) {\n    http_response_code(503);\n    echo '{\"error\":\"Расчёт временно недоступен. Попробуйте ещё раз\"}';\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Успешный ответ для срочного заказа с курьером — {\"total_minor\":203750,\"currency\":\"RUB\"}. Код 422 означает неверные поля или JSON: исправьте ввод. Код 503 означает сбой сервера, а не нулевую стоимость. Для реального публичного сервиса также настройте ограничение частоты запросов на хостинге или в приложении."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "request",
+        "label": "Покажите ответ сервера в форме",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Покажите ответ сервера в форме"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В calculator.html замените комментарий перед закрывающим body на следующий script. Данные собираются через FormData до блокировки полей: отключённые элементы формы в FormData не попадают. Затем fetch отправляет JSON в calculate.php на том же сайте."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пока идёт запрос, поля заблокированы, чтобы показанная цена точно относилась к выбранным параметрам. При ошибке или задержке больше десяти секунд пользователь увидит сообщение и сможет повторить расчёт."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JavaScript · public/calculator.html · перед </body>",
+                  "code": "<script>\n  window.Telegram?.WebApp.ready();\n  const form = document.querySelector('#calculator');\n  const fields = document.querySelector('#fields');\n  const result = document.querySelector('#result');\n  const money = new Intl.NumberFormat('ru-RU', { style: 'currency', currency: 'RUB' });\n  form.oninput = () => { result.textContent = 'Параметры изменены. Рассчитайте заново.'; };\n  form.onsubmit = async (event) => {\n    event.preventDefault();\n    if (fields.disabled) return;\n    const params = Object.fromEntries(new FormData(form));\n    fields.disabled = true;\n    result.textContent = 'Рассчитываем…';\n    const controller = new AbortController();\n    const timer = setTimeout(() => controller.abort(), 10000);\n    try {\n      const response = await fetch('./calculate.php', {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json' },\n        body: JSON.stringify(params),\n        signal: controller.signal\n      });\n      const data = await response.json();\n      if (!response.ok) throw new Error(data.error || 'Ошибка расчёта');\n      result.textContent = 'Предварительно: ' + money.format(data.total_minor / 100);\n    } catch (error) {\n      result.textContent = error.name === 'AbortError'\n        ? 'Сервер не ответил вовремя. Нажмите «Рассчитать стоимость» ещё раз.'\n        : 'Не удалось рассчитать: ' + error.message;\n    } finally {\n      clearTimeout(timer);\n      fields.disabled = false;\n    }\n  };\n</script>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При изменении параметров результат очищается. Поэтому старая сумма не останется рядом с новым количеством. Повторить этот запрос безопасно для данных: calculate.php только вычисляет цену. Сохранение предложения и отправка уведомления будут отдельными действиями с собственной защитой от повторов."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity",
+        "label": "Откройте калькулятор в браузере, затем в Telegram",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Откройте калькулятор в браузере, затем в Telegram"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для локальной проверки из папки calculator выполните команду и откройте http://127.0.0.1:8080/calculator.html. Встроенный сервер PHP нужен только для разработки; для доступа из Telegram разместите файлы на обычном HTTPS-хостинге."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash / PowerShell · из папки calculator",
+                  "code": "php -S 127.0.0.1:8080 -t public"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нажмите «Рассчитать стоимость»: с начальными параметрами ожидается 1350,00 ₽. Выберите срочность и курьера, нажмите ещё раз — 2037,50 ₽. Если видите HTML или 404 вместо JSON, проверьте имя calculate.php, его размещение рядом с calculator.html и работу PHP на хостинге. Открытие HTML двойным щелчком через file:// не запускает сервер."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда браузерный вариант работает, разместите pricing.php выше public, а оба публичных файла — в корне HTTPS-сайта. Например, адрес формы получится https://calculator.example.com/calculator.html. Откройте его с телефона и повторите расчёт."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В "
+                },
+                {
+                  "type": "text",
+                  "text": "BotFather",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://t.me/BotFather"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " создайте отдельного тестового бота или выберите своего. Вызовите /setmenubutton, выберите бота, укажите HTTPS-адрес формы и текст кнопки «Рассчитать». Затем откройте личный чат бота и нажмите эту кнопку. Настройка описана в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации меню Mini Apps",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps#launching-mini-apps-from-the-menu-button"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Теперь та же форма должна открываться внутри Telegram и выдавать те же суммы. Для этого сценария не нужен webhook: кнопка открывает сайт, а форма обращается прямо к вашему PHP. Не отключайте уже работающий webhook существующего бота."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "На этом основной калькулятор готов. Его можно адаптировать под свою услугу и использовать для предварительного расчёта. Следующие разделы понадобятся, если результат нужно превратить в сохраняемое предложение и заявку."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "adapt",
+        "label": "Как заменить печать ремонтом или доставкой",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как заменить печать ремонтом или доставкой"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Меняйте три вещи согласованно: поля формы, допустимые значения в options и формулу price. Разделение полезно именно здесь: HTTP-обработчик и показ ответа можно оставить прежними. Название услуги само по себе не требует другого Telegram API."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сценарий"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Вместо параметров печати"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что важно определить"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ремонт помещения"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Площадь, вид работ, материалы"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что входит в цену за м², есть ли минимальный заказ, нужен ли замер"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ремонт техники"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Тип устройства, неисправность, выезд"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Какие цены фиксированы, а какие можно назвать только после диагностики"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Доставка"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Зона, вес, срочность"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Границы зон, шаг округления веса, какие надбавки сочетаются"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Услуги по времени"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Количество часов и категория специалиста"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Минимальная длительность и оплачиваемый шаг — час или полчаса"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Например, для доставки внутри заранее известных зон формула может быть такой: тариф зоны + доплата за вес + срочность. Таблицу тарифов храните на сервере, а из формы передавайте код зоны и вес. Если стоимость зависит от маршрута, одного поля «расстояние» от клиента недостаточно: расстояние должен подтвердить ваш сервер или доверенный сервис."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для дробных величин выберите единицы заранее: вес можно передавать целыми граммами, время — минутами. Для площади решите, сколько десятичных знаков допустимо и где происходит округление. Ограничения в интерфейсе и PHP должны совпадать."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не обещайте точность, которой нет в исходных данных. Если стоимость ремонта зависит от осмотра, подпишите результат «Предварительная оценка» и объясните, что уточнит менеджер. Для оценки диапазоном изменится и ответ API: интерфейс должен показать нижнюю и верхнюю границы, а не одну случайно выбранную цифру."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После изменения тарифов проверьте несколько расчётов вручную: минимальный заказ, обычный заказ, все надбавки и предельные значения. Для срочности отдельно проверьте, что она применяется к нужной части стоимости."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "offer",
+        "label": "Сохраните предложение, которое клиент сможет подтвердить",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните предложение, которое клиент сможет подтвердить"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Показать цену и сохранить предложение — разные операции. Для предложения понадобятся параметры, рассчитанная сервером сумма, версия тарифа, владелец и срок действия. Например, клиент видит предложение на 2037,50 ₽, действующее сутки. Если тариф изменится через час, сохранённое предложение останется понятным обеим сторонам."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Здесь нужно определить пользователя. Передавайте исходную строку Telegram.WebApp.initData из формы в заголовке X-Telegram-Init-Data. PHP должен проверить её подпись и возраст, затем извлечь Telegram ID. Не берите владельца из поля user_id в запросе и не доверяйте initDataUnsafe без проверки. Подробная реализация приведена в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по проверке initData",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-initdata-auth-php-laravel"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "; официальный алгоритм — в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для сохранения и заявки есть "
+                },
+                {
+                  "type": "text",
+                  "text": "расширенный PHP-пример на GitHub",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/tree/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". В нём public/app.html добавляет кнопки сохранения и отправки, public/api.php проверяет пользователя, а SQLite хранит предложения. Минимальные три файла выше уже работают самостоятельно; расширение можно изучать отдельно."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сохраняемое поле"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Зачем нужно"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "id и user_id"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Находим предложение и проверяем владельца при каждом обращении"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "params, total_minor, tariff"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Восстанавливаем выбранные параметры, цену и версию правил"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "created_at и expires_at"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Показываем срок и отклоняем просроченное подтверждение"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "operation и input_hash"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Узнаём повтор того же сохранения и отклоняем повтор ключа с другими параметрами"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В "
+                },
+                {
+                  "type": "text",
+                  "text": "domain.php",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/domain.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " функция saveQuote повторно вызывает options и price из pricing.php, сохраняет проверенные параметры, сумму и срок. Обработчик выполняет операцию в транзакции; UNIQUE(user_id, operation) не даёт создать два предложения при повторе того же запроса. Полная реализация и схема БД доступны по ссылке."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ключ operation создаётся в браузере для одной попытки сохранить выбранный набор параметров. При сетевом сбое повторяем его же, при изменении формы создаём новый. Так повтор запроса возвращает существующее предложение. Если тот же ключ пришёл с другим набором параметров, сервер отклоняет конфликт вместо незаметной подмены старой записи."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После сохранения покажите именно серверную цену и срок. На кнопку «Передать заявку» отправляйте ID предложения, а не заново присланную пользователем стоимость. Владелец и срок проверяются на сервере, даже если интерфейс уже отключил просроченную кнопку. После истечения срока создаётся новое предложение по текущему тарифу; старое не переписывается."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "manager",
+        "label": "Передайте менеджеру подтверждённую заявку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Передайте менеджеру подтверждённую заявку"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Получение заявки стоит отделить от доставки сообщения. Сначала приложение сохраняет действие клиента, затем отправляет уведомление менеджеру. Если Telegram временно недоступен, заявка остаётся в базе, а интерфейс может честно сообщить: «Заявка сохранена»."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В расширенном примере "
+                },
+                {
+                  "type": "text",
+                  "text": "submitQuote в domain.php",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/domain.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " ищет предложение по ID и владельцу, проверяет срок и в той же транзакции записывает уведомление в outbox — таблицу ожидающих отправки сообщений. Повторное подтверждение уже принятого предложения не добавляет новую заявку. Подключение отправителя описано в "
+                },
+                {
+                  "type": "text",
+                  "text": "README PHP-примера",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/README.md"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "worker.php отправляет уведомление отдельно. Менеджер получает номер заявки, Telegram ID клиента, параметры и предварительную сумму. Если для связи нужен телефон, добавьте отдельное поле или запрос контакта с понятным объяснением; из одного Telegram ID номер телефона не появляется."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запись outbox защищает сохранение намерения отправить сообщение, но не гарантирует единственную доставку при любом сетевом сбое. Подтверждённый лимит Telegram можно повторить после retry_after. При таймауте результат может быть неизвестен: сообщение уже могло попасть в чат. Поэтому такие случаи в примере остаются для проверки, а не повторяются бесконечно."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если у вас уже есть Laravel-приложение, база заказов и очередь уведомлений, используйте их для сохранения предложения и отправки. Отдельная SQLite-база нужна только для самостоятельного учебного примера. Сама формула price и правила проверки владельца от выбора хранилища не меняются."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "run",
+        "label": "Проверьте результат и характерные ошибки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте результат и характерные ошибки"
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что проверить"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ожидаемый результат"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "100 ч/б A4, самовывоз, обычный срок"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "1350,00 ₽ в браузере и в Telegram"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Тот же заказ, срочно и с курьером"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "2037,50 ₽"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Количество 0, 1,5 или 1001; неизвестный формат"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Отказ в расчёте, а не нулевая сумма"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Добавить в HTTP-запрос свою цену"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "PHP считает по своим правилам и игнорирует переданную цену"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Изменить параметры после успешного расчёта"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Прежняя цена скрыта до следующего расчёта"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Отключить сеть и нажать кнопку"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сообщение об ошибке; форма снова доступна для повтора"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сохранение без корректной подписи в расширенной версии"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "401 от api.php; общий calculate.php остаётся публичным"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Отправить чужое или просроченное предложение"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сервер отклоняет действие"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Повторить подтверждение принятого предложения"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Одна заявка и одна запись уведомления"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подмену полей проверяют отдельным HTTP-запросом: браузерная форма может остановить неверное значение раньше PHP. Например, отправьте qty: 0 или size: \"A5\". Такой запрос должен вернуть 422. Если приходит 200 с дешёвой ценой, валидация работает неверно."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если форма открывается снаружи, но не в Telegram, проверьте полный HTTPS-адрес кнопки, сертификат и доступность сайта с телефона. Пустой экран и ошибка PHP — разные проблемы: при 503 смотрите журнал PHP, при отсутствии страницы — адрес и корень сайта."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В расширенной версии 401 обычно означает отсутствие, истечение срока или неверную подпись initData: заново откройте приложение кнопкой нужного бота. Если заявка есть, но сообщения нет, проверьте запуск worker, MANAGER_CHAT_ID и состояние конкретного уведомления. Не предлагайте клиенту создавать новую заявку только из-за задержки уведомления."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Если уведомления отправляются через BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если уведомления отправляются через BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Основной расчёт идёт между формой и вашим PHP-сайтом. BotGate может использоваться для обращений к Telegram при настройке бота и доставке уведомлений; формула, сохранённые предложения и права доступа остаются в приложении. Для подключения используйте "
+                },
+                {
+                  "type": "text",
+                  "text": "документацию",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "руководство по PHP SDK",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/php-telegram-bot-sdk"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". При замене прямого клиента учитывайте авторизацию сервиса и обработку ошибок, а не только адрес API."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "example",
+        "label": "Где посмотреть исходники и расширение на GitHub",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Где посмотреть исходники и расширение на GitHub"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Основной калькулятор можно собрать из трёх файлов выше. Полные исходники и расширение с сохранением, историей и заявками находятся в "
+                },
+                {
+                  "type": "text",
+                  "text": "PHP-папке примера на GitHub",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/tree/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". По ссылкам ниже можно открыть нужный файл в браузере. Ссылки закреплены за версией, разобранной в статье."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Открыть"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что внутри"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "README",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/README.md"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Требования, запуск простой формы и подключение расширенной версии"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "pricing.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/pricing.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Формула и допустимые параметры — общие для обеих форм"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "calculator.html",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/public/calculator.html"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "text": " и "
+                            },
+                            {
+                              "type": "text",
+                              "text": "calculate.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/public/calculate.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Минимальный калькулятор из статьи"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "app.html",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/public/app.html"
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "text": " и "
+                            },
+                            {
+                              "type": "text",
+                              "text": "api.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/public/api.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сохранённые предложения и запросы пользователя"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "domain.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-mini-app-service-calculator/php/domain.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Проверка владельца, срока и повторного подтверждения"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В репозитории примеры сгруппированы по статьям, а внутри — по языкам. Здесь используется examples/telegram-mini-app-service-calculator/php. HTML и JavaScript интерфейса относятся к этому PHP-варианту."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для запуска всей версии клонируйте репозиторий и перейдите в папку PHP. Требования расширения, настройка токена, создание SQLite-базы и запуск уведомлений приведены в README; основной калькулятор не требует этих дополнительных настроек."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash / PowerShell · получение проверенной версии",
+                  "code": "git clone https://github.com/Alexby8/botgate-examples.git\ncd botgate-examples\ngit checkout 0a8ef3505a83641106dd1f6e382fb279b64b3fad\ncd examples/telegram-mini-app-service-calculator/php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это учебное приложение на один сервер, без оплаты и полноценной CRM. Для переноса в свою систему начните с формулы и операций над предложением, затем используйте собственное хранилище и уведомления."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

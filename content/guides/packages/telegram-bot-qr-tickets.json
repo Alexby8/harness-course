@@ -1,0 +1,1201 @@
+[
+  {
+    "slug": "telegram-bot-qr-tickets",
+    "title": "Как выдавать билеты с QR-кодом через Telegram-бота",
+    "seo_title": "Как выдавать билеты с QR-кодом через Telegram-бота",
+    "description": "Регистрация участника, персональный QR-билет и отдельный экран проверяющего: пример на PHP с правами сотрудников и защитой от повторного прохода.",
+    "card_description": "Регистрация участника, персональный QR-билет и отдельный экран проверяющего: пример на PHP с правами сотрудников и защитой от повторного прохода.",
+    "category": "Практика",
+    "topics": "Telegram Bot API · QR-коды · Mini Apps · PHP",
+    "reading_time": "34 минут",
+    "published_at": "2026-11-12",
+    "is_published": true,
+    "sort_order": 56,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера организуем встречу разработчиков. Участник отправляет боту /ticket и получает PNG-билет. Сотрудник открывает отдельный Mini App, сканирует QR, проверяет результат и подтверждает проход. Два одновременных сканирования не должны пропустить по одному билету двух человек. Ниже соберём выдачу, экран проверяющего и серверную проверку в одно небольшое приложение."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "flow",
+        "label": "Как будет работать билет",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как будет работать билет"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "QR — это способ передать строку, а не самостоятельная защита. Если закодировать номер участника и считать любой такой номер действительным, билет легко подобрать. Если после сканирования менять только цвет экрана, второй телефон не узнает о первом проходе. Решение хранится на сервере: непредсказуемый код, состояние билета и атомарная запись использования."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Один участник получает один билет на мероприятие. Повторная команда возвращает тот же код."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сканирование показывает состояние, но не расходует билет. Для прохода сотрудник отдельно нажимает «Пропустить участника»."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сервер при каждом запросе проверяет актуальные права сотрудника и мероприятие."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Успешный проход записывается вместе со временем и Telegram ID проверяющего. Следующий запрос увидит использованный билет."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В примере регистрация бесплатная и без лимита мест: Telegram ID достаточно, чтобы зарегистрировать участника. Для платного события выдавайте билет после подтверждённой оплаты; для ограниченной вместимости добавьте резерв и проверку остатка мест в ту же транзакцию регистрации. Эти условия нельзя заменить наличием QR-картинки."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовим проект и данные",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовим проект и данные"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример рассчитан на один бот и одну базу SQLite на локальном диске сервера, PHP 8.3+ с расширениями PDO SQLite и cURL. Публичный корень сайта — только папка "
+                },
+                {
+                  "type": "text",
+                  "text": "public/",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "; остальные PHP-файлы, база и Composer-зависимости находятся уровнем выше. Для нескольких ботов добавьте идентификатор бота во все ключи уникальности. Не размещайте SQLite на общей сетевой папке нескольких серверов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Дополнительно понадобится GD для PNG и библиотека "
+                },
+                {
+                  "type": "text",
+                  "text": "endroid/qr-code",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Пример использует API ветки 6; ограничение версии в установке сохраняет показанные конструкторы. Бот уже создан в BotFather, сайт доступен по HTTPS. Для проверяющих настройте кнопку меню этого бота на "
+                },
+                {
+                  "type": "text",
+                  "text": "https://example.com/checker.html",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ": она должна открывать страницу именно как Mini App, иначе подписанных данных пользователя не будет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · установка",
+                  "code": "composer require endroid/qr-code:^6.0"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение · пример значений",
+                  "code": "BOT_TOKEN=TOKEN_FROM_BOTFATHER\nBOT_DB_PATH=/srv/tickets/private/bot.sqlite\nWEBHOOK_SECRET=RANDOM_SECRET_FROM_PASSWORD_MANAGER\nWEBHOOK_URL=https://example.com/webhook.php\nTICKET_KEY=SEPARATE_RANDOM_KEY_AT_LEAST_32_CHARACTERS"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это настоящие переменные окружения процесса: настройте их и для PHP-FPM, и для CLI. Обычный PHP не читает "
+                },
+                {
+                  "type": "text",
+                  "text": ".env",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " автоматически. Создайте закрытую папку "
+                },
+                {
+                  "type": "text",
+                  "text": "private/",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", дайте пользователю приложения право записи в неё и запретите доступ из веба. Токен и секрет webhook не должны попадать в браузер, репозиторий или логи. В примерах ниже все команды выполняются из корня отдельного учебного приложения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "TICKET_KEY",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " — отдельный случайный секрет, стабильный на всё время жизни билетов. Он позволяет повторно сформировать код по ID билета, не храня сам код в таблице. В базе остаётся SHA-256 полного кода. Смена ключа без процедуры перевыпуска сделает повторно выданные изображения несовместимыми со старыми хешами; не генерируйте ключ при каждом запуске."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE events (\n    id INTEGER PRIMARY KEY, title TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1\n);\nCREATE TABLE checkers (\n    event_id INTEGER NOT NULL REFERENCES events(id), user_id INTEGER NOT NULL,\n    active INTEGER NOT NULL DEFAULT 1, PRIMARY KEY(event_id, user_id)\n);\nCREATE TABLE tickets (\n    id TEXT PRIMARY KEY, event_id INTEGER NOT NULL REFERENCES events(id),\n    user_id INTEGER NOT NULL, token_hash TEXT NOT NULL UNIQUE,\n    created_at INTEGER NOT NULL, used_at INTEGER, used_by INTEGER,\n    cancelled INTEGER NOT NULL DEFAULT 0, UNIQUE(event_id, user_id)\n);\nCREATE TABLE updates (id INTEGER PRIMARY KEY);\nINSERT INTO events(id, title) VALUES (1, 'Встреча разработчиков');"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction setting(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing setting: '.$name);\n    }\n    return $value;\n}\n\nfunction database(): PDO\n{\n    $path = setting('BOT_DB_PATH');\n    if (!is_file($path)) {\n        throw new RuntimeException('Run init.php first');\n    }\n    $db = new PDO('sqlite:'.$path, options: [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA foreign_keys=ON');\n    $db->exec('PRAGMA busy_timeout=3000');\n    return $db;\n}\n\n/** @param list<int|string|null> $values */\nfunction sql(PDO $db, string $query, array $values = []): PDOStatement\n{\n    $statement = $db->prepare($query);\n    $statement->execute($values);\n    return $statement;\n}\n\n/** @return array<string, int|string|null>|null */\nfunction row(PDOStatement $statement): ?array\n{\n    $result = $statement->fetch(PDO::FETCH_ASSOC);\n    if ($result === false) {\n        return null;\n    }\n    if (!is_array($result)) {\n        throw new RuntimeException('Invalid database row');\n    }\n    foreach ($result as $key => $value) {\n        if (!is_string($key) || !(is_int($value) || is_string($value) || $value === null)) {\n            throw new RuntimeException('Invalid database field');\n        }\n    }\n    return $result;\n}\n\n/**\n * @template T\n * @param callable(): T $action\n * @return T\n */\nfunction atomic(PDO $db, callable $action): mixed\n{\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $result = $action();\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $e) {\n        $db->exec('ROLLBACK');\n        throw $e;\n    }\n}\n\n/** @return array<string, mixed> */\nfunction jsonBody(): array\n{\n    $raw = file_get_contents('php://input', length: 65537);\n    if ($raw === false || strlen($raw) > 65536) {\n        throw new InvalidArgumentException('Request too large');\n    }\n    $data = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);\n    if (!is_array($data) || array_is_list($data)) {\n        throw new InvalidArgumentException('Expected JSON object');\n    }\n    $result = [];\n    foreach ($data as $key => $value) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Invalid JSON key');\n        }\n        $result[$key] = $value;\n    }\n    return $result;\n}\n\n/** @param array<string, mixed> $data */\nfunction reply(array $data, int $status = 200): never\n{\n    http_response_code($status);\n    header('Content-Type: application/json; charset=utf-8');\n    header('Cache-Control: no-store');\n    echo json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n    exit;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nif (PHP_SAPI !== 'cli') {\n    exit(1);\n}\n$path = setting('BOT_DB_PATH');\nif (file_exists($path)) {\n    throw new RuntimeException('Database already exists');\n}\n$schema = file_get_contents(__DIR__.'/schema.sql');\nif ($schema === false) {\n    throw new RuntimeException('Missing schema.sql');\n}\n$db = new PDO('sqlite:'.$path, options: [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n$db->exec('PRAGMA foreign_keys=ON');\n$db->exec($schema);\necho \"Database created\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · создание базы",
+                  "code": "php init.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ожидаемый ответ — "
+                },
+                {
+                  "type": "text",
+                  "text": "Database created",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Повторный запуск специально останавливается, чтобы не пересоздать рабочие таблицы. Время хранится в Unix timestamp; его отображение на телефоне не влияет на сравнение состояния."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "issue",
+        "label": "Зарегистрируем участника и сформируем QR",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Зарегистрируем участника и сформируем QR"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Вынесем правила билета в "
+                },
+                {
+                  "type": "text",
+                  "text": "tickets.php",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". "
+                },
+                {
+                  "type": "text",
+                  "text": "BEGIN IMMEDIATE",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " сериализует короткие операции записи SQLite: параллельные команды одного пользователя не создадут две регистрации, а параллельные подтверждения не увидят билет свободным одновременно. Сетевых запросов внутри транзакции нет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · tickets.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction ticketToken(string $id, string $key): string\n{\n    if (strlen($key) < 32) {\n        throw new RuntimeException('TICKET_KEY must contain at least 32 characters');\n    }\n    return $id.'.'.hash_hmac('sha256', $id, $key);\n}\n\nfunction registerTicket(PDO $db, int $event, int $user, string $key, int $now): string\n{\n    return atomic($db, function () use ($db, $event, $user, $key, $now): string {\n        $exists = row(sql($db, 'SELECT active FROM events WHERE id=?', [$event]));\n        if ($exists === null || (int) $exists['active'] !== 1) {\n            throw new DomainException('Регистрация закрыта');\n        }\n        $ticket = row(sql($db, 'SELECT id FROM tickets WHERE event_id=? AND user_id=?', [$event, $user]));\n        if ($ticket !== null) {\n            return ticketToken((string) $ticket['id'], $key);\n        }\n        $id = bin2hex(random_bytes(16));\n        $token = ticketToken($id, $key);\n        sql($db, 'INSERT INTO tickets(id,event_id,user_id,token_hash,created_at) VALUES(?,?,?,?,?)',\n            [$id, $event, $user, hash('sha256', $token), $now]);\n        return $token;\n    });\n}\n\n/** @return array{status: string, ticket?: string, used_at?: int} */\nfunction checkTicket(PDO $db, int $event, int $checker, string $token, bool $consume, int $now): array\n{\n    return atomic($db, function () use ($db, $event, $checker, $token, $consume, $now): array {\n        $role = row(sql($db, 'SELECT 1 AS allowed FROM checkers c JOIN events e ON e.id=c.event_id\n            WHERE c.event_id=? AND c.user_id=? AND c.active=1 AND e.active=1', [$event, $checker]));\n        if ($role === null) {\n            throw new DomainException('Нет доступа к проверке этого мероприятия');\n        }\n        if (!preg_match('/^[a-f0-9]{32}\\.[a-f0-9]{64}$/D', $token)) {\n            return ['status' => 'invalid'];\n        }\n        $ticket = row(sql($db, 'SELECT * FROM tickets WHERE token_hash=? AND event_id=?',\n            [hash('sha256', $token), $event]));\n        if ($ticket === null || (int) $ticket['cancelled'] === 1) {\n            return ['status' => 'invalid'];\n        }\n        if ($ticket['used_at'] !== null) {\n            return ['status' => 'used', 'ticket' => (string) $ticket['id'], 'used_at' => (int) $ticket['used_at']];\n        }\n        if (!$consume) {\n            return ['status' => 'ready', 'ticket' => (string) $ticket['id']];\n        }\n        sql($db, 'UPDATE tickets SET used_at=?,used_by=? WHERE id=? AND used_at IS NULL AND cancelled=0',\n            [$now, $checker, (string) $ticket['id']]);\n        return ['status' => 'accepted', 'ticket' => (string) $ticket['id'], 'used_at' => $now];\n    });\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Код состоит из случайного ID и HMAC. В нём нет имени, телефона или номера заказа. Читатель QR узнает только непрозрачную строку; доступ к серверной проверке по-прежнему требует роли сотрудника. Не вставляйте код в публичный URL, метрики или журнал запросов."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · telegram.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/**\n * @param array<string, mixed> $params\n * @return array{state: string, result?: mixed, code?: int, retry_after?: int}\n */\nfunction telegram(string $method, array $params, bool $multipart = false): array\n{\n    $curl = curl_init('https://api.telegram.org/bot'.setting('BOT_TOKEN').'/'.$method);\n    curl_setopt_array($curl, [\n        CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 8,\n        CURLOPT_POSTFIELDS => $multipart ? $params : json_encode($params, JSON_THROW_ON_ERROR),\n        CURLOPT_HTTPHEADER => $multipart ? [] : ['Content-Type: application/json'],\n    ]);\n    $raw = curl_exec($curl);\n    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    if (!is_string($raw) || $status >= 500) {\n        return ['state' => 'unknown'];\n    }\n    $data = json_decode($raw, true);\n    if (!is_array($data)) {\n        return ['state' => 'unknown'];\n    }\n    if (($data['ok'] ?? null) === true) {\n        return ['state' => 'ok', 'result' => $data['result'] ?? null];\n    }\n    if (($data['ok'] ?? null) !== false || !is_int($data['error_code'] ?? null)) {\n        return ['state' => 'unknown'];\n    }\n    $parameters = $data['parameters'] ?? null;\n    $delay = is_array($parameters) ? ($parameters['retry_after'] ?? null) : null;\n    return ['state' => 'rejected', 'code' => $data['error_code'],\n        'retry_after' => is_int($delay) && $delay > 0 ? $delay : 60];\n}\n\n/** @return array<string, mixed> */\nfunction incomingUpdate(): array\n{\n    $secret = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';\n    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !is_string($secret)\n        || !hash_equals(setting('WEBHOOK_SECRET'), $secret)) {\n        reply(['error' => 'Forbidden'], 403);\n    }\n    return jsonBody();\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/telegram.php';\nrequire dirname(__DIR__).'/tickets.php';\nrequire dirname(__DIR__).'/vendor/autoload.php';\n\n$update = incomingUpdate();\n$message = $update['message'] ?? null;\n$chat = is_array($message) ? ($message['chat'] ?? null) : null;\n$from = is_array($message) ? ($message['from'] ?? null) : null;\nif (!is_int($update['update_id'] ?? null) || !is_array($message) || !is_array($chat)\n    || !is_array($from) || ($chat['type'] ?? '') !== 'private'\n    || !is_int($from['id'] ?? null) || ($chat['id'] ?? null) !== $from['id']) {\n    reply(['ok' => true]);\n}\n$user = $from['id'];\n$db = database();\nif (($message['text'] ?? '') !== '/ticket') {\n    reply(['ok' => true]);\n}\ntry {\n    $token = registerTicket($db, 1, $user, setting('TICKET_KEY'), time());\n} catch (DomainException) {\n    reply(['ok' => true]);\n}\n$png = (new Endroid\\QrCode\\Writer\\PngWriter())->write(\n    new Endroid\\QrCode\\QrCode(data: $token, size: 400, margin: 16)\n)->getString();\n// A repeated webhook must not send another document automatically.\n$claimed = sql($db, 'INSERT OR IGNORE INTO updates(id) VALUES(?)', [$update['update_id']])->rowCount();\nif ($claimed === 0) {\n    reply(['ok' => true]);\n}\n$result = telegram('sendDocument', [\n    'chat_id' => $user,\n    'document' => new CURLStringFile($png, 'ticket.png', 'image/png'),\n    'caption' => 'Билет на встречу разработчиков. Покажите QR на входе. Копия билета не даёт второго прохода.',\n], true);\nif ($result['state'] !== 'ok') {\n    error_log('ticket_delivery_'.$result['state'].' update='.$update['update_id']);\n}\nreply(['ok' => true]);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PNG передаётся через "
+                },
+                {
+                  "type": "text",
+                  "text": "CURLStringFile",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " непосредственно из памяти, без публичной папки билетов и без внешнего сервиса генерации QR. Команда "
+                },
+                {
+                  "type": "text",
+                  "text": "/ticket",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " из личного диалога регистрирует участника и отправляет документ. Сохранение файла Telegram не означает, что человек прочитал сообщение или пришёл на мероприятие."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Таблица "
+                },
+                {
+                  "type": "text",
+                  "text": "updates",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " запрещает повторную отправку документа при автоматическом повторе одного webhook. Если процесс остановился после фиксации update, но до отправки, или ответ Telegram потерян, автоматического повтора нет: участник запрашивает "
+                },
+                {
+                  "type": "text",
+                  "text": "/ticket",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " ещё раз и получает тот же билет. Это сознательная простая схема восстановления; журнал доставки и очередь понадобятся, если организатору нужно самому отслеживать каждую неудачную выдачу."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Зарегистрируйте прямой webhook Telegram следующим CLI-скриптом. Здесь принимаются только обновления "
+                },
+                {
+                  "type": "text",
+                  "text": "message",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "; если у бота уже есть обработчики других событий, сохраните их в общем обработчике и в "
+                },
+                {
+                  "type": "text",
+                  "text": "allowed_updates",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", вместо установки второго webhook. Один бот не использует одновременно этот webhook и "
+                },
+                {
+                  "type": "text",
+                  "text": "getUpdates",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-webhook.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/telegram.php';\nif (PHP_SAPI !== 'cli') {\n    exit(1);\n}\n$url = setting('WEBHOOK_URL');\nif (!str_starts_with($url, 'https://')) {\n    throw new RuntimeException('HTTPS webhook required');\n}\n$result = telegram('setWebhook', [\n    'url' => $url, 'secret_token' => setting('WEBHOOK_SECRET'),\n    'allowed_updates' => ['message'],\n]);\nif ($result['state'] !== 'ok') {\n    throw new RuntimeException('Webhook not confirmed');\n}\necho \"Webhook configured\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · включение webhook",
+                  "code": "php setup-webhook.php"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "permissions",
+        "label": "Назначим проверяющего на мероприятие",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Назначим проверяющего на мероприятие"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не используйте пароль в URL и не доверяйте полю "
+                },
+                {
+                  "type": "text",
+                  "text": "is_admin",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " из JavaScript. Таблица "
+                },
+                {
+                  "type": "text",
+                  "text": "checkers",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " связывает конкретный Telegram ID с конкретным мероприятием. В демонстрации ID мероприятия равен 1 и задан на сервере; посетитель не может изменить его в POST."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · checker-admin.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nif (PHP_SAPI !== 'cli' || !ctype_digit($argv[1] ?? '') || !in_array($argv[2] ?? '', ['on', 'off'], true)) {\n    exit(\"Usage: php checker-admin.php TELEGRAM_USER_ID on|off\\n\");\n}\nsql(database(), 'INSERT INTO checkers(event_id,user_id,active) VALUES(1,?,?)\n    ON CONFLICT(event_id,user_id) DO UPDATE SET active=excluded.active',\n    [(int) $argv[1], $argv[2] === 'on' ? 1 : 0]);\necho \"Checker updated\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · выдать и отозвать право",
+                  "code": "php checker-admin.php 123456789 on\n# После смены или при потере устройства:\nphp checker-admin.php 123456789 off"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Замените число на ID сотрудника, проверенный по подписанному событию вашего бота. Это не username и не ID чата группы. Участник может открыть ту же страницу, но API ответит 403. Отзыв роли действует и для уже открытого экрана — сервер читает права заново."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запросы страницы передают исходную строку "
+                },
+                {
+                  "type": "text",
+                  "text": "Telegram.WebApp.initData",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " в заголовке "
+                },
+                {
+                  "type": "text",
+                  "text": "X-Telegram-Init-Data",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Сервер проверяет HMAC и срок действия и берёт Telegram ID только из подписанных данных. В этом небольшом примере нет cookie-сессии: каждый POST заново авторизуется, поэтому отдельный CSRF-токен не нужен. Не включайте разрешающий CORS, не переносите авторизацию в query string и не сохраняйте этот заголовок в журналах."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Через десять минут после запуска сервер попросит открыть Mini App заново. Это выбранный срок нашего примера, а не лимит Telegram. Для долгой работы обменяйте проверенный "
+                },
+                {
+                  "type": "text",
+                  "text": "initData",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " на серверную сессию с CSRF-защитой по "
+                },
+                {
+                  "type": "text",
+                  "text": "отдельному руководству",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-initdata-auth-php-laravel"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Проверка подписи подтверждает пользователя, но не назначает ему права сотрудника."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · auth.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction miniUser(string $raw, string $token, int $now): int\n{\n    if ($raw === '' || strlen($raw) > 16384) {\n        throw new InvalidArgumentException('Open Mini App again');\n    }\n    $fields = [];\n    foreach (explode('&', $raw) as $part) {\n        $pair = explode('=', $part, 2);\n        if (count($pair) !== 2) {\n            throw new InvalidArgumentException('Invalid initData');\n        }\n        $key = urldecode($pair[0]);\n        if (array_key_exists($key, $fields)) {\n            throw new InvalidArgumentException('Duplicate initData field');\n        }\n        $fields[$key] = urldecode($pair[1]);\n    }\n    $hash = $fields['hash'] ?? '';\n    unset($fields['hash']);\n    ksort($fields, SORT_STRING);\n    $lines = [];\n    foreach ($fields as $key => $value) {\n        $lines[] = $key.'='.$value;\n    }\n    $secret = hash_hmac('sha256', $token, 'WebAppData', true);\n    $expected = hash_hmac('sha256', implode(\"\\n\", $lines), $secret);\n    $date = $fields['auth_date'] ?? '';\n    if (!preg_match('/^[a-f0-9]{64}$/D', $hash) || !hash_equals($expected, $hash)\n        || !ctype_digit($date) || (int) $date < $now - 600 || (int) $date > $now + 30) {\n        throw new InvalidArgumentException('Expired or invalid initData');\n    }\n    $user = json_decode($fields['user'] ?? '', true, 16, JSON_THROW_ON_ERROR);\n    if (!is_array($user) || !is_int($user['id'] ?? null) || $user['id'] < 1) {\n        throw new InvalidArgumentException('Missing Telegram user');\n    }\n    return $user['id'];\n}\n\nfunction authenticatedUser(): int\n{\n    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {\n        reply(['error' => 'POST required'], 405);\n    }\n    $raw = $_SERVER['HTTP_X_TELEGRAM_INIT_DATA'] ?? '';\n    try {\n        return miniUser(is_string($raw) ? $raw : '', setting('BOT_TOKEN'), time());\n    } catch (InvalidArgumentException|JsonException) {\n        reply(['error' => 'Откройте Mini App заново'], 401);\n    }\n}"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "checker",
+        "label": "Сделаем отдельный экран сканирования",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сделаем отдельный экран сканирования"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-qr-tickets/ticket-check.jpg",
+                  "alt": "Учебный QR-код и три результата проверки: билет действителен, проход записан, билет уже использован.",
+                  "caption": "Фрагменты checker.html с тестовыми ответами сервера. Проверка кода не расходует билет: проход фиксируется отдельной кнопкой. QR на иллюстрации не является действующим билетом.",
+                  "width": 1080,
+                  "height": 979,
+                  "mobile_src": "/images/guides/telegram-bot-qr-tickets/ticket-check-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1698
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/check-api.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/auth.php';\nrequire dirname(__DIR__).'/tickets.php';\n$user = authenticatedUser();\ntry {\n    $body = jsonBody();\n    $action = $body['action'] ?? null;\n    $token = $body['token'] ?? null;\n    if (!is_string($token) || strlen($token) > 120 || !in_array($action, ['preview', 'consume'], true)) {\n        reply(['error' => 'Неверный запрос'], 422);\n    }\n    reply(checkTicket(database(), 1, $user, $token, $action === 'consume', time()));\n} catch (DomainException $e) {\n    reply(['error' => $e->getMessage()], 403);\n} catch (InvalidArgumentException|JsonException) {\n    reply(['error' => 'Неверный JSON'], 422);\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "HTML и JavaScript · public/checker.html",
+                  "code": "<!doctype html>\n<html lang=\"ru\"><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Проверка билетов</title>\n<script src=\"https://telegram.org/js/telegram-web-app.js\"></script>\n<style>\nbody{font:18px system-ui;margin:24px;color:var(--tg-theme-text-color,#111);background:var(--tg-theme-bg-color,#fff)}\nbutton,input{display:block;width:100%;box-sizing:border-box;margin:16px 0;padding:14px;font:inherit}\n#result{overflow-wrap:anywhere}button{min-height:48px}\n</style>\n<h1>Встреча разработчиков</h1>\n<button id=\"scan\">Сканировать QR</button>\n<input id=\"token\" aria-label=\"Код билета\" placeholder=\"Или вставьте код со сканера\">\n<button id=\"preview\">Проверить</button>\n<p id=\"result\" role=\"status\" aria-live=\"polite\"></p>\n<button id=\"consume\" disabled>Пропустить участника</button>\n<script>\nconst tg = window.Telegram?.WebApp;\nconst el = id => document.getElementById(id);\nlet checked = '', busy = false;\nasync function request(action) {\n  if (busy) return;\n  busy = true;\n  el('token').disabled = true;\n  el('consume').disabled = true;\n  const token = action === 'consume' ? checked : el('token').value.trim();\n  checked = '';\n  try {\n    const response = await fetch('check-api.php', {\n      method:'POST', headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg?.initData || ''},\n      body:JSON.stringify({action, token})\n    });\n    const data = await response.json();\n    if (!response.ok) throw new Error(data.error || 'Ошибка проверки');\n    const messages = {ready:'Билет действителен. Подтвердите проход.', accepted:'Проход записан. Пропустите участника.',\n      used:'Билет уже использован. Повторный проход запрещён.', invalid:'Билет не найден или отменён.'};\n    el('result').textContent = messages[data.status] || 'Неизвестный ответ';\n    if (data.used_at) el('result').textContent += ' Время: ' + new Date(data.used_at * 1000).toLocaleString();\n    if (data.status === 'ready') checked = token;\n  } catch (error) {\n    el('result').textContent = error.message + '. При потере связи проверьте этот же билет снова.';\n  } finally {\n    busy = false;\n    el('token').disabled = false;\n    el('consume').disabled = !checked;\n  }\n}\nel('preview').onclick = () => request('preview');\nel('consume').onclick = () => request('consume');\nel('token').oninput = () => {checked = ''; el('consume').disabled = true;};\nel('scan').onclick = () => {\n  if (busy) return;\n  if (!tg?.isVersionAtLeast('6.4')) {\n    el('result').textContent = 'Обновите Telegram или вставьте код с внешнего сканера.';\n    return;\n  }\n  tg.showScanQrPopup({text:'Наведите камеру на билет'}, value => {\n    el('token').value = value;\n    request('preview');\n    return true;\n  });\n};\ntg?.ready();\n</script></html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Камера запускается нативным "
+                },
+                {
+                  "type": "text",
+                  "text": "showScanQrPopup",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". На неподдерживаемом клиенте остаётся поле для текста от внешнего сканера; оно проходит ту же серверную проверку. Возврат "
+                },
+                {
+                  "type": "text",
+                  "text": "true",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " из callback закрывает сканер. Положительная предварительная проверка только включает кнопку подтверждения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Результат «Проход записан» сотрудник показывает участнику после ответа сервера. Если два сотрудника предварительно увидели свободный билет, подтвердить проход сможет один: второй получит время предыдущего использования. При сетевом обрыве нельзя разрешать вход по локальному зелёному индикатору. Повторно проверьте билет; при статусе used сверьте время и журнал, чтобы понять, успел ли пройти ваш запрос."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "operations",
+        "label": "Отмена, копии и работа на входе",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отмена, копии и работа на входе"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отмена билета — изменение "
+                },
+                {
+                  "type": "text",
+                  "text": "cancelled",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " на 1 по его внутреннему ID в закрытой админке или консоли. Не удаляйте использованные билеты: иначе потеряется история. Для повторного входа нужна отдельная политика выходов и возвращений, а не обнуление "
+                },
+                {
+                  "type": "text",
+                  "text": "used_at",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " сотрудником на телефоне."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · отмена конкретного билета",
+                  "code": "UPDATE tickets SET cancelled = 1 WHERE id = 'TICKET_ID_FROM_ADMIN';\nSELECT id, used_at, used_by, cancelled FROM tickets WHERE event_id = 1;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Защита от повторного использования не доказывает личность предъявителя: первый обладатель копии действительного QR может пройти. Если билет строго именной, добавьте проверяемое имя и регламент сверки на входе, выводя минимум данных только авторизованному сотруднику. Не публикуйте список участников вместе с QR."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для входа нужен интернет и общая серверная база. Два независимых офлайн-списка не смогут надёжно исключить одновременный проход по копиям. До мероприятия проверьте сеть, вход сотрудника и чтение билета с экрана с пониженной яркостью; оставьте поля вокруг QR и не накладывайте декоративный логотип на код."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверим полный сценарий",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверим полный сценарий"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "В отдельном тестовом боте отправьте /ticket дважды. Изображения могут прийти два раза, запись tickets должна быть одна и код одинаковый."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте checker.html как Mini App обычным участником: проверка должна вернуть 403. После назначения сотрудника та же операция разрешена."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сканируйте билет, затем закройте экран без подтверждения. used_at остаётся NULL."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Подтвердите один код на двух телефонах почти одновременно. Только один ответ accepted; второй — used."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отмените ещё не использованный билет: экран должен вернуть invalid. Измените один символ QR — результат тот же."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отзовите роль сотрудника при открытом экране. Следующий POST должен вернуть 403; просроченный initData — 401."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При ошибке блокировки SQLite запрос должен завершиться ошибкой, а экран — попросить повторную проверку. Не возвращайте «Пропущен» из обработчика исключения. Если нагрузка перерастёт одну локальную SQLite-базу, перенесите транзакции на серверную БД с блокировкой строки; простая замена DSN без пересмотра "
+                },
+                {
+                  "type": "text",
+                  "text": "BEGIN IMMEDIATE",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " не подходит."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Если сообщения отправляются через BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если сообщения отправляются через BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate может обслуживать запросы отправки билетов; регистрацию, права проверяющих и погашение сохраняйте в своём приложении. Для файлов используйте документированный multipart-транспорт из "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". При переходе с прямого webhook на webhook сервиса замените проверку подлинности по "
+                },
+                {
+                  "type": "text",
+                  "text": "контракту webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#webhook"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", а не переносите заголовок Telegram по аналогии."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Технические источники: "
+                },
+                {
+                  "type": "text",
+                  "text": "генерация QR в Endroid",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/endroid/qr-code"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "сканер и проверка данных Mini App",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps#initializing-mini-apps"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "sendDocument",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#senddocument"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Разбор неопределённого результата отправки — в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве о дублях",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-duplicate-messages"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

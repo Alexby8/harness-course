@@ -1,0 +1,1103 @@
+[
+  {
+    "slug": "telegram-channel-paid-subscription-stars",
+    "title": "Как сделать платную подписку на закрытый Telegram-канал",
+    "seo_title": "Как сделать платную подписку на закрытый Telegram-канал",
+    "description": "Платный канал в Stars: PHP-пример создания подписной ссылки, бот с проверкой доступа, хранение предложений, продление и обработка обращений подписчиков.",
+    "card_description": "Платный канал в Stars: PHP-пример создания подписной ссылки, бот с проверкой доступа, хранение предложений, продление и обработка обращений подписчиков.",
+    "category": "Практика",
+    "topics": "Telegram · Stars · Каналы · PHP",
+    "reading_time": "27 минут",
+    "published_at": "2026-11-18",
+    "is_published": true,
+    "sort_order": 67,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера откроем закрытый канал с еженедельными разборами для участников клуба. Вход стоит 300 Stars за 30 дней. Пользователь получает ссылку от бота, оплачивает подписку в Telegram и попадает в канал. Бот объясняет условия и помогает проверить доступ, а механизм подписки обслуживает Telegram."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "mechanism",
+        "label": "Выберите подписную ссылку для канала",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выберите подписную ссылку для канала"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для этого сценария используем createChatSubscriptionInviteLink. Он предназначен для канала; боту нужны права администратора can_invite_users. Период — 2592000 секунд, цена — от 1 до 10000 Stars. Это параметры "
+                },
+                {
+                  "type": "text",
+                  "text": "метода Bot API",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#createchatsubscriptioninvitelink"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Оплата подписной ссылки поступает на баланс канала. После оплаты Telegram добавляет пользователя и обслуживает продление. Схема отличается от покупки услуги по invoice бота: не создавайте второй счёт поверх платной ссылки и не ожидайте от неё платёжный процесс своего магазина. Описание различий есть в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации подписок Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/api/subscriptions"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если продаётся доступ к функции приложения, отдельному файлу или личной консультации, потребуется другой сценарий. Его разбирает "
+                },
+                {
+                  "type": "text",
+                  "text": "статья об оплате цифрового доступа в Stars",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-stars-digital-access"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Здесь строим именно платный вход в канал."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "prepare",
+        "label": "Подготовьте канал и предложение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте канал и предложение"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Создайте отдельный закрытый канал для теста и добавьте бота администратором с правом приглашать участников. Получите числовой chat_id канала."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте все действующие приглашения. Обычная бесплатная ссылка или ручное добавление участника обходит выбранный платный вход. Решите, кому нужны исключения, и фиксируйте их отдельно."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сформулируйте предложение: название клуба, содержание, 300 Stars за 30 дней, повторное списание при продлении и способ обратиться в поддержку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Определите правила для уже добавленных участников. Создание платной ссылки само по себе не превращает всех прежних участников в плательщиков."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Платная ссылка — вход в канал, а не персональный секрет конкретного покупателя. Не используйте факт выдачи ссылки пользователю как доказательство покупки. Для аналитики достаточно хранить версию предложения и канал распространения; реальный доступ проверяется отдельно."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Файлы и подготовка PHP-примера",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Файлы и подготовка PHP-примера"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример рассчитан на PHP 8.3+ с cURL, mbstring, PDO и pdo_sqlite. Дополнительные Composer-пакеты не нужны. SQLite упрощает пробный запуск; для нескольких серверов используйте общую БД и блокировки, подходящие её драйверу. Здесь каждый сценарий — отдельная папка со своей БД, не смешивайте одноимённые common.php из разных статей."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "public/webhook.php\ncommon.php\nvalues.php\nschema.sql\ninit.php\ncreate-offer.php\nbot.php\nworker.php\nsupport-reply.php\nsetup-webhook.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · значения-примеры",
+                  "code": "APP_DB=/private/channel-bot.sqlite\nBOT_TOKEN=TOKEN_FROM_BOTFATHER\nCHANNEL_ID=-1001234567890\nACTIVE_OFFER=club-300\nWEBHOOK_SECRET=RANDOM_HEX_64\nWEBHOOK_URL=https://example.com/webhook.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задайте настоящие значения в окружении процесса. Обычный PHP не читает .env автоматически. Не размещайте токены, базу или файлы блокировок в public и не сохраняйте их в Git. Для WEBHOOK_SECRET сгенерируйте случайную строку из допустимых Telegram символов; её длина в примере — 64 шестнадцатеричных знака."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "values.php проверяет типы на границе JSON и БД. Некорректные данные прерывают операцию; они не должны превращаться в ложный успешный результат."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · values.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @return array<string,mixed>\n */\nfunction objectValue(mixed $value): array\n{\n    if (!is_array($value)) {\n        throw new InvalidArgumentException('Expected object');\n    }\n    $result = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected object keys');\n        }\n        $result[$key] = $item;\n    }\n    return $result;\n}\n\nfunction stringValue(mixed $value): string\n{\n    if (!is_string($value)) {\n        throw new InvalidArgumentException('Expected string');\n    }\n    return $value;\n}\n\nfunction intValue(mixed $value): int\n{\n    if (!is_int($value) && !is_string($value)) {\n        throw new InvalidArgumentException('Expected integer');\n    }\n    $integer = filter_var($value, FILTER_VALIDATE_INT);\n    if ($integer === false) {\n        throw new InvalidArgumentException('Invalid integer');\n    }\n    return $integer;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/values.php';\n\nfunction envRequired(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing environment: '.$name);\n    }\n    return $value;\n}\n\n/**\n * @param array<string, mixed>|null $data\n * \n * @param list<string> $headers\n * \n * @return array{status:int, body:array<string, mixed>}\n */\nfunction jsonHttp(string $method, string $url, ?array $data = null, array $headers = []): array\n{\n    if ($method === '') {\n        throw new InvalidArgumentException('Empty HTTP method');\n    }\n    $curl = curl_init($url);\n    if ($curl === false) {\n        throw new RuntimeException('Cannot initialize HTTP client');\n    }\n    curl_setopt_array($curl, [\n        CURLOPT_CUSTOMREQUEST => $method,\n        CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 5,\n        CURLOPT_TIMEOUT => 40,\n        CURLOPT_FOLLOWLOCATION => false,\n        CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json', ...$headers],\n    ]);\n    if ($data !== null) {\n        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));\n    }\n    $raw = curl_exec($curl);\n    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    if (!is_string($raw)) {\n        throw new RuntimeException('Transport result unknown');\n    }\n    if ($status === 204) {\n        return ['status' => 204, 'body' => []];\n    }\n    $body = objectValue(json_decode($raw, true, 64, JSON_THROW_ON_ERROR));\n    return ['status' => $status, 'body' => $body];\n}\n\n/**\n * @param array<string, mixed> $params\n * @return array<string, mixed>\n */\nfunction telegram(string $method, array $params): array\n{\n    $response = jsonHttp('POST', 'https://api.telegram.org/bot'.envRequired('BOT_TOKEN').'/'.$method, $params);\n    if ($response['status'] !== 200 || ($response['body']['ok'] ?? false) !== true) {\n        throw new RuntimeException('Telegram call failed; inspect HTTP/error_code without logging token');\n    }\n    return $response['body'];\n}\n\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.envRequired('APP_DB'), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA busy_timeout=5000');\n    return $db;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE IF NOT EXISTS inbox (\n    update_id INTEGER PRIMARY KEY,\n    payload TEXT NOT NULL,\n    state TEXT NOT NULL DEFAULT 'pending',\n    created_at INTEGER NOT NULL,\n    error_kind TEXT\n);\nCREATE TABLE IF NOT EXISTS offers (\n    code TEXT PRIMARY KEY,\n    chat_id TEXT NOT NULL,\n    price INTEGER NOT NULL,\n    invite_link TEXT,\n    state TEXT NOT NULL,\n    created_at INTEGER NOT NULL\n);\nCREATE TABLE IF NOT EXISTS support (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    user_id INTEGER NOT NULL,\n    offer_code TEXT NOT NULL,\n    state TEXT NOT NULL DEFAULT 'open',\n    details TEXT NOT NULL DEFAULT '',\n    created_at INTEGER NOT NULL\n);\nCREATE UNIQUE INDEX IF NOT EXISTS open_support ON support(user_id) WHERE state='open';"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$sql = file_get_contents(__DIR__.'/schema.sql');\nif ($sql === false) {\n    throw new RuntimeException('Schema missing');\n}\ndatabase()->exec($sql);\necho \"Database ready\\n\";"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "create",
+        "label": "Создайте ссылку один раз",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте ссылку один раз"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создание ссылки вынесено в CLI-команду администратора. В таблице offers хранится версия предложения, канал, цена и статус создания. Обработчик /start только читает готовую ссылку и не создаёт новые приглашения. Это позволяет отдельно проверить предложение до выдачи клиентам."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · create-offer.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$db = database();\n$code = $argv[1] ?? '';\n$price = filter_var($argv[2] ?? '', FILTER_VALIDATE_INT);\nif (!preg_match('/^[a-z0-9-]{1,32}$/D', $code) || $price === false || $price < 1 || $price > 10000) {\n    throw new RuntimeException('Usage: php create-offer.php club-300 300');\n}\n$channel = envRequired('CHANNEL_ID');\n// Уникальный code не позволяет повторно создать ссылку незаметно.\n$db->prepare(\"INSERT INTO offers(code,chat_id,price,state,created_at) VALUES(?,?,?,'creating',?)\")\n    ->execute([$code,$channel,$price,time()]);\ntry {\n    $reply = telegram('createChatSubscriptionInviteLink', [\n        'chat_id' => $channel,'name' => $code,'subscription_period' => 2592000,'subscription_price' => $price,\n    ]);\n    $link = objectValue($reply['result'] ?? [])['invite_link'] ?? null;\n    if (!is_string($link) || !str_starts_with($link, 'https://t.me/')) {\n        throw new RuntimeException('Missing link');\n    }\n    $db->prepare(\"UPDATE offers SET invite_link=?,state='active' WHERE code=?\")->execute([$link,$code]);\n    echo \"Offer saved: \".$code.\"\\n\";\n} catch (Throwable $error) {\n    $db->prepare(\"UPDATE offers SET state='review' WHERE code=?\")->execute([$code]);\n    throw $error;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · создание первого предложения",
+                  "code": "php init.php\nphp create-offer.php club-300 300"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Успех — сообщение Offer saved и строка offers.state=active. Проверьте ссылку из offers.invite_link на тестовом аккаунте: открывается нужный канал и Telegram показывает 300 Stars за период. Сам скрипт ничего не списывает с пользователя; реальная оплата требует отдельного подтверждения в Telegram."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Состояние creating записывается до API-вызова. При ошибке будет review, а повтор с тем же code остановится на уникальном ключе. Сначала проверьте список приглашений канала у администратора: после потерянного ответа ссылка могла быть создана. Если нашли её, сверьте канал, цену, период и имя, затем восстановите именно эту запись; не удаляйте блокировку и не запускайте создание вслепую."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · проверка предложения",
+                  "code": "SELECT code,chat_id,price,state,invite_link FROM offers WHERE code='club-300';"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Параметры предложения хранятся на сервере. Не принимайте стоимость или chat_id из callback пользователя. Для нового предложения создайте новый code, протестируйте его и только потом поменяйте ACTIVE_OFFER. Старые строки сохраняйте для поддержки."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "renewal",
+        "label": "Объясните продление и отмену",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Объясните продление и отмену"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Период в 30 дней не равен календарному месяцу: не обещайте списание всегда первого числа. Telegram автоматически продлевает подписку за Stars; пользователь управляет ею в интерфейсе Telegram. Если средств не хватает или продление отключено, не объявляйте следующий период оплаченным. "
+                },
+                {
+                  "type": "text",
+                  "text": "Жизненный цикл подписки",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/api/subscriptions"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " описан отдельно от Bot API."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Текст перед оплатой для нашего примера: «Доступ к закрытому каналу клуба — 300 Stars на 30 дней. Подписка продлевается автоматически при доступном балансе и включённом продлении. Управлять подпиской можно в Telegram. По вопросам доступа нажмите Помощь с подпиской». Проверьте этот путь на используемых клиентах: названия экранов могут различаться."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выход из канала и отмена дальнейшего продления — разные действия. Если оплаченный период ещё действует, Telegram поддерживает повторный вход без новой оплаты. Не отправляйте ушедшему участнику новый счёт автоматически: попросите открыть исходное приглашение и проверить подписку в Telegram."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Боту не нужен собственный таймер списаний или ежедневный массовый ban участников. Он обслуживает поддержку и проверку членства. Самостоятельное исключение по устаревшей локальной дате может лишить доступа человека, у которого подписка уже продлилась."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "membership",
+        "label": "Проверяйте доступ, не подменяя его платёжным отчётом",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяйте доступ, не подменяя его платёжным отчётом"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В bot.php реализованы /start, /access и /help, а также кнопки проверки и помощи. Для личного чата user_id берётся из самого события; у callback дополнительно проверяется совпадение from.id с получателем сообщения. Произвольный Telegram ID из пользовательского текста здесь не принимается."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · bot.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @param array<string,mixed> $member\n */\nfunction accessText(array $member): string\n{\n    $status = $member['status'] ?? '';\n    if ($status === 'creator' || $status === 'administrator') {\n        return 'Доступ есть по административной роли.';\n    }\n    if ($status === 'member') {\n        $until = $member['until_date'] ?? null;\n        if (is_int($until) && $until > 0) {\n            $date = (new DateTimeImmutable('@'.$until))->setTimezone(new DateTimeZone('Europe/Moscow'));\n            return 'Вы состоите в канале. Telegram сообщает срок подписки: '.$date->format('d.m.Y H:i').' (Москва).';\n        }\n        return 'Вы состоите в канале. Срок оплаченного периода в ответе не указан.';\n    }\n    if ($status === 'left' || $status === 'kicked') {\n        return 'Сейчас доступа к каналу нет. Если вы уже платили, проверьте исходную ссылку и обратитесь в поддержку: /help. Не оплачивайте повторно до проверки.';\n    }\n    return 'Не удалось однозначно определить доступ. Обратитесь в поддержку: /help.';\n}\n\n/**\n * @param array<string,mixed> $update\n */\nfunction handleUpdate(PDO $db, array $update): void\n{\n    $callback = $update['callback_query'] ?? null;\n    $message = is_array($callback) ? ($callback['message'] ?? null) : ($update['message'] ?? null);\n    if (!is_array($message) || !is_array($message['chat'] ?? null) || ($message['chat']['type'] ?? null) !== 'private'\n        || !is_int($message['chat']['id'] ?? null)) {\n        return;\n    }\n    $userId = $message['chat']['id'];\n    if (is_array($callback) && (!is_array($callback['from'] ?? null) || ($callback['from']['id'] ?? null) !== $userId)) {\n        return;\n    }\n    $action = is_array($callback) ? ($callback['data'] ?? '') : ($message['text'] ?? '');\n    if (!is_string($action)) {\n        return;\n    }\n    if (is_array($callback) && is_string($callback['id'] ?? null)) {\n        // Просроченное подтверждение кнопки не должно отменять проверку доступа.\n        try {\n            telegram('answerCallbackQuery', ['callback_query_id' => $callback['id']]);\n        } catch (Throwable) {\n        }\n    }\n    $query = $db->prepare(\"SELECT * FROM offers WHERE code=? AND state='active'\");\n    $query->execute([envRequired('ACTIVE_OFFER')]);\n    $offer = $query->fetch(PDO::FETCH_ASSOC);\n    if (!is_array($offer)) {\n        throw new RuntimeException('Active offer not configured');\n    }\n    $price = intValue($offer['price']);\n    $reply = [];\n    if ($action === '/start') {\n        $text = 'Закрытый клуб: '.$price.' Stars за 30 дней. Подписка продлевается автоматически при доступном балансе и включённом продлении. Управление подпиской — в Telegram. /help — поддержка.';\n        $reply = ['inline_keyboard' => [\n            [['text' => 'Вступить — '.$price.' Stars','url' => $offer['invite_link']]],\n            [['text' => 'Проверить доступ','callback_data' => 'access'],['text' => 'Помощь','callback_data' => 'help']],\n        ]];\n    } elseif (in_array($action, ['/access','access'], true)) {\n        try {\n            $result = telegram('getChatMember', ['chat_id' => $offer['chat_id'],'user_id' => $userId]);\n            $member = $result['result'] ?? null;\n            $text = is_array($member) ? accessText(objectValue($member)) : 'Проверка пока недоступна. Попробуйте позже.';\n        } catch (Throwable) {\n            $text = 'Проверка пока недоступна. Это не означает отсутствие оплаты.';\n        }\n    } elseif (in_array($action, ['/help','help'], true)) {\n        $db->prepare('INSERT OR IGNORE INTO support(user_id,offer_code,created_at) VALUES(?,?,?)')\n            ->execute([$userId,$offer['code'],time()]);\n        $q = $db->prepare(\"SELECT id FROM support WHERE user_id=? AND state='open'\");\n        $q->execute([$userId]);\n        $text = 'Обращение №'.$q->fetchColumn().'. Напишите, что произошло. Не присылайте коды входа и банковские данные.';\n    } else {\n        $q = $db->prepare(\"UPDATE support SET details=substr(details || char(10) || ?,1,12000) WHERE user_id=? AND state='open'\");\n        $q->execute([mb_substr($action, 0, 2000),$userId]);\n        $text = $q->rowCount() > 0 ? 'Добавил сообщение в обращение.' : 'Используйте /start, /access или /help.';\n    }\n    telegram('sendMessage', ['chat_id' => $userId,'text' => $text] + ($reply ? ['reply_markup' => $reply] : []));\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "accessText отдельно переводит результат getChatMember в ответ клиенту. member означает текущее членство; optional until_date показывает срок, если Telegram его вернул. Администратор получает отдельный текст. left/kicked не объясняют, почему доступа нет, поэтому код не предлагает сразу заплатить снова. "
+                },
+                {
+                  "type": "text",
+                  "text": "Описание ChatMemberMember",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#chatmembermember"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Кнопка «Помощь» и /help создают одну открытую запись поддержки пользователя. При первом обращении сохраняется текущее предложение; повтор после его смены возвращает прежнее открытое обращение. offer_code помогает маршрутизации, но сам по себе не доказывает, по какой ссылке человек платил. Следующие сообщения добавляются к обращению. Старые inline-кнопки остаются безопасными: они не меняют цену и не инициируют списание. В этом минимальном примере проверка всегда относится к настроенному каналу; при нескольких каналах добавьте проверяемый сервером идентификатор предложения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При сбое getChatMember бот пишет о недоступной проверке, а не об отсутствии оплаты. Автоматические повторы чтения можно добавить с небольшим пределом; повтор sendMessage — отдельная операция с риском дубля. На рабочем боте ограничьте частоту /access для каждого пользователя."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "change-offer",
+        "label": "Как менять предложение и отзывать приглашение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как менять предложение и отзывать приглашение"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "editChatSubscriptionInviteLink меняет название ссылки, но не её цену или период. Для другой цены создайте новое предложение и новую ссылку. revokeChatInviteLink отзывает приглашение, созданное ботом. "
+                },
+                {
+                  "type": "text",
+                  "text": "Методы управления ссылкой",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#editchatsubscriptioninvitelink"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " не следует трактовать как управление всеми действующими подписками."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В приложении храните версии: club-300, club-500, дату прекращения выдачи старой ссылки и текст условий. Новым пользователям показывайте нужную версию; обращения прежних подписчиков связывайте с их исходным предложением. Не обещайте, что новая цена автоматически применится к действующим участникам."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед отзывом рабочей ссылки подготовьте маршрут поддержки для тех, кто сохранил старую кнопку. Отзыв ссылки не равен возврату средств, отмене продления или немедленному исключению всех вступивших по ней. Каждое из этих действий требует собственного подтверждённого механизма."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "support",
+        "label": "Помогите подписчику без повторной покупки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Помогите подписчику без повторной покупки"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "«Оплатил, но не попал»: сверить аккаунт Telegram, канал и текущее членство; попросить открыть исходную ссылку. Не запрашивать код входа, пароль или данные банковской карты."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "«Вышел случайно»: предложить исходное приглашение и проверить текущий оплаченный период в Telegram, прежде чем обсуждать новую оплату."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "«Не хочу продлевать»: объяснить управление подпиской в Telegram. Кнопка вашего бота «Больше не присылать новости» не отменяет подписку канала."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "«Хочу возврат»: зарегистрировать обращение и передать администратору канала. Не показывать успешный возврат до фактического подтверждения операции."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Методы возврата и отмены подписки бота, привязанные к его платёжной транзакции, нельзя автоматически использовать для подписной ссылки канала. Не придумывайте telegram_payment_charge_id из ID пользователя или приглашения. Поддержка должна различать продукты и получателя платежа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраняйте номер обращения, канал, Telegram user_id, время проверки и технический результат без токенов. Пользователю сообщайте номер и следующий шаг. Переписку с сотрудником можно организовать через "
+                },
+                {
+                  "type": "text",
+                  "text": "операторскую группу",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-support-operator-group"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · support-reply.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$id = filter_var($argv[1] ?? '', FILTER_VALIDATE_INT);\n$text = trim($argv[2] ?? '');\nif ($id === false || $id < 1 || $text === '' || mb_strlen($text) > 2000) {\n    throw new RuntimeException('Usage: php support-reply.php ID \"Ответ\"');\n}\n$lock = fopen(envRequired('APP_DB').'.worker.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    throw new RuntimeException('Worker busy; try later');\n}\n$db = database();\n$q = $db->prepare(\"SELECT user_id FROM support WHERE id=? AND state='open'\");\n$q->execute([$id]);\n$userId = $q->fetchColumn();\nif ($userId === false) {\n    throw new RuntimeException('Open request not found');\n}\ntelegram('sendMessage', ['chat_id' => (int)$userId,'text' => $text]);\n$db->prepare(\"UPDATE support SET state='closed' WHERE id=?\")->execute([$id]);\necho \"Reply sent\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · очередь обращений",
+                  "code": "SELECT id,user_id,offer_code,details FROM support WHERE state='open' ORDER BY id;"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · ответ на обращение",
+                  "code": "php support-reply.php 1 \"Проверьте исходное приглашение с того аккаунта, которым оплачена подписка. Если доступ не восстановился, сообщите время оплаты.\""
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Команда отвечает конкретному пользователю и закрывает только указанное обращение после подтверждённого ответа API. Номер обращения не даёт права выполнить возврат или изменить подписку. CLI предназначен для сотрудника с серверным доступом; для веб-интерфейса потребуются аутентификация, права и журнал действий."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если Telegram принял сообщение, а процесс остановился до UPDATE, обращение останется открытым. Перед повтором сверьте диалог. В большой поддержке вместо ручного скрипта нужен журнал исходящих сообщений с состоянием неизвестного результата."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "delivery",
+        "label": "Как подключается Telegram-транспорт",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как подключается Telegram-транспорт"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция telegram использует прямой Bot API. При переходе на BotGate замените исходящий адрес и авторизацию по "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#proxy"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", а проверку входящего webhook — на HMAC BotGate. Не запускайте приведённый setup-webhook.php для уже управляемого подключения BotGate."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook-runtime",
+        "label": "Приём событий и запуск worker",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Приём событий и запуск worker"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Файлы ниже подключают основную логику к прямому webhook Telegram. Для одного бота используется одна SQLite-база и один worker. Секрет проверяется до разбора тела, успешный HTTP-ответ возвращается после записи события. Повтор одного update_id не создаёт вторую строку. Если используете другой существующий обработчик, перенесите вызов handleUpdate после его проверки подлинности и дедупликации."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\n\n$secret = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';\nif (!is_string($secret) || !hash_equals(envRequired('WEBHOOK_SECRET'), $secret)) {\n    http_response_code(403);\n    exit;\n}\n$raw = file_get_contents('php://input', false, null, 0, 65537);\nif (!is_string($raw) || strlen($raw) > 65536) {\n    http_response_code(413);\n    exit;\n}\ntry {\n    $update = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);\n    if (!is_array($update) || !is_int($update['update_id'] ?? null)) {\n        http_response_code(400);\n        exit;\n    }\n    $stmt = database()->prepare('INSERT OR IGNORE INTO inbox(update_id,payload,created_at) VALUES(?,?,?)');\n    $stmt->execute([$update['update_id'], $raw, time()]);\n    http_response_code(200);\n} catch (Throwable) {\n    http_response_code(503);\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · worker.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/bot.php';\n\n$lock = fopen(envRequired('APP_DB').'.worker.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    exit(0);\n}\n$db = database();\n$pending = $db->query(\"SELECT * FROM inbox WHERE state='pending' ORDER BY update_id LIMIT 20\");\nif ($pending === false) {\n    throw new RuntimeException('Cannot read inbox');\n}\n$pending->setFetchMode(PDO::FETCH_ASSOC);\nforeach ($pending as $data) {\n    $row = objectValue($data);\n    $row['update_id'] = intValue($row['update_id']);\n    $claim = $db->prepare(\"UPDATE inbox SET state='processing' WHERE update_id=? AND state='pending'\");\n    $claim->execute([$row['update_id']]);\n    if ($claim->rowCount() !== 1) {\n        continue;\n    }\n    try {\n        $update = objectValue(json_decode(stringValue($row['payload']), true, 32, JSON_THROW_ON_ERROR));\n        handleUpdate($db, $update);\n        $db->prepare(\"UPDATE inbox SET state='done' WHERE update_id=?\")->execute([$row['update_id']]);\n    } catch (Throwable) {\n        // Повтор после отправки может продублировать сообщение.\n        $db->prepare(\"UPDATE inbox SET state='review',error_kind='handler_failed' WHERE update_id=?\")\n            ->execute([$row['update_id']]);\n    }\n}\nflock($lock, LOCK_UN);\nfclose($lock);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\ntelegram('setWebhook', [\n    'url' => envRequired('WEBHOOK_URL'),\n    'secret_token' => envRequired('WEBHOOK_SECRET'),\n    'allowed_updates' => ['message', 'callback_query'],\n]);\necho \"Webhook configured\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · первый запуск учебного бота",
+                  "code": "php init.php\nphp setup-webhook.php\nphp worker.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала создайте отдельного тестового бота и откройте только каталог public по HTTPS. В WEBHOOK_URL укажите полный адрес /webhook.php. APP_DB находится вне public; каталог базы доступен на запись процессам PHP. Переменные окружения должны быть доступны и PHP-FPM, и CLI worker: экспорт в одной SSH-сессии не настраивает PHP-FPM."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После /start запустите worker.php: появится приветствие, а inbox.state станет done. Для теста держите цикл ниже открытым в терминале; в рабочей системе настройте постоянный процесс под менеджером процессов. Для inline-кнопок особенно важна быстрая обработка: очередь с минутным интервалом задерживает answerCallbackQuery. При нагрузке подтверждение кнопок отделяйте от долгих заданий. Один проход берёт до 20 событий; flock не допускает параллельный запуск на одном сервере. В этом учебном варианте worker последовательно делает сетевые запросы, поэтому при большом потоке нужна общая очередь и лимиты на пользователя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "processing после аварии и review после ошибки не возвращаются в pending автоматически: Telegram мог уже принять сообщение. Сверьте конкретный диалог, затем решайте, нужна ли повторная обработка. Не сбрасывайте весь inbox одним UPDATE. Для временного лимита в рабочей версии добавьте next_attempt_at и обработку retry_after; повторять все ошибки без разбора нельзя."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · диагностика обработки",
+                  "code": "SELECT update_id,state,error_kind,created_at FROM inbox ORDER BY update_id DESC LIMIT 20;\nSELECT COUNT(*) AS pending FROM inbox WHERE state='pending';"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · непрерывная обработка для теста",
+                  "code": "while true; do\n  php worker.php\n  sleep 1\ndone"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate-check",
+        "label": "BotGate и проверка перед запуском",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate и проверка перед запуском"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При использовании BotGate Telegram-методы вызываются через /v1/bots/{botPublicId}/{method} с Bearer API-ключом; JSON-параметры сохраняются. Ссылки и баланс Stars принадлежат Telegram, условия предложения и обращения — вашему приложению. Формат запросов описан в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#proxy"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте, что приглашение ведёт в нужный закрытый канал и Telegram показывает выбранные 300 Stars и период до подтверждения оплаты."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте обычного участника, администратора, вышедшего пользователя и ошибку чтения. Бот не должен называть ошибку сети неоплатой."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторные /start и нажатия не создают новые приглашения и обращения."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте устаревшую кнопку после смены предложения и доступность поддержки."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Фактическую оплату, продление, отмену и повторный вход проверяйте отдельно на контролируемых аккаунтах. Успешный ответ создания ссылки ещё не проверяет весь платёжный цикл."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проведите два разных теста: технический без платежа (/start, /access, /help, повтор кнопок и ответ поддержки) и отдельный пользовательский платёжный цикл. Для второго заранее выберите контролируемые аккаунты и согласованный расход Stars. Команда создания приглашения и успешный тест getChatMember не подтверждают продление через 30 дней."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте также удаление права can_invite_users у тестового бота: создание нового предложения должно остановиться, а приложение не должно объявить ссылку готовой. Верните право и разберите review-запись вручную. Это помогает отличить недостаточные права от сетевого сбоя и не выдавать клиенту несуществующее приглашение."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

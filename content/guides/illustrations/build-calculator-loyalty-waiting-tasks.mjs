@@ -1,0 +1,36 @@
+import fs from 'node:fs';import path from 'node:path';import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const examplesRoot=path.resolve(process.argv[3]||path.join(root,'../../../botgate-examples/examples'));
+const output=path.resolve(process.argv[2]||'storage/app/calculator-loyalty-waiting-tasks');fs.mkdirSync(output,{recursive:true});
+function guide(slug){const f=path.join(root,'packages',slug+'.json');return JSON.parse(fs.readFileSync(fs.existsSync(f)?f:path.join(root,'current.json'),'utf8')).find(a=>a.slug===slug);}
+function html(slug){for(const name of ['calculator.html','app.html']){const source=path.join(examplesRoot,slug,'php','public',name);if(fs.existsSync(source))return fs.readFileSync(source,'utf8');}for(const s of guide(slug).sections)for(const n of s.content.content)if(n.attrs?.id==='guide-code'&&n.attrs.config.label==='HTML · public/app.html')return n.attrs.config.code;throw Error('Missing HTML source; clone botgate-examples beside bot-gate-main or pass its examples directory as the third argument');}
+const quote={id:'demo-quote',operation:'demo-operation',qty:100,params:JSON.stringify({qty:100,size:'A4',color:'bw',urgent:'yes',delivery:'courier'}),total_minor:203750,tariff:'2026-11-v1',expires_at:1795600800,submitted_at:null};
+const card={balance:68,review:false,lots:[{remaining:20,expires_at:1803283200},{remaining:48,expires_at:1803369600}],orders:[{id:'ORDER-003',total_minor:120000,requested:0}],history:[{kind:'Начисление по заказу ORDER-002',delta:48,created_at:1795410000},{kind:'Списание по заказу ORDER-002',delta:-30,created_at:1795410000},{kind:'Начисление по заказу ORDER-001',delta:50,created_at:1795323600}]};
+const manifest=[];
+for(const mobile of [false,true]){
+ for(const [slug,name,fixture,caption,alt] of [
+  ['telegram-mini-app-service-calculator','service-calculator',{total_minor:203750,currency:'RUB'},'Форма из статьи на учебных данных: срочность и курьер дают 2037,50 ₽. Для иллюстрации подставлен ответ PHP-формулы; это не снимок клиента Telegram.','Форма калькулятора печати: 100 чёрно-белых A4, срочность и курьер, предварительная цена 2037,50 рубля.'],
+  ['telegram-mini-app-loyalty-card','loyalty-card',card,'Фрагмент HTML-карты из статьи на учебных данных: 50 баллов, списание 30 и новое начисление 48 дают остаток 68.','Бонусная карта с 68 баллами, ближайшим сроком действия, открытым заказом и историей начисления и списания.']
+ ]){
+  const width=mobile?390:650;let source=html(slug);
+  const mock=`<script>window.Telegram={WebApp:{initData:'DEMO',ready(){}}};window.fetch=async()=>({ok:true,json:async()=>(${JSON.stringify(fixture)})});window.demoQuote=${JSON.stringify(quote)};</script>`;
+  source=source.replace('<main>',`<div class="canvas"><div class="demo-label">МАКЕТ НА УЧЕБНЫХ ДАННЫХ</div><main>`).replace('</main>','</main></div>');
+  source=source.replace('<script src=',mock+'<script src=');
+  if(name==='service-calculator')source=source.replace('</html>','<script>const demoForm=document.querySelector("#calculator");demoForm.elements.urgent.value="yes";demoForm.elements.delivery.value="courier";demoForm.requestSubmit();</script></html>');
+  source=source.replace('</html>',`<style>.canvas{width:${width}px}.demo-label{font:13px system-ui;letter-spacing:1px;color:#506785;padding:22px 24px 0}main{padding-top:8px}#history{padding-left:20px}#refresh{display:none}${name==='service-calculator'?'#history{display:none}#status{display:none}':'form+small{font-size:14px}'}</style></html>`);
+  const filename=name+(mobile?'-mobile':'')+'.html';fs.writeFileSync(path.join(output,filename),source);
+  manifest.push({slug,name,filename,mobile,width,caption,alt});
+ }
+ const css=`*{box-sizing:border-box}body{margin:0;font:25px/1.4 Arial;background:#152438;color:#edf4ff}.canvas{width:1080px;padding:42px}.eyebrow{font-size:18px;color:#bcbaff;letter-spacing:1px}h1{font-size:36px;line-height:1.2;margin:16px 0 28px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.box{padding:22px;background:#263b54;border-radius:14px}.box strong{display:block;margin-bottom:14px}.tag{color:#a9dfca}.note{font-size:22px;color:#c1d0e4;margin:24px 0 0}.rule{background:#e1f3eb;color:#244e40;padding:22px;border-radius:14px;margin-top:24px}.task{background:#f0f5fb;color:#1a3048;padding:26px;border-radius:16px;white-space:pre-line}.states{display:flex;gap:16px;margin-top:22px}.states>div{flex:1}.mobile{font-size:20px}.mobile .canvas{width:390px;padding:24px 20px}.mobile .eyebrow{font-size:13px}.mobile h1{font-size:28px}.mobile .grid{grid-template-columns:1fr}.mobile .box{padding:18px}.mobile .note{font-size:17px}.mobile .rule{font-size:19px;padding:18px}.mobile .task{font-size:20px;padding:20px}.mobile .states{flex-direction:column}`;
+ const variants=[{
+  slug:'telegram-bot-waiting-list',name:'waiting-offer',title:'Одно место — одно активное предложение',
+  body:'<div class="grid"><div class="box"><strong>1. Анна</strong><span class="tag">Предложение</span><p>10 минут на подтверждение</p></div><div class="box"><strong>2. Борис</strong><span class="tag">Ожидает</span><p>Получит предложение после отказа или истечения срока</p></div><div class="box"><strong>3. Вера</strong><span class="tag">Ожидает</span><p>Сохраняет своё место в очереди</p></div></div><div class="rule">«Подтвердить» → сервер проверяет владельца, срок и свободное место.</div><p class="note">Поздно доставленная карточка не даёт права занять уже переданный слот. /status восстанавливает действующее предложение.</p>',
+  caption:'Поясняющая схема FIFO-очереди одного конкретного времени. Имена вымышлены; нативный интерфейс Telegram не воспроизводится.',alt:'Анна получает единственное предложение на десять минут; после отказа или истечения срока очередь переходит к Борису, затем к Вере.'
+ },{
+  slug:'telegram-bot-employee-tasks',name:'task-statuses',title:'Статус меняется с проверкой роли и версии',
+  body:'<div class="task">#1 Подготовить новый прайс\nВ работе\nСрок: 26.11.2026 18:00 МСК · версия 2</div><div class="states"><div class="box"><strong>Исполнитель</strong><span class="tag">Новая → В работе → Выполнена</span></div><div class="box"><strong>Руководитель</strong><span class="tag">Создать · Назначить · Отменить</span></div></div><div class="rule">Старая кнопка версии 1 отклоняется. Актуальная карточка: /task 1.</div><p class="note">Принятое действие сохраняет новый статус и запись в истории в одной транзакции. Уведомление отправляется отдельно.</p>',
+  caption:'Поясняющая схема карточки и прав из PHP-примера. Это условная композиция, а не снимок Telegram.',alt:'Задача подготовки прайса находится в работе с версией 2; исполнитель завершает её, руководитель может отменить, старая кнопка версии 1 отклоняется.'
+ }];
+ for(const item of variants){const filename=item.name+(mobile?'-mobile':'')+'.html';fs.writeFileSync(path.join(output,filename),`<!doctype html><html lang="ru"><meta charset="utf-8"><style>${css}</style><body class="${mobile?'mobile':''}"><main class="canvas"><div class="eyebrow">ПОЯСНЯЮЩАЯ СХЕМА</div><h1>${item.title}</h1>${item.body}</main></body></html>`);const {body,title,...metadata}=item;manifest.push({...metadata,filename,mobile,width:mobile?390:1080});}
+}
+fs.writeFileSync(path.join(output,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');

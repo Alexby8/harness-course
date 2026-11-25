@@ -1,0 +1,605 @@
+[
+  {
+    "slug": "laravel-telegram-appointment-reminders",
+    "title": "Как отправлять напоминания о записи через Telegram-бота на Laravel",
+    "seo_title": "Как отправлять напоминания о записи через Telegram-бота на Laravel",
+    "description": "Планируем напоминания о записи в Laravel: время в UTC, перенос и отмена события, проверка актуальности перед отправкой и разбор неопределённого результата Telegram.",
+    "card_description": "Планируем напоминания о записи в Laravel: время в UTC, перенос и отмена события, проверка актуальности перед отправкой и разбор неопределённого результата Telegram.",
+    "category": "Практика",
+    "topics": "Laravel · Планировщик · Напоминания",
+    "reading_time": "13 минут",
+    "published_at": "2026-11-02",
+    "is_published": true,
+    "sort_order": 27,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера напомним клиенту о консультации за час до начала. Запись может перенестись или отмениться, а сервер — пропустить минуту запуска. Поэтому напоминание должно храниться в БД, проверять актуальную запись перед отправкой и отличать подтверждённый отказ Telegram от потерянного ответа."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "design",
+        "label": "Что хранить кроме даты отправки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что хранить кроме даты отправки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Используем Laravel 12 с PHP 8.3+ и обычный Telegram Bot API через HTTP-клиент Laravel. Те же основные приёмы доступны в Laravel 13, который требует PHP 8.3+. Предполагается, что пользователь уже открыл личный чат с ботом и в приложении сохранён проверенный chat_id. Наличие номера телефона или username не позволяет боту начать личную переписку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для небольшого потока покажем отдельную Artisan-команду, которая раз в минуту выбирает до 20 готовых напоминаний. Она отправляет сообщения последовательно с ограниченным таймаутом. Если объём растёт, эту же логику можно вынести в задания очереди; правила проверки версии записи и результата отправки сохраняются."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В appointments нужны id, status (confirmed/cancelled), starts_at, timezone, version и telegram_chat_id. В appointment_reminders — id, appointment_id, appointment_version, due_at, state, attempts, telegram_message_id. Время starts_at и due_at храните в UTC; timezone содержит исходную зону IANA, например Europe/Moscow. Не используйте локальное время сервера как время клиента."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ограничение UNIQUE(appointment_id, appointment_version) задаёт одно напоминание за час для каждой версии записи. Для нескольких интервалов добавьте reminder_kind в ключ. Индекс (state, due_at) ускоряет выборку. Version увеличивается при переносе, смене получателя и других изменениях, влияющих на уведомление. Это прикладные таблицы вашего проекта; готовой модели Appointment в Laravel нет."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "time",
+        "label": "Считаем время и создаём напоминание",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Считаем время и создаём напоминание"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Уточняйте у клиента зону записи: время консультации может относиться к зоне кабинета, а не телефона. На форме покажите дату, время и название зоны. Для зон с переводом часов неоднозначное или несуществующее местное время нужно разрешить при записи, до вычисления напоминания."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · перевод подтверждённого времени в UTC",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nuse Carbon\\CarbonImmutable;\n\n// Значение и зона уже проверены формой записи.\n$zone = 'Europe/Moscow';\n$start = CarbonImmutable::createFromFormat('!Y-m-d H:i', '2026-11-10 15:00', $zone);\nif ($start === false) {\n    throw new InvalidArgumentException('Некорректное время записи');\n}\n$startsAtUtc = $start->utc();\n$dueAtUtc = $startsAtUtc->subHour();"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В этом примере консультация начинается в 12:00 UTC, напоминание готово с 11:00 UTC. Используем неизменяемую дату, чтобы вычитание часа не сдвинуло само начало встречи. Общую timezone приложения и соединение БД настройте на UTC."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создание записи и строки appointment_reminders выполняйте в одной транзакции. Для новой строки задайте state=pending, attempts=0, appointment_version равной версии записи. Если запись создана меньше чем за час до начала, выберите явное правило: отправить в ближайшую минуту либо не создавать часовое напоминание. В этом руководстве отправляем в ближайшую минуту, пока событие ещё не началось."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не сравнивайте due_at с текущей минутой на точное равенство. Выборка due_at <= now() подхватит пропущенный запуск. Начавшиеся события отсекаются отдельной проверкой starts_at > now()."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "schedule",
+        "label": "Подключаем команду к планировщику Laravel",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключаем команду к планировщику Laravel"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте команду и зарегистрируйте расписание. Само имя команды ничего не отправляет, пока не реализован handle. Пример ниже использует стандартный каталог app/Console/Commands."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · в вашем Laravel-приложении",
+                  "code": "php artisan make:command SendAppointmentReminders"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · routes/console.php",
+                  "code": "<?php\nuse Illuminate\\Support\\Facades\\Schedule;\n\nSchedule::command('appointments:remind')\n    ->everyMinute()\n    ->withoutOverlapping(5);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "На сервере вашего приложения один раз настройте запуск schedule:run каждую минуту. Замените путь своим; если планировщик уже запущен, вторую cron-строку добавлять не нужно."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · строка crontab",
+                  "code": "* * * * * cd /path/to/your-app && php artisan schedule:run >> /dev/null 2>&1"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверить регистрацию можно командой php artisan schedule:list. Для локальной разработки подходит php artisan schedule:work. withoutOverlapping использует блокировку cache и ограничивает пересечение именно запусков команды; уникальные строки и атомарный захват напоминания всё равно нужны. На нескольких серверах понадобится согласованная конфигурация общего cache и, при необходимости, onOneServer."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Планировщик не должен запускать «15:00» отдельно в зоне каждого клиента. Он проверяет готовые UTC-моменты раз в минуту. Это упрощает работу с разными зонами и переходами на летнее время; ограничения timezone-расписаний описаны в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации Laravel Scheduler",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/docs/12.x/scheduling#timezones"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "send",
+        "label": "Захватываем строку и проверяем запись перед отправкой",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Захватываем строку и проверяем запись перед отправкой"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В config/services.php добавьте секцию telegram с token из env(\"TELEGRAM_BOT_TOKEN\"). Реальный токен хранится в окружении, не в коде. Схема таблиц выше должна быть создана миграциями вашего приложения. Ниже — содержимое класса команды целиком; во время выполнения не нужны модели с неочевидными casts."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Console/Commands/SendAppointmentReminders.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nnamespace App\\Console\\Commands;\n\nuse Carbon\\CarbonImmutable;\nuse Illuminate\\Console\\Command;\nuse Illuminate\\Http\\Client\\ConnectionException;\nuse Illuminate\\Support\\Facades\\DB;\nuse Illuminate\\Support\\Facades\\Http;\n\nfinal class SendAppointmentReminders extends Command\n{\n    protected $signature = 'appointments:remind';\n    protected $description = 'Send due appointment reminders';\n\n    public function handle(): int\n    {\n        $token = (string) config('services.telegram.token');\n        if ($token === '') {\n            $this->error('Не настроен токен Telegram');\n            return self::FAILURE;\n        }\n        $rows = DB::table('appointment_reminders')\n            ->where('state', 'pending')->where('due_at', '<=', now())\n            ->orderBy('due_at')->limit(20)->get();\n\n        foreach ($rows as $row) {\n            // Только один процесс может изменить pending на sending.\n            $claimed = DB::table('appointment_reminders')->where('id', $row->id)\n                ->where('state', 'pending')->where('due_at', '<=', now())\n                ->where('attempts', '<', 5)->update([\n                    'state' => 'sending', 'attempts' => DB::raw('attempts + 1'),\n                ]);\n            if ($claimed !== 1) {\n                continue;\n            }\n            $query = DB::table('appointment_reminders')->where('id', $row->id);\n            $row = $query->first();\n            $appointment = DB::table('appointments')->where('id', $row->appointment_id)->first();\n            if ($appointment === null || $appointment->status !== 'confirmed'\n                || (int) $appointment->version !== (int) $row->appointment_version\n                || CarbonImmutable::parse($appointment->starts_at, 'UTC')->lte(now())) {\n                $query->update(['state' => 'cancelled']);\n                continue;\n            }\n            $when = CarbonImmutable::parse($appointment->starts_at, 'UTC')\n                ->setTimezone($appointment->timezone)->format('d.m.Y H:i');\n            try {\n                $response = Http::connectTimeout(2)->timeout(5)\n                    ->post('https://api.telegram.org/bot'.$token.'/sendMessage', [\n                        'chat_id' => (string) $appointment->telegram_chat_id,\n                        'text' => 'Напоминаем о консультации '.$when.' ('.$appointment->timezone.').',\n                    ]);\n            } catch (ConnectionException) {\n                $query->update(['state' => 'unknown']);\n                continue;\n            }\n            $body = $response->json();\n            if ($response->successful() && is_array($body)\n                && ($body['ok'] ?? null) === true\n                && is_int($body['result']['message_id'] ?? null)) {\n                $query->update([\n                    'state' => 'sent', 'telegram_message_id' => $body['result']['message_id'],\n                ]);\n            } elseif (is_array($body) && ($body['ok'] ?? null) === false\n                && ($body['error_code'] ?? null) === 429\n                && (int) $row->attempts < 5) {\n                $wait = max(1, (int) ($body['parameters']['retry_after'] ?? 60));\n                $query->update(['state' => 'pending', 'due_at' => now()->addSeconds($wait)]);\n            } else {\n                $knownRejection = !$response->serverError() && is_array($body)\n                    && ($body['ok'] ?? null) === false;\n                $query->update(['state' => $knownRejection ? 'failed' : 'unknown']);\n            }\n        }\n        return self::SUCCESS;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это консервативный пример: HTTP-клиент не вызывает retry, а таймаут не вызывает повтор sendMessage. После подтверждённого Telegram 429 строка снова становится pending, не более пяти попыток всего. Due_at задаёт нижнюю границу повтора, поэтому планировщик может отправить позже, но не раньше retry_after."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Зависшее sending после аварийного завершения процесса тоже требует разбора как неизвестный результат. Не возвращайте все sending в pending по истечении пяти минут: сообщение могло дойти до клиента до падения процесса. Для эксплуатации добавьте время захвата, журнал состояния и оповещение о failed/unknown без токена и полного URL запроса."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В этой команде транзакция БД не удерживается во время HTTP. У неё остаётся короткое окно между чтением записи и запросом Telegram: перенос или отмена в этот момент не могут отозвать уже начатую отправку. Это нужно учитывать в интерфейсе отмены. Запись sent подтверждает успешный ответ API, но не прочтение сообщения клиентом."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "reschedule",
+        "label": "Переносим или отменяем запись",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Переносим или отменяем запись"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При переносе начните транзакцию, заблокируйте строку appointments для обновления и увеличьте version. Запишите новые starts_at/timezone, отмените старые pending-напоминания и создайте одно pending для новой версии. Сохраните транзакцию целиком. Не меняйте дату у уже отправленной строки: история должна показывать, какое уведомление действительно ушло."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При отмене тем же способом задайте status=cancelled, увеличьте version и отмените pending. Команда после захвата сверит версию и статус ещё раз. Отмена, сохранённая до этого чтения, остановит отправку; старые задания очереди, если вы их добавите, тоже должны проходить эту проверку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для изменений после последней проверки действует описанное окно гонки. Если клиенту уже ушло старое напоминание, отправьте отдельное подтверждение переноса с новой датой, а не пытайтесь скрыть ситуацию повторным статусом «не отправлено». Для отключения напоминаний проверяйте согласие и доступность канала тем же способом, что статус записи."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При большом потоке планировщик может только создавать задания очереди. Передавайте ID напоминания, а в handle задания заново загружайте appointment. Долгая задержка Job::delay сама по себе не решает отмену и изменение версии. Запуск worker и базовая настройка очереди разобраны в "
+                },
+                {
+                  "type": "text",
+                  "text": "статье об уведомлениях Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-telegram-notifications"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "check",
+        "label": "Проверяем время, отмену и сбои",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем время, отмену и сбои"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Создайте тестовую запись на 15:00 Europe/Moscow: starts_at должен быть 12:00 UTC, due_at — 11:00 UTC."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Перенесите её до времени отправки. Старая версия не должна отправляться; у новой остаётся одно напоминание."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отмените запись, а затем запустите команду: отправок быть не должно. Повторный запуск после sent тоже ничего не отправляет."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сдвиньте due_at в прошлое при будущем starts_at: уведомление подхватывается. Прошедшее событие пропускается."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Через Http::fake проверьте ok=true, 429 с retry_after, 403 и соединение без ответа. Они должны давать sent, pending, failed и unknown соответственно."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Убедитесь, что сервисный мониторинг замечает пропуск планировщика и рост failed/unknown. Рабочий cron не доказывает доставку сообщения. Для тестов используйте отдельный чат, а не реальных клиентов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При отправке через BotGate бизнес-таблицы и расписание остаются у вас. Пример выше обращается напрямую к Telegram; его нельзя переключить только заменой токена. Подключите транспорт по "
+                },
+                {
+                  "type": "text",
+                  "text": "документации API",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#proxy"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " или используйте "
+                },
+                {
+                  "type": "text",
+                  "text": "Laravel-пакет",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#sdk"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". В таком варианте отдельно учитывайте лимит самого сервиса и ответ Telegram, чтобы решение о повторе принимал один уровень приложения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Дополнительные источники: "
+                },
+                {
+                  "type": "text",
+                  "text": "планировщик Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/docs/12.x/scheduling"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "HTTP-клиент и его тестирование",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/docs/12.x/http-client#testing"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "sendMessage Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#sendmessage"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

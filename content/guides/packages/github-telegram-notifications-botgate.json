@@ -1,0 +1,897 @@
+[
+  {
+    "slug": "github-telegram-notifications-botgate",
+    "title": "Как получать уведомления из GitHub в Telegram через BotGate",
+    "seo_title": "Как получать уведомления из GitHub в Telegram через BotGate",
+    "description": "Практический пример на PHP: подпись GitHub webhook, новые PR, результаты CI и выкладки, фильтры событий, очередь отправки через BotGate и обработка повторов.",
+    "card_description": "Практический пример на PHP: подпись GitHub webhook, новые PR, результаты CI и выкладки, фильтры событий, очередь отправки через BotGate и обработка повторов.",
+    "category": "Практика",
+    "topics": "GitHub · Webhook · BotGate SDK · PHP",
+    "reading_time": "30 минут",
+    "published_at": "2026-11-17",
+    "is_published": true,
+    "sort_order": 64,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера подключим один GitHub-репозиторий к рабочему чату Telegram. Команда увидит pull request, который пора проверить, результат CI на main и итог выкладки. Webhook проверит подпись и сохранит уведомление в SQLite; отдельный процесс отправит его через BotGate. Соберём связанные файлы, разберём повторные доставки и покажем, где искать причину пропавшего сообщения."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "events",
+        "label": "Какие события действительно нужны команде",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Какие события действительно нужны команде"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Начнём с правил, а не с подписки на все события. В нашем примере PR уведомляет один раз, когда он впервые готов к ревью. Добавление каждого коммита в открытый PR не вызывает сообщение. По CI получаем один итог всего workflow, а не отчёт о каждой матричной задаче. По выкладке выбираем один источник результата."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "pull_request: opened для обычного PR и ready_for_review для бывшего черновика. Draft, synchronize, edited и повторное возвращение в review пропускаем."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "workflow_run: только completed; workflow с именем CI, ветка main, запуск от push. Уведомляем и об успехе, и об ошибке. Для проверок PR ниже показано, как изменить фильтр."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выкладка: либо completed у workflow Deploy, либо конечный deployment_status окружения production. Настройка DEPLOY_SOURCE переключает вариант; одновременно оба не отправляются."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Поля входящего запроса сверяйте с официальным описанием: "
+                },
+                {
+                  "type": "text",
+                  "text": "Список событий и структура GitHub payload",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://docs.github.com/en/webhooks/webhook-events-and-payloads"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "check_run полезен, если команда ждёт одну конкретную проверку сторонней системы. Для сводки GitHub Actions мы выбрали workflow_run: подписка одновременно на check_run, check_suite и workflow_run обычно превращает один запуск в несколько похожих сообщений. Для другого репозитория правила можно расширить, но сначала сформулируйте, какое действие должен сделать человек после уведомления."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовка бота, репозитория и файлов",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовка бота, репозитория и файлов"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Понадобятся PHP 8.3+ с PDO SQLite и mbstring, Composer, HTTPS-адрес обработчика и один сервер с локальным диском. Это небольшой самостоятельный сервис, не часть выполняемого кода из PR. Он не скачивает артефакты и не запускает команды из события. Веб-сервер публикует только public; БД, Composer и конфигурация находятся снаружи."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "github-notify/\n  common.php\n  init.php\n  schema.sql\n  events.php\n  sender.php\n  worker.php\n  vendor/\n  public/webhook.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · установка SDK",
+                  "code": "composer require botgate/sdk"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавьте бота в BotGate, получите API-ключ аккаунта и публичный ID бота. Это разные значения: BOTGATE_BOT_ID не равен Telegram user ID, а API-ключ не равен токену BotFather. Для рабочего чата добавьте бота и разрешите отправку сообщений. Для личной проверки сначала напишите боту /start. Chat ID задаётся настройкой, а не приходит из GitHub payload."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Первую отправку и получение идентификатора чата подробно разбирает "
+                },
+                {
+                  "type": "text",
+                  "text": "Подключение BotGate SDK",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/php-telegram-bot-sdk"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · значения-примеры",
+                  "code": "APP_DB=/srv/github-notify/var/events.sqlite\nGITHUB_WEBHOOK_SECRET=REPLACE_WITH_RANDOM_SECRET\nGITHUB_REPOSITORY_ID=123456789\nBOTGATE_API_KEY=REPLACE_WITH_BOTGATE_KEY\nBOTGATE_BOT_ID=bot_REPLACE_WITH_PUBLIC_ID\nTELEGRAM_CHAT_ID=-1001234567890\nDEPLOY_SOURCE=workflow"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это список переменных, а не автоматически загружаемый .env. Передайте их PHP-FPM и процессу worker через защищённую конфигурацию вашего менеджера процессов. Для локального CLI-сеанса используйте export NAME=value. Секрет не храните в репозитории, URL webhook или журнале. Случайную строку можно получить через php -r 'echo bin2hex(random_bytes(32)), PHP_EOL;'. Каталог var создайте заранее; PHP-FPM и worker должны иметь доступ к одному файлу БД и его каталогу."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В репозитории GitHub откройте Settings → Webhooks → Add webhook. Укажите HTTPS URL /webhook.php, тип application/json, случайный Secret и оставьте проверку TLS включённой. Выберите отдельные события Pull requests и Workflow runs. Для DEPLOY_SOURCE=deployment дополнительно выберите Deployment statuses. Нужны права управления webhook репозитория. Токен GitHub этому приёмнику не требуется: он получает события, а не читает приватный API."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Числовой GITHUB_REPOSITORY_ID возьмите из repository.id в тестовой доставке ping в Recent deliveries и задайте до рабочих событий. Такой ID переживает переименование репозитория. Подписанный запрос от другого репозитория, использующего тот же секрет, не должен отправить сообщение в этот чат."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "storage",
+        "label": "Хранилище: доставка и уведомление — разные записи",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Хранилище: доставка и уведомление — разные записи"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В deliveries хранится факт приёма GitHub-запроса. В notifications — подготовленный текст и состояние отправки. Для повторной доставки используем X-GitHub-Delivery. Для повторного бизнес-события есть event_key: новый идентификатор доставки не должен повторно пригласить команду к ревью того же PR."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE deliveries (\n    delivery_id TEXT PRIMARY KEY,\n    event TEXT NOT NULL,\n    body_hash TEXT NOT NULL,\n    received_at INTEGER NOT NULL\n);\nCREATE TABLE notifications (\n    event_key TEXT PRIMARY KEY,\n    text TEXT NOT NULL,\n    state TEXT NOT NULL DEFAULT 'pending',\n    attempts INTEGER NOT NULL DEFAULT 0,\n    available_at INTEGER NOT NULL,\n    message_id INTEGER,\n    error_kind TEXT,\n    created_at INTEGER NOT NULL\n);\nCREATE INDEX notifications_due ON notifications(state, available_at);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction setting(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing setting: '.$name);\n    }\n    return $value;\n}\n\nfunction database(): PDO\n{\n    $path = setting('APP_DB');\n    if (!is_file($path)) {\n        throw new RuntimeException('Run init.php first');\n    }\n    $db = new PDO('sqlite:'.$path, options: [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=3000');\n    return $db;\n}\n\n/** @param list<int|string|null> $params */\nfunction sql(PDO $db, string $query, array $params = []): PDOStatement\n{\n    $statement = $db->prepare($query);\n    $statement->execute($params);\n    return $statement;\n}\n\n/**\n * @param list<int|string|null> $params\n * @return array<string, int|string|null>|null\n */\nfunction row(PDO $db, string $query, array $params = []): ?array\n{\n    $value = sql($db, $query, $params)->fetch(PDO::FETCH_ASSOC);\n    if ($value === false) {\n        return null;\n    }\n    /** @var array<string, int|string|null> $value */\n    return $value;\n}\n\n/**\n * @template T\n * @param callable(): T $work\n * @return T\n */\nfunction atomic(PDO $db, callable $work): mixed\n{\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $result = $work();\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $e) {\n        $db->exec('ROLLBACK');\n        throw $e;\n    }\n}\n\n/** @return array<string, mixed> */\nfunction objectJson(string $raw): array\n{\n    $value = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);\n    if (!is_array($value) || array_is_list($value)) {\n        throw new InvalidArgumentException('Expected JSON object');\n    }\n    $object = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected string keys');\n        }\n        $object[$key] = $item;\n    }\n    return $object;\n}\n\nfunction finish(int $status): never\n{\n    http_response_code($status);\n    header('Cache-Control: no-store');\n    exit;\n}\n\nfunction requestHeader(string $key): string\n{\n    $value = $_SERVER[$key] ?? '';\n    return is_string($value) ? $value : '';\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nif (PHP_SAPI !== 'cli') { exit(1); }\n$path = setting('APP_DB');\nif (file_exists($path)) { throw new RuntimeException('Database already exists'); }\n$schema = file_get_contents(__DIR__.'/schema.sql');\nif ($schema === false) { throw new RuntimeException('Missing schema'); }\n$db = new PDO('sqlite:'.$path, options: [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n$db->exec($schema);\necho \"Database created\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · создание отдельной БД",
+                  "code": "php init.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "init.php откажется работать поверх существующего файла. Веб-обработчик не создаёт таблицы при каждом запросе. Операция приёма одной транзакцией сохраняет delivery и уведомление: либо обе записи видны worker, либо нет ни одной. SQLite здесь рассчитана на небольшой поток одного репозитория; для нескольких серверов нужны общая БД и механизм блокировок вместо локального flock."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "filter",
+        "label": "Фильтры и ссылки на конкретный запуск",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Фильтры и ссылки на конкретный запуск"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "events.php содержит чистое преобразование события в сообщение и транзакцию сохранения. Название PR ограничиваем по длине; не включаем его описание, diff или логи сборки. Сообщение отправляется без parse_mode, поэтому символы HTML из заголовка не становятся разметкой. Ссылки на PR и запуск собираем из проверенных идентификаторов репозитория и события."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · events.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/** @return array<string, mixed> */\nfunction obj(mixed $value): array\n{\n    if (!is_array($value)) { return []; }\n    $object = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) { return []; }\n        $object[$key] = $item;\n    }\n    return $object;\n}\n\nfunction shortText(mixed $value, int $limit = 180): string\n{\n    if (!is_string($value)) { return ''; }\n    $value = preg_replace('/[\\p{C}\\s]+/u', ' ', $value) ?? '';\n    return mb_substr(trim($value), 0, $limit);\n}\n\nfunction positiveId(mixed $value): ?int\n{\n    return is_int($value) && $value > 0 ? $value : null;\n}\n\nfunction githubSignatureValid(string $body, string $signature, string $secret): bool\n{\n    return preg_match('/^sha256=[a-f0-9]{64}$/D', $signature) === 1\n        && hash_equals('sha256='.hash_hmac('sha256', $body, $secret), $signature);\n}\n\n/**\n * @param array<string, mixed> $payload\n * @return array{key:string,text:string}|null\n */\nfunction notification(string $event, array $payload): ?array\n{\n    $repo = obj($payload['repository'] ?? null);\n    $repoId = positiveId($repo['id'] ?? null);\n    $fullName = $repo['full_name'] ?? null;\n    if ((string) $repoId !== setting('GITHUB_REPOSITORY_ID')\n        || !is_string($fullName)\n        || preg_match('~^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$~D', $fullName) !== 1) {\n        return null;\n    }\n    $base = 'https://github.com/'.$fullName;\n    $action = $payload['action'] ?? null;\n    if ($event === 'pull_request') {\n        $pr = obj($payload['pull_request'] ?? null);\n        $number = positiveId($pr['number'] ?? null);\n        if (!in_array($action, ['opened', 'ready_for_review'], true)\n            || ($pr['draft'] ?? true) !== false || $number === null) {\n            return null;\n        }\n        // Один запрос на ревью за жизнь PR, даже при повторном ready_for_review.\n        return ['key' => \"$repoId:pr:$number:review\", 'text' =>\n            \"$fullName: PR #$number готов к ревью\\n\".\n            shortText($pr['title'] ?? null).\"\\n$base/pull/$number\"];\n    }\n    if ($event === 'workflow_run' && $action === 'completed') {\n        $run = obj($payload['workflow_run'] ?? null);\n        $id = positiveId($run['id'] ?? null);\n        $attempt = positiveId($run['run_attempt'] ?? null);\n        $name = $run['name'] ?? null;\n        $result = $run['conclusion'] ?? null;\n        $isDeploy = $name === 'Deploy' && setting('DEPLOY_SOURCE') === 'workflow';\n        if ($id === null || $attempt === null\n            || ($name !== 'CI' && !$isDeploy)\n            || ($run['head_branch'] ?? null) !== 'main'\n            || ($run['event'] ?? null) !== 'push'\n            || !in_array($result, ['success', 'failure', 'timed_out', 'cancelled', 'action_required', 'startup_failure', 'stale'], true)) {\n            return null;\n        }\n        return ['key' => \"$repoId:run:$id:$attempt\", 'text' =>\n            \"$fullName: $name — $result (попытка $attempt)\\n\".\n            \"$base/actions/runs/$id/attempts/$attempt\"];\n    }\n    if ($event === 'deployment_status' && setting('DEPLOY_SOURCE') === 'deployment') {\n        $deployment = obj($payload['deployment'] ?? null);\n        $status = obj($payload['deployment_status'] ?? null);\n        $id = positiveId($deployment['id'] ?? null);\n        $statusId = positiveId($status['id'] ?? null);\n        $state = $status['state'] ?? null;\n        if ($id === null || $statusId === null\n            || ($deployment['environment'] ?? null) !== 'production'\n            || !in_array($state, ['success', 'failure', 'error'], true)) {\n            return null;\n        }\n        // Ссылка только на запуск в том же репозитории, не произвольный log_url.\n        $url = $status['log_url'] ?? null;\n        $runPattern = '~^'.preg_quote($base, '~').'/actions/runs/[0-9]+(?:/attempts/[0-9]+)?$~D';\n        $url = is_string($url) && preg_match($runPattern, $url) === 1\n            ? $url : $base.'/deployments';\n        return ['key' => \"$repoId:deployment:$id:$state\", 'text' =>\n            \"$fullName: production — $state\\nDeployment #$id, status #$statusId\\n$url\"];\n    }\n    return null;\n}\n\n/** @param array<string, mixed> $payload */\nfunction acceptDelivery(PDO $db, string $id, string $event, string $body, array $payload): void\n{\n    atomic($db, function () use ($db, $id, $event, $body, $payload): void {\n        $hash = hash('sha256', $body);\n        $old = row($db, 'SELECT * FROM deliveries WHERE delivery_id=?', [$id]);\n        if ($old !== null) {\n            if ($old['body_hash'] !== $hash || $old['event'] !== $event) {\n                throw new DomainException('Delivery ID collision');\n            }\n            return;\n        }\n        $item = notification($event, $payload);\n        sql($db, 'INSERT INTO deliveries VALUES (?, ?, ?, ?)', [$id, $event, $hash, time()]);\n        if ($item !== null) {\n            sql($db, 'INSERT INTO notifications(event_key,text,available_at,created_at)\n                VALUES (?,?,?,?) ON CONFLICT(event_key) DO NOTHING',\n                [$item['key'], $item['text'], time(), time()]);\n        }\n    });\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "run_attempt входит в ключ и ссылку: перезапуск того же workflow имеет право прислать новый результат. В варианте deployment ключ объединяет deployment ID и конечное состояние. Повторный success того же deployment пропускается, а переход failure → success виден. Если ваша система переиспользует один deployment ID для нескольких независимых выкладок, выдавайте новый deployment ID либо включите собственный номер попытки в ключ."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для CI по pull request замените проверку event=push на разрешённый список [push, pull_request], а фильтр head_branch=main применяйте только к push. Иначе PR из feature-ветки закономерно исчезнут. Для режима «только проблемы» добавьте условие conclusion !== success. Если нужны также сообщения о восстановлении после ошибки, храните предыдущий результат по workflow и ветке: просто убрать success из фильтра недостаточно."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Workflow Deploy должен завершаться после выкладки и проверки работоспособности приложения. Если он только ставит задачу внешнему сервису, зелёный workflow сообщает об успешной постановке, а не о готовности production. В таком процессе используйте deployment_status от системы, которая знает итог. log_url должен указывать на запуск Actions; если такой ссылки нет, пример ведёт в историю deployments."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Правила окружений и согласований описаны отдельно: "
+                },
+                {
+                  "type": "text",
+                  "text": "Окружения и выкладки в GitHub Actions",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "signature",
+        "label": "Webhook: проверяем исходное тело и сохраняем событие",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Webhook: проверяем исходное тело и сохраняем событие"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подпись вычисляется по исходным байтам запроса, до json_decode. Повторная сериализация меняет пробелы или порядок полей и ломает проверку. Secret нужен именно от этого GitHub webhook. Подпись BotGate и Telegram secret_token к этому endpoint отношения не имеют."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/events.php';\n\nif (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { finish(405); }\nif (!str_starts_with(requestHeader('CONTENT_TYPE'), 'application/json')) { finish(415); }\n$body = file_get_contents('php://input', length: 1048577);\nif ($body === false || strlen($body) > 1048576) { finish(413); }\nif (!githubSignatureValid($body, requestHeader('HTTP_X_HUB_SIGNATURE_256'), setting('GITHUB_WEBHOOK_SECRET'))) {\n    finish(403);\n}\n$id = requestHeader('HTTP_X_GITHUB_DELIVERY');\n$event = requestHeader('HTTP_X_GITHUB_EVENT');\nif (preg_match('/^[a-zA-Z0-9-]{1,100}$/D', $id) !== 1\n    || !in_array($event, ['ping', 'pull_request', 'workflow_run', 'deployment_status'], true)) {\n    finish(400);\n}\ntry {\n    $payload = objectJson($body);\n} catch (JsonException|InvalidArgumentException) {\n    finish(400);\n}\ntry {\n    acceptDelivery(database(), $id, $event, $body, $payload);\n} catch (DomainException) {\n    finish(409);\n} catch (Throwable) {\n    error_log('GitHub webhook: save failed');\n    finish(503);\n}\nfinish(202);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Алгоритм и заголовок: "
+                },
+                {
+                  "type": "text",
+                  "text": "Проверка подписи GitHub",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "202 возвращается после COMMIT. При недоступной БД возвращается 503; при неправильной подписи — 403. ping и отфильтрованные события сохраняют delivery, но не создают уведомление. Это нормально: успешная доставка webhook не означает, что для неё обязательно отправляется сообщение."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В примере свой предел тела — 1 МиБ. Он меньше максимума GitHub; слишком большой запрос получит 413 и потребует разбора. Не повышайте его без контроля памяти и размера запроса на веб-сервере. Заголовки event и delivery не входят в HMAC тела, поэтому дополнительно проверяются структура события, repository.id и бизнес-ключ. Перехваченный корректный webhook нельзя считать новым действием только из-за нового заголовка доставки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Быстрый ответ, HTTPS и повторные доставки: "
+                },
+                {
+                  "type": "text",
+                  "text": "Рекомендации GitHub по webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "send",
+        "label": "Отправка через BotGate и определённые ошибки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправка через BotGate и определённые ошибки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "sender.php делает ровно одну попытку HTTP-запроса. Он различает подтверждённый отказ, лимит и неизвестный результат. Для Telegram 429 используется retry_after из TelegramException; для лимита самого BotGate — RateLimitException. В остальных случаях автоматический повтор может оказаться небезопасным."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · sender.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nuse BotGate\\BotClient;\nuse BotGate\\Exception\\BotGateException;\nuse BotGate\\Exception\\RateLimitException;\nuse BotGate\\Exception\\TelegramException;\n\n/** @return array{state:string,message_id:?int,delay:int,error:?string} */\nfunction sendNotification(BotClient $bot, string $text, int $attempt): array\n{\n    $result = ['state' => 'unknown', 'message_id' => null, 'delay' => 0, 'error' => null];\n    try {\n        $answer = $bot->call('sendMessage', [\n            'chat_id' => setting('TELEGRAM_CHAT_ID'),\n            'text' => $text,\n            'link_preview_options' => ['is_disabled' => true],\n        ]);\n        if (is_array($answer->result) && is_int($answer->result['message_id'] ?? null)) {\n            $result['state'] = 'sent';\n            $result['message_id'] = $answer->result['message_id'];\n        } else {\n            $result['error'] = 'unexpected_response';\n        }\n    } catch (TelegramException $e) {\n        $code = $e->telegramErrorCode();\n        $result['error'] = 'telegram_'.($code ?? 0);\n        $result['state'] = $code !== null && $code < 500 ? 'failed' : 'unknown';\n        if ($code === 429 && $attempt < 4) {\n            $result['state'] = 'pending';\n            $result['delay'] = max(1, $e->retryAfter() ?? 60) + 1;\n        }\n    } catch (RateLimitException $e) {\n        $result['state'] = $attempt < 4 ? 'pending' : 'failed';\n        $result['delay'] = max(1, $e->retryAfter() ?? 60) + 1;\n        $result['error'] = 'botgate_limit';\n    } catch (BotGateException $e) {\n        $result['error'] = 'botgate_or_transport';\n        $result['state'] = in_array($e->httpStatusCode(), [401, 403, 404], true) ? 'failed' : 'unknown';\n    } catch (Throwable) {\n        $result['error'] = 'unexpected_failure';\n    }\n    return $result;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Лимит повторяем максимум до четырёх попыток, с указанной задержкой. Ошибки прав или неверного chat_id сохраняются как failed: их надо исправить, а не повторять каждую секунду. Сетевой обрыв, 5xx и неожиданный ответ дают unknown. В журнал пишется категория ошибки без API-ключа, тела webhook и текста приватного PR."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Различия лимитов подробнее: "
+                },
+                {
+                  "type": "text",
+                  "text": "Ограничения и retry_after",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-api-error-429"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · worker.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/vendor/autoload.php';\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/sender.php';\nif (PHP_SAPI !== 'cli') { exit(1); }\n$lock = fopen(setting('APP_DB').'.worker.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) { exit(0); }\n$db = database();\n$bot = BotGate\\Client::fromConfig(new BotGate\\Config(\n    apiKey: setting('BOTGATE_API_KEY'), timeout: 8, maxRetries: 0,\n))->bot(setting('BOTGATE_BOT_ID'));\nfor ($i = 0; $i < 20; $i++) {\n    $item = atomic($db, function () use ($db): ?array {\n        $next = row($db, \"SELECT * FROM notifications WHERE state='pending'\n            AND available_at<=? ORDER BY created_at,event_key LIMIT 1\", [time()]);\n        if ($next !== null) {\n            sql($db, \"UPDATE notifications SET state='sending',attempts=attempts+1 WHERE event_key=?\", [$next['event_key']]);\n        }\n        return $next;\n    });\n    if ($item === null) { break; }\n    $result = sendNotification($bot, (string) $item['text'], (int) $item['attempts'] + 1);\n    sql($db, 'UPDATE notifications SET state=?,message_id=?,available_at=?,error_kind=? WHERE event_key=?', [\n        $result['state'], $result['message_id'], time() + $result['delay'], $result['error'], $item['event_key'],\n    ]);\n    // Не устраиваем всплеск отправок в один рабочий чат.\n    if ($result['state'] !== 'sent') { break; }\n    usleep(3500000);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "maxRetries: 0 отключает автоматические повторы SDK: решения о повторе принимает этот worker. flock допускает один процесс отправки для этой БД на одном сервере. Перед сетевым запросом состояние становится sending, после ответа — sent, pending, failed или unknown. Пауза между успешными отправками снижает нагрузку на один групповой чат; она не заменяет обработку 429."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · обработка накопленных уведомлений",
+                  "code": "php worker.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для небольшой команды запускайте worker.php раз в минуту планировщиком или менеджером процессов с теми же переменными окружения. Один проход обрабатывает до 20 записей; параллельный запуск завершится благодаря flock. Контролируйте возраст самой старой pending-записи: если минутной частоты недостаточно, переходите на постоянный worker и общую очередь, сохранив те же состояния."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "recovery",
+        "label": "Что делать после сбоя и повторной доставки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что делать после сбоя и повторной доставки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "GitHub не повторяет неуспешные доставки автоматически. После восстановления обработчика откройте Recent deliveries и вручную повторите неуспешную доставку; для большого потока добавьте отдельный контролируемый процесс redelivery через GitHub API. Если событие уже сохранено, повтор не создаст второе уведомление."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Порядок повторной доставки описан у GitHub: "
+                },
+                {
+                  "type": "text",
+                  "text": "Восстановление неуспешных доставок",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://docs.github.com/en/webhooks/using-webhooks/handling-failed-webhook-deliveries"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · диагностика локальной очереди",
+                  "code": "SELECT state, COUNT(*) FROM notifications GROUP BY state;\nSELECT event_key, state, attempts, error_kind, created_at\nFROM notifications WHERE state IN ('sending','unknown','failed')\nORDER BY created_at;\nSELECT MIN(created_at) AS oldest_pending\nFROM notifications WHERE state='pending';"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "sending после остановки worker — тоже неизвестный результат: процесс мог погибнуть между отправкой и записью message_id. Нельзя безусловно переводить все такие записи в pending. Сначала проверьте рабочий чат и журнал запросов BotGate. Если сообщение найдено, зафиксируйте его message_id и sent; если принято решение отправить заново, меняйте только конкретный event_key и учитывайте риск дубля."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не удаляйте историю ключей раньше выбранного горизонта повторов. Для крупного сервиса можно удалить текст старых sent-уведомлений, сохранив ключ, состояние и дату. Удаление всей строки снова разрешит отправку старого события. База содержит названия приватных PR: доступ к её резервным копиям должен соответствовать доступу к репозиторию."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Окно сбоя между API и БД подробнее объясняет статья "
+                },
+                {
+                  "type": "text",
+                  "text": "Почему бот отправляет дубли",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-duplicate-messages"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Проверка перед подключением рабочего чата",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка перед подключением рабочего чата"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Начните с личного тестового чата и отдельного репозитория. ping получает 202, но сообщения не создаёт."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте обычный PR: появится одна pending-запись и после worker — одно сообщение со ссылкой. Draft не уведомляет; ready_for_review уведомляет один раз."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Нажмите Redeliver в GitHub: число notifications не меняется. Измените тело сохранённого тестового запроса, оставив старую подпись: ожидается 403."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Завершите CI на main, затем повторите запуск: в ссылках различаются attempts/1 и attempts/2. Workflow с другим именем и промежуточное событие requested пропускаются."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте Deploy или deployment_status, в зависимости от выбранного режима. Зелёный результат должен соответствовать завершённой проверке приложения."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Остановите worker, отправьте событие и убедитесь, что запись остаётся pending. Верните worker — уведомление уйдёт. При недоступной БД webhook должен отвечать 503, а не 202."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "На тестовом транспорте проверьте 429, 403 и таймаут. Только подтверждённый лимит возвращается в pending; таймаут остаётся unknown."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для приватного репозитория используйте чат с тем же кругом доступа. Наличие ссылки не даёт права читать GitHub, но название PR уже может раскрыть внутреннюю информацию. Не добавляйте токены, содержимое Secrets, полный payload или логи CI в Telegram."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate в этой схеме отвечает за вызовы Telegram API. Проверка GitHub-подписи, правила уведомлений и очередь остаются в вашем приложении. Поэтому смена транспорта не исправит неправильный фильтр и не превратит неуспешную выкладку в успешную."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настройка API и диагностика запросов: "
+                },
+                {
+                  "type": "text",
+                  "text": "Документация BotGate",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

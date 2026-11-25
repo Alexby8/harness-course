@@ -1,0 +1,1020 @@
+[
+  {
+    "slug": "telegram-mini-app-form-draft",
+    "title": "Как сохранять черновик формы в Telegram Mini App",
+    "seo_title": "Как сохранять черновик формы в Telegram Mini App",
+    "description": "Черновик формы Mini App: PHP API с проверкой initData, автосохранение, восстановление, конфликт версий и отправка заявки без повторного создания. Сравнение с CloudStorage.",
+    "card_description": "Черновик формы Mini App: PHP API с проверкой initData, автосохранение, восстановление, конфликт версий и отправка заявки без повторного создания. Сравнение с CloudStorage.",
+    "category": "Практика",
+    "topics": "Mini Apps · PHP · Черновики",
+    "reading_time": "31 минута",
+    "published_at": "2026-11-18",
+    "is_published": true,
+    "sort_order": 69,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера пользователь заполняет заявку на консультацию: выбирает тему и подробно описывает вопрос. Он закрывает Mini App, а позже продолжает на том же или другом устройстве. Сделаем рабочую форму с серверным черновиком на PHP: автосохранение, проверка версии, повтор после потери ответа и очистка при оформлении заявки. JavaScript понадобится только для интерфейса Mini App."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "choose",
+        "label": "Где хранить черновик",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Где хранить черновик"
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Вариант"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Когда подходит"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что учитывать"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "localStorage"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Небольшая несекретная форма на одном устройстве."
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Привязан к origin и окружению браузера. Пользователь или клиент могут очистить данные; это не резервная копия."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Telegram DeviceStorage"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Локальный черновик в поддерживающем клиенте Telegram."
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Bot API 9.0+, до 5 МБ на пользователя у бота. Данные остаются на устройстве."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Telegram CloudStorage"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Короткий черновик, который нужно открыть на другом устройстве."
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Bot API 6.9+, до 1024 ключей; значение до 4096 символов. Нет прикладного контроля версий между устройствами."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сервер приложения"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Длинная заявка, файлы, несколько устройств, аудит изменений."
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Нужны авторизация, срок хранения, обработка конфликтов и удаление по правилам продукта."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ограничения и методы приведены в документации "
+                },
+                {
+                  "type": "text",
+                  "text": "CloudStorage",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps#cloudstorage"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "DeviceStorage",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps#devicestorage"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Ни один вариант черновика не подтверждает подлинность формы: при отправке сервер заново проверяет пользователя и поля."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для основной реализации выберем собственный PHP-сервер: это позволяет хранить до 10000 символов вопроса и проверять версии между устройствами. CloudStorage ниже останется альтернативой для коротких несекретных черновиков. Переключать хранилище незаметно после ошибки нельзя: пользователь должен понимать, где сохранены данные."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "format",
+        "label": "Задайте формат, срок жизни и ключ",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задайте формат, срок жизни и ключ"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сервер выдаёт draftId, целочисленную revision, state, fields и expiresAt. Пользователь не выбирает владельца: user_id получаем только после проверки initData. draftId связывает черновик с заявкой, revision защищает от перезаписи, operationId отличает повтор одного запроса от новой правки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-mini-app-form-draft/draft-states.jpg",
+                  "width": 1080,
+                  "height": 1034,
+                  "alt": "Восстановленная форма содержит вопрос о переносе базы; после отправки показан номер 42 и кнопка новой заявки, старый черновик очищен.",
+                  "caption": "Фрагменты HTML-формы статьи с демонстрационными данными: восстановленный черновик, затем статус и кнопка после отправки. Нижняя памятка формы опущена; API Telegram и сервер здесь не вызываются.",
+                  "mobile_src": "/images/guides/telegram-mini-app-form-draft/draft-states-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1373
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Черновик живёт семь дней после последнего сохранения. После отправки состояние становится submitted, поля черновика очищаются, applicationId сохраняется. При следующем открытии показываем номер принятой заявки, а не предлагаем отправить старый текст ещё раз. Новая заявка начинается отдельной кнопкой."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не включайте токены, платёжные реквизиты и полное initData в fields. Вложения потребуют отдельной загрузки с проверкой типа, размера и владельца; здесь форма текстовая. Заявка, черновик и журнал повторов имеют разные сроки хранения: завершённая заявка может оставаться в рабочей системе, а текст черновика удаляется."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "public/form.html\npublic/api.php\ncommon.php\nvalues.php\nauth.php\ndrafts.php\nschema.sql\ninit.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · значения-примеры",
+                  "code": "APP_DB=/private/form-drafts.sqlite\nBOT_TOKEN=TOKEN_FROM_BOTFATHER"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нужны PHP 8.3+, mbstring, PDO и pdo_sqlite; Composer не требуется. Публичный корень — только public, база лежит вне него. Задайте переменные процессу PHP-FPM. Для учебного примера используем одну базу на одном сервере; при переносе на MySQL адаптируйте транзакции и блокировки, не копируйте BEGIN IMMEDIATE."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "values.php проверяет типы на границе JSON и БД. Некорректные данные прерывают операцию; они не должны превращаться в ложный успешный результат."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · values.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @return array<string,mixed>\n */\nfunction objectValue(mixed $value): array\n{\n    if (!is_array($value)) {\n        throw new InvalidArgumentException('Expected object');\n    }\n    $result = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected object keys');\n        }\n        $result[$key] = $item;\n    }\n    return $result;\n}\n\nfunction stringValue(mixed $value): string\n{\n    if (!is_string($value)) {\n        throw new InvalidArgumentException('Expected string');\n    }\n    return $value;\n}\n\nfunction intValue(mixed $value): int\n{\n    if (!is_int($value) && !is_string($value)) {\n        throw new InvalidArgumentException('Expected integer');\n    }\n    $integer = filter_var($value, FILTER_VALIDATE_INT);\n    if ($integer === false) {\n        throw new InvalidArgumentException('Invalid integer');\n    }\n    return $integer;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/values.php';\n\nfunction envRequired(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing environment: '.$name);\n    }\n    return $value;\n}\n\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.envRequired('APP_DB'), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA busy_timeout=5000');\n    return $db;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE IF NOT EXISTS drafts (\n    user_id INTEGER PRIMARY KEY,\n    draft_id TEXT NOT NULL UNIQUE,\n    revision INTEGER NOT NULL,\n    state TEXT NOT NULL,\n    fields TEXT NOT NULL,\n    expires_at INTEGER NOT NULL,\n    application_id INTEGER\n);\nCREATE TABLE IF NOT EXISTS applications (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    user_id INTEGER NOT NULL,\n    draft_id TEXT NOT NULL,\n    fields TEXT NOT NULL,\n    created_at INTEGER NOT NULL,\n    UNIQUE(user_id,draft_id)\n);\nCREATE TABLE IF NOT EXISTS operations (\n    user_id INTEGER NOT NULL,\n    operation_id TEXT NOT NULL,\n    request_hash TEXT NOT NULL,\n    response TEXT NOT NULL,\n    PRIMARY KEY(user_id,operation_id)\n);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$sql = file_get_contents(__DIR__.'/schema.sql');\nif ($sql === false) {\n    throw new RuntimeException('Schema missing');\n}\ndatabase()->exec($sql);\necho \"Database ready\\n\";"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "autosave",
+        "label": "Восстановление и последовательное автосохранение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Восстановление и последовательное автосохранение"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Основное сохранение выполняется на PHP. currentDraft получает запись текущего пользователя; mutateDraft проверяет исходную версию и записывает результат операции. Повтор того же operationId с тем же содержимым возвращает ранее сохранённый ответ. Тот же ключ с другим текстом получает конфликт."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · drafts.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nfinal class DraftConflict extends RuntimeException\n{\n}\n\n/**\n * @param array<string,mixed> $input\n * @return array{topic:string,question:string}\n */\nfunction draftFields(array $input): array\n{\n    if (!in_array($input['topic'] ?? null, ['consultation','migration'], true)\n        || !is_string($input['question'] ?? null) || mb_strlen($input['question']) > 10000) {\n        throw new InvalidArgumentException('Выберите тему и ограничьте вопрос 10000 символами');\n    }\n    return ['topic' => $input['topic'],'question' => $input['question']];\n}\n\n/**\n * @return array<string,mixed>\n */\nfunction currentDraft(PDO $db, int $userId): array\n{\n    $q = $db->prepare('SELECT * FROM drafts WHERE user_id=?');\n    $q->execute([$userId]);\n    $row = $q->fetch(PDO::FETCH_ASSOC);\n    if (!$row) {\n        $db->prepare(\"INSERT INTO drafts(user_id,draft_id,revision,state,fields,expires_at) VALUES(?,?,0,'editing',?,?)\")\n            ->execute([$userId,bin2hex(random_bytes(16)),json_encode(['topic' => 'consultation','question' => ''], JSON_THROW_ON_ERROR),time() + 604800]);\n        $q->execute([$userId]);\n        $row = $q->fetch(PDO::FETCH_ASSOC);\n    }\n    $row = objectValue($row);\n    if ($row['state'] === 'editing' && intValue($row['expires_at']) < time()) {\n        $db->prepare(\"UPDATE drafts SET state='expired',fields='{}',revision=revision+1 WHERE user_id=?\")->execute([$userId]);\n        $q->execute([$userId]);\n        $row = objectValue($q->fetch(PDO::FETCH_ASSOC));\n    }\n    return ['draftId' => $row['draft_id'],'revision' => intValue($row['revision']),'state' => $row['state'],\n        'fields' => objectValue(json_decode(stringValue($row['fields']), true, 16, JSON_THROW_ON_ERROR)),'expiresAt' => intValue($row['expires_at']),\n        'applicationId' => $row['application_id'] === null ? null : intValue($row['application_id'])];\n}\n\n/**\n * @param array<string,mixed> $request\n * @return array<string,mixed>\n */\nfunction mutateDraft(PDO $db, int $userId, array $request): array\n{\n    $operation = $request['operationId'] ?? '';\n    $action = $request['action'] ?? '';\n    if (!is_string($operation) || !preg_match('/^[0-9a-f-]{36}$/D', $operation)\n        || !in_array($action, ['save','submit','new'], true)\n        || !is_string($request['draftId'] ?? null) || !is_int($request['revision'] ?? null)) {\n        throw new InvalidArgumentException('Некорректная операция');\n    }\n    $fields = $action === 'new' ? [] : draftFields(is_array($request['fields'] ?? null) ? objectValue($request['fields']) : []);\n    $hash = hash('sha256', json_encode([$action,$request['draftId'],$request['revision'],$fields], JSON_THROW_ON_ERROR));\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $q = $db->prepare('SELECT * FROM operations WHERE user_id=? AND operation_id=?');\n        $q->execute([$userId,$operation]);\n        $previous = $q->fetch(PDO::FETCH_ASSOC);\n        if (is_array($previous)) {\n            if (!hash_equals(stringValue($previous['request_hash']), $hash)) {\n                throw new DraftConflict('Ключ уже использован с другими данными');\n            }\n            $result = objectValue(json_decode(stringValue($previous['response']), true, 32, JSON_THROW_ON_ERROR));\n            $db->exec('COMMIT');\n            return $result;\n        }\n        $draft = currentDraft($db, $userId);\n        if ($draft['draftId'] !== $request['draftId'] || $draft['revision'] !== $request['revision']) {\n            throw new DraftConflict('Форма изменена на другом устройстве');\n        }\n        if ($action === 'new') {\n            if ($draft['state'] === 'editing') {\n                throw new DraftConflict('Сначала завершите текущую заявку');\n            }\n            $db->prepare(\"UPDATE drafts SET draft_id=?,revision=0,state='editing',fields=?,expires_at=?,application_id=NULL WHERE user_id=?\")\n                ->execute([bin2hex(random_bytes(16)),json_encode(['topic' => 'consultation','question' => ''], JSON_THROW_ON_ERROR),time() + 604800,$userId]);\n        } else {\n            if ($draft['state'] !== 'editing') {\n                throw new DraftConflict('Черновик уже закрыт или просрочен');\n            }\n            if ($action === 'submit' && mb_strlen(trim($fields['question'] ?? '')) < 10) {\n                throw new InvalidArgumentException('Опишите вопрос: минимум 10 символов');\n            }\n            $body = json_encode($fields, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n            $applicationId = null;\n            if ($action === 'submit') {\n                $db->prepare('INSERT INTO applications(user_id,draft_id,fields,created_at) VALUES(?,?,?,?)')->execute([$userId,$draft['draftId'],$body,time()]);\n                $applicationId = (int)$db->lastInsertId();\n            }\n            $db->prepare('UPDATE drafts SET fields=?,revision=revision+1,state=?,expires_at=?,application_id=? WHERE user_id=?')\n                ->execute([$action === 'submit' ? '{}' : $body,$action === 'submit' ? 'submitted' : 'editing',time() + 604800,$applicationId,$userId]);\n        }\n        $result = currentDraft($db, $userId);\n        $db->prepare('INSERT INTO operations(user_id,operation_id,request_hash,response) VALUES(?,?,?,?)')\n            ->execute([$userId,$operation,$hash,json_encode($result, JSON_THROW_ON_ERROR)]);\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $error) {\n        $db->exec('ROLLBACK');\n        throw $error;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BEGIN IMMEDIATE сериализует короткие записи SQLite. Проверка revision, создание заявки, очистка черновика и сохранение результата операции выполняются в одной транзакции. Если второй телефон отправит старую revision, он получит 409 и не затрёт первый. Повтор submit после потерянного ответа вернёт тот же applicationId."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После submitted поздний save отклоняется. Кнопка новой заявки разрешена только для закрытого или просроченного черновика. Благодаря отдельному draftId старая операция не относится к новой форме даже при одинаковой revision=0. Не заменяйте эти проверки одним updatedAt: часы на устройствах могут различаться."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Валидация сохранения допускает пустой вопрос, а отправка требует минимум десять символов. Поэтому человек может начать форму и сохранить неполный текст. Ограничения и перечень тем проверяются на сервере, даже если браузер уже показывает select и maxlength."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "connect",
+        "label": "Подключите модуль к существующей форме",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключите модуль к существующей форме"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала проверим исходные данные Telegram, затем подключим API. Пример использует заголовок X-Telegram-Init-Data и не создаёт cookie-сессию. initData не пишется в БД или журнал; сервер проверяет подпись и срок. После часа открытое окно попросит переоткрыть Mini App. Для более длинных сессий выдавайте собственную сессию после проверки, как в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по авторизации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-initdata-auth-php-laravel"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · auth.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nfunction telegramUser(string $raw, string $botToken, int $now): int\n{\n    if ($raw === '' || strlen($raw) > 16384) {\n        throw new RuntimeException('Invalid initData');\n    }\n    $fields = [];\n    foreach (explode('&', $raw) as $pair) {\n        [$key,$value] = array_pad(explode('=', $pair, 2), 2, '');\n        $key = urldecode($key);\n        $value = urldecode($value);\n        if ($key === '' || array_key_exists($key, $fields)) {\n            throw new RuntimeException('Duplicate field');\n        }\n        $fields[$key] = $value;\n    }\n    $hash = $fields['hash'] ?? '';\n    unset($fields['hash']);\n    if (!preg_match('/^[a-f0-9]{64}$/D', $hash)) {\n        throw new RuntimeException('Invalid hash');\n    }\n    ksort($fields, SORT_STRING);\n    $lines = [];\n    foreach ($fields as $key => $value) {\n        $lines[] = $key.'='.$value;\n    }\n    $secret = hash_hmac('sha256', $botToken, 'WebAppData', true);\n    if (!hash_equals(hash_hmac('sha256', implode(\"\\n\", $lines), $secret), $hash)) {\n        throw new RuntimeException('Bad signature');\n    }\n    $date = filter_var($fields['auth_date'] ?? '', FILTER_VALIDATE_INT);\n    if ($date === false || $date > $now + 30 || $date < $now - 3600) {\n        throw new RuntimeException('Expired initData');\n    }\n    $user = json_decode($fields['user'] ?? '', true, 16, JSON_THROW_ON_ERROR);\n    if (!is_array($user) || !is_int($user['id'] ?? null) || $user['id'] <= 0) {\n        throw new RuntimeException('Missing user');\n    }\n    return $user['id'];\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/api.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/auth.php';\nrequire dirname(__DIR__).'/drafts.php';\nheader('Content-Type: application/json; charset=utf-8');\nheader('Cache-Control: no-store');\n/**\n * @param array<string,mixed> $body\n */\nfunction respond(int $status, array $body): never\n{\n    http_response_code($status);\n    echo json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n    exit;\n}\ntry {\n    $userId = telegramUser(stringValue($_SERVER['HTTP_X_TELEGRAM_INIT_DATA'] ?? ''), envRequired('BOT_TOKEN'), time());\n} catch (Throwable) {\n    respond(401, ['error' => 'Откройте Mini App заново в Telegram']);\n}\ntry {\n    $db = database();\n    $method = $_SERVER['REQUEST_METHOD'] ?? '';\n    if ($method === 'GET') {\n        // Первый GET может создать пустой черновик; короткая блокировка исключает гонку.\n        $db->exec('BEGIN IMMEDIATE');\n        try {\n            $result = currentDraft($db, $userId);\n            $db->exec('COMMIT');\n        } catch (Throwable $error) {\n            $db->exec('ROLLBACK');\n            throw $error;\n        }\n        respond(200, $result);\n    }\n    if ($method !== 'POST') {\n        respond(405, ['error' => 'Метод не поддерживается']);\n    }\n    $raw = file_get_contents('php://input', false, null, 0, 65537);\n    if (!is_string($raw) || strlen($raw) > 65536) {\n        respond(413, ['error' => 'Слишком большой запрос']);\n    }\n    $body = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);\n    if (!is_array($body)) {\n        respond(422, ['error' => 'Ожидается объект JSON']);\n    }\n    respond(200, mutateDraft($db, $userId, objectValue($body)));\n} catch (DraftConflict $error) {\n    respond(409, ['error' => $error->getMessage()]);\n} catch (InvalidArgumentException|JsonException $error) {\n    respond(422, ['error' => 'Проверьте формат и поля заявки']);\n} catch (Throwable) {\n    respond(503,['error' => 'Не удалось подтвердить сохранение']);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Код отклоняет повторяющиеся поля query string, неверную подпись и старый auth_date. В HMAC проверке исключается hash; алгоритм с исключением ещё и signature относится к другой, Ed25519-проверке третьей стороной. Не смешивайте эти два режима."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "HTML и JavaScript · public/form.html",
+                  "code": "<!doctype html>\n<html lang=\"ru\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Заявка на консультацию</title>\n<script src=\"https://telegram.org/js/telegram-web-app.js\"></script>\n<style>\n*{box-sizing:border-box}body{margin:0;padding:22px;font:16px/1.5 system-ui;background:var(--tg-theme-bg-color,#f4f7fb);color:var(--tg-theme-text-color,#17212b)}main{max-width:560px;margin:auto}h1{font-size:25px;margin:0 0 12px}label{display:block;margin:18px 0 7px}select,textarea,button{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid #aab8ca}textarea{min-height:180px;resize:vertical}button{margin-top:12px;background:var(--tg-theme-button-color,#2869b0);color:var(--tg-theme-button-text-color,#fff);border:0}button:disabled{opacity:.55}#status{position:sticky;top:0;padding:12px;background:var(--tg-theme-secondary-bg-color,#e4edf8);border-radius:10px}small{display:block;margin-top:12px;color:#68798e}\n</style></head><body><main>\n<h1>Заявка на консультацию</h1>\n<p id=\"status\" role=\"status\">Загружаем черновик…</p>\n<label for=\"topic\">Тема</label><select id=\"topic\" disabled><option value=\"consultation\">Консультация</option><option value=\"migration\">Перенос данных</option></select>\n<label for=\"question\">Ваш вопрос</label><textarea id=\"question\" maxlength=\"10000\" disabled></textarea>\n<button id=\"save\" disabled>Сохранить черновик</button>\n<button id=\"submit\" disabled>Отправить заявку</button>\n<button id=\"retry\" hidden>Повторить неподтверждённую операцию</button>\n<button id=\"reload\" hidden>Загрузить серверную версию</button>\n<button id=\"new\" hidden>Новая заявка</button>\n<small>Черновик хранится семь дней после последнего сохранения. Перед закрытием дождитесь подтверждения.</small>\n</main><script type=\"module\">\nconst tg=window.Telegram?.WebApp;\nconst el=id=>document.getElementById(id);\nconst status=text=>{el('status').textContent=text;};\nlet draft, timer, pending=null, busy=false, dirty=false, ready=false;\nconst fields=()=>({topic:el('topic').value,question:el('question').value});\nfunction controls(){\n  const locked=!ready||busy||!!pending||draft?.state!=='editing';\n  for(const id of ['topic','question','save','submit'])el(id).disabled=locked;\n  el('retry').hidden=!pending;el('new').hidden=!draft||draft.state==='editing';\n  el('new').disabled=busy||!!pending;\n}\nasync function api(body){\n  const response=await fetch('./api.php',{\n    method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg?.initData??''},\n    body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(15000)\n  });\n  const result=await response.json();\n  if(!response.ok)throw Object.assign(new Error(result.error||'Ошибка сервера'),{status:response.status});\n  if(!result.draftId||!Number.isInteger(result.revision))throw new Error('Неожиданный ответ сервера');\n  return result;\n}\nfunction display(){\n  el('topic').value=draft.fields.topic||'consultation';el('question').value=draft.fields.question||'';\n  status(draft.state==='submitted'?'Заявка №'+draft.applicationId+' принята. Черновик очищен.':\n    draft.state==='expired'?'Срок хранения истёк. Начните новую заявку.':\n    draft.fields.question?'Черновик восстановлен':'Можно начать заполнение');\n}\nasync function load(){\n  ready=false;controls();\n  try{draft=await api();pending=null;dirty=false;ready=true;display();el('reload').hidden=true;}\n  catch(error){status(error.message);el('reload').hidden=false;}\n  controls();\n}\nasync function send(action){\n  clearTimeout(timer);if(busy)return;\n  if(!pending){\n    if(!ready)return;\n    pending={action,operationId:crypto.randomUUID(),draftId:draft.draftId,revision:draft.revision,\n      ...(action==='new'?{}:{fields:fields()})};\n  }\n  busy=true;controls();status('Сохраняем…');\n  try{\n    const sent=pending;draft=await api(sent);pending=null;dirty=false;ready=true;\n    display();if(draft.state==='editing'&&sent.action==='save')status('Черновик сохранён');\n    el('reload').hidden=true;\n  }catch(error){\n    status(error.message+(error.status===409?' Скопируйте свой текст перед загрузкой серверной версии.':''));\n    if(error.status===409||error.status===401){pending=null;ready=false;el('reload').hidden=false;}\n    else if(error.status===422){pending=null;}\n    // При таймауте/503 payload и operationId сохраняются, поля заблокированы.\n  }finally{busy=false;controls();}\n}\nfor(const id of ['topic','question'])el(id).addEventListener('input',()=>{\n  dirty=true;status('Есть несохранённые изменения');clearTimeout(timer);\n  timer=setTimeout(()=>send('save'),800);\n});\nel('save').onclick=()=>send('save');el('submit').onclick=()=>send('submit');\nel('retry').onclick=()=>send(pending.action);el('new').onclick=()=>send('new');\nel('reload').onclick=()=>{if(!dirty||confirm('Загрузить серверную версию? Сначала скопируйте свой текст.'))load();};\nif(tg?.initData){tg.ready();load();}else status('Откройте форму через меню Telegram-бота.');\n</script></body></html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Форма ставит таймер на 800 мс после ввода. Во время запроса поля временно блокируются, поэтому завершение старой записи не затрёт новые символы. Это простой учебный вариант: в сложной форме можно разрешить дальнейший ввод, но тогда нужен отдельный снимок отправленной версии и последовательная очередь."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При таймауте или 503 сохраняется тот же payload и operationId, а интерфейс предлагает повтор. При 409 текст остаётся на экране: пользователь может скопировать его перед загрузкой серверной версии. Не перезагружайте форму автоматически в обработчике конфликта. При 422 исправьте поля и отправьте новую операцию."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · создать базу формы",
+                  "code": "php init.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разместите public на HTTPS-домене и задайте адрес form.html в меню Mini App тестового бота. Открытие обычной вкладкой без Telegram должно показать подсказку, а GET api.php без initData — 401. Откройте форму через бота, введите вопрос, дождитесь «Черновик сохранён», закройте и откройте её снова. Для первого опыта не нужен реальный клиент или платёж."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "submit",
+        "label": "Очищайте черновик после подтверждения заявки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Очищайте черновик после подтверждения заявки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В этом примере кнопка «Отправить заявку» вызывает action=submit с последними полями и текущей revision. Код PHP создаёт applications, очищает drafts.fields и сохраняет номер заявки атомарно. Отдельный DELETE после ответа не нужен: он оставил бы окно, в котором заявка уже принята, а черновик ещё активен."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При неизвестном результате интерфейс блокирует редактирование отправленного снимка и повторяет тот же ключ. Если пользователь закрыл окно, следующий GET вернёт submitted и номер заявки. В браузере не хранится отдельная копия, способная вновь загрузиться поверх закрытого черновика."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · проверить результат заявки",
+                  "code": "SELECT id,user_id,draft_id,created_at FROM applications ORDER BY id DESC LIMIT 5;\nSELECT user_id,draft_id,revision,state,application_id,fields FROM drafts;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После одного успешного submit ожидается одна строка applications, состояние submitted, пустые поля черновика и application_id этой строки. Повтор той же операции не увеличивает количество заявок. Новый operationId со старым draftId и revision даёт 409: повтор нельзя превращать в новую заявку просто сменой ключа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправку сообщения в Telegram выполняйте отдельно после commit через очередь. Ошибка sendMessage не должна откатывать принятую заявку или возвращать клиенту «не отправлено». В интерфейсе источником успеха служит номер сохранённой заявки, а доставка уведомления — отдельный статус."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "server",
+        "label": "Несколько устройств: когда нужен свой сервер",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Несколько устройств: когда нужен свой сервер"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В примере все операции живут в одном public/api.php. GET возвращает текущий черновик, POST принимает action=save, submit или new. Это маршруты приложения, не Telegram Bot API. Обеим операциям нужна подтверждённая личность; переданный в JSON user_id не используется."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для двух устройств выполните тест: откройте форму на обоих с revision=0, сохраните текст на первом, затем попробуйте сохранить на втором. Второй должен получить 409 и сохранить введённый текст на экране. Нажатие «Загрузить серверную версию» после копирования текста покажет уже сохранённую запись."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Очистку просроченных черновиков запускайте и фоново, чтобы они не ждали следующего GET. Не удаляйте журнал operations одновременно с черновиком: он нужен для повторов. В рабочей системе храните в журнале только минимальный результат операции, без полного текста, и задайте горизонт повторов. Здесь response содержит снимок для прозрачного учебного поведения — это дополнительная копия текста, для которой тоже нужен срок удаления."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "До публичного запуска добавьте лимит запросов по подтверждённому user_id, мониторинг 409/503 и ограничение размера тела на веб-сервере. Для cookie-сессии потребуется CSRF-защита; для текущего заголовочного протокола не открывайте разрешающий произвольные origin CORS. Настройку уведомления через BotGate держите только на сервере."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "storage",
+        "label": "Когда достаточно CloudStorage",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда достаточно CloudStorage"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если серверный черновик пока избыточен, используйте этот отдельный адаптер для короткой несекретной формы. Он не является второй копией основного сценария: выберите одно хранилище. CloudStorage не заменит серверную проверку при окончательном оформлении заявки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключите telegram-web-app.js на странице Mini App, затем используйте адаптер ниже. Ключ состоит из допустимых букв, цифр, подчёркиваний и дефисов. Успех записи определяется callback, а не фактом вызова setItem. При отсутствии поддержки показываем явное ограничение."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JavaScript · cloud-draft.mjs",
+                  "code": "export function cloudStore(tg, key = 'consultation_draft_v1') {\n  if (!tg?.isVersionAtLeast('6.9') || !tg.CloudStorage) {\n    throw new Error('CloudStorage недоступен: обновите Telegram');\n  }\n  let uncertain = false;\n  function call(method, ...args) {\n    if (uncertain) return Promise.reject(new Error('Перезапустите форму после сбоя хранения'));\n    return new Promise((resolve, reject) => {\n      let settled = false;\n      const timer = setTimeout(() => {\n        settled = true; uncertain = true;\n        reject(new Error('Нет подтверждения хранения. Не закрывайте форму'));\n      }, 10000);\n      const done = (error, value) => {\n        if (settled) return;\n        settled = true; clearTimeout(timer);\n        if (error || (method !== 'getItem' && value !== true)) {\n          reject(new Error('Хранилище не подтвердило операцию'));\n        } else resolve(value);\n      };\n      try { tg.CloudStorage[method](key, ...args, done); }\n      catch (error) { clearTimeout(timer); settled = true; reject(error); }\n    });\n  }\n  return {\n    read: () => call('getItem'),\n    write: value => {\n      if (value.length > 4096) return Promise.reject(new Error('Черновик слишком большой'));\n      return call('setItem', value);\n    },\n    remove: () => call('removeItem')\n  };\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После таймаута адаптер блокирует новые операции до перезапуска: старый setItem ещё мог выполняться, и следующий запрос не должен обгонять его. Скопируйте введённый текст перед перезапуском. Для прозрачного продолжения при таких сбоях нужен серверный вариант с версиями и идемпотентными операциями."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JavaScript · минимальное использование адаптера",
+                  "code": "import {cloudStore} from './cloud-draft.mjs';\nconst store = cloudStore(window.Telegram.WebApp);\nconst raw = await store.read();\n// Перед применением проверьте schema, срок и типы полей.\nconst draft = raw ? JSON.parse(raw) : null;\nawait store.write(JSON.stringify({schema:1, updatedAt:Date.now(), fields:{question:'Тестовый вопрос'}}));\n// Вызывать только после подтверждённого принятия сервером:\n// await store.remove();"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для этой альтернативы сериализуйте записи, сохраняйте после паузы во вводе и показывайте успех только после callback. Перед очисткой дождитесь последней записи. Два одновременно открытых устройства всё равно могут перезаписать друг друга: серверная revision в основном примере решает именно эту проблему. Для localStorage действует то же требование явного успеха плюс риск очистки WebView на устройстве."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Проверки перед запуском",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверки перед запуском"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введите текст, дождитесь «Черновик сохранён», закройте Mini App и откройте снова: поля восстановились."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "При медленном сохранении поля временно заблокированы; после успешного ответа снова доступны. Новая правка должна отправляться уже с полученной revision."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отказ хранилища и превышение размера показывают ошибку. Неподдерживаемый клиент не получает ложный статус успеха."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Некорректный JSON и недопустимые поля дают 422; истёкший черновик закрывается по сроку хранения."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ошибка до сохранения заявки не очищает серверный черновик. При потерянном ответе повтор той же операции возвращает сохранённый результат; принятие заявки и очистка выполняются атомарно."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Потерянный ответ оформления и повторное открытие возвращают номер прежней заявки."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Два устройства в серверном варианте получают конфликт revision, поздняя запись не воскрешает закрытый черновик."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте Android, iOS и Desktop отдельно: доступность API не заменяет проверку жизненного цикла WebView. BotGate можно использовать для сообщения о принятой заявке, но хранение черновика выполняет Mini App или ваш сервер, а не Telegram-транспорт сервиса."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте и отказ доступа: изменённый user в initData, неверный hash и просроченный auth_date должны дать 401 до чтения чужой формы. Подмена draftId в JSON при корректном пользователе должна дать конфликт, а не доступ к чужому черновику. После новой заявки повтор старого запроса может вернуть старый результат из журнала, но не должен изменить новую форму."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

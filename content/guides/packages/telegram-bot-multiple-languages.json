@@ -1,0 +1,1425 @@
+[
+  {
+    "slug": "telegram-bot-multiple-languages",
+    "title": "Как сделать Telegram-бота на нескольких языках",
+    "seo_title": "Как сделать Telegram-бота на нескольких языках",
+    "description": "Полный диалог на русском и английском в Laravel: определение языка, ручной выбор, сообщения, кнопки, ошибки, уведомления и запасной перевод.",
+    "card_description": "Полный диалог на русском и английском в Laravel: определение языка, ручной выбор, сообщения, кнопки, ошибки, уведомления и запасной перевод.",
+    "category": "Практика",
+    "topics": "Laravel · Локализация · Диалоги",
+    "reading_time": "32 минуты",
+    "published_at": "2026-11-20",
+    "is_published": true,
+    "sort_order": 74,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера сделаем учебного бота сервисного центра на русском и английском. Он представляется, спрашивает имя, проверяет ввод, позволяет изменить язык и получает служебное уведомление из приложения. Пройдём весь путь: словари Laravel, сохранение выбора, webhook, отправка и проверка отсутствующих переводов. Реальная запись на приём в этот пример не входит."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "language-policy",
+        "label": "Сначала определите правила выбора языка",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала определите правила выбора языка"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перевод пары приветствий не делает бота многоязычным. Пользователь должен видеть на выбранном языке инструкции, подписи кнопок, ошибки ввода и сообщения, которые приходят позже без нового входящего Update. При этом технические команды и значения callback_data остаются стабильными: переводится надпись «Помощь», а действие help не меняет смысл."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В объекте User поле language_code необязательно и содержит языковой тег. В этом примере ru и ru-RU выбирают русский, en и en-US — английский. Неизвестный язык или отсутствие поля приводят к английскому. Это подсказка для первого контакта; по ней нельзя надёжно определить страну, валюту или часовой пояс. "
+                },
+                {
+                  "type": "text",
+                  "text": "Объект User",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#user"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ситуация"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Решение в примере"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Первый контакт"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Нормализовать language_code и сохранить ru или en"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Пользователь выбрал язык кнопкой"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сохранить новый выбор и подтвердить на новом языке"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Следующий Update пришёл с другим language_code"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Использовать сохранённый выбор"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "В выбранном словаре нет строки"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Использовать английский перевод и записать ключ в журнал"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Строки нет и в английском"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Отправить безопасную запасную фразу без служебного ключа"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Мы намеренно не переопределяем язык после первого сохранения, даже если первый выбор был автоматическим. Так поведение предсказуемо: смена языка Telegram на телефоне не меняет незавершённый диалог. Команда /language всегда доступна. Русский и английский обозначаем собственными названиями, без флагов: язык не равен гражданству."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Создайте отдельное приложение и таблицы",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте отдельное приложение и таблицы"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нужны PHP 8.3+ в 64-битном окружении, Laravel 13, Composer, mbstring, HTTPS и база данных. Для первого опыта подходит SQLite с pdo_sqlite; для параллельной рабочей нагрузки можно использовать настроенную БД Laravel. В проекте ниже один бот и одна таблица пользователей: для нескольких ботов ключи должны учитывать bot_id, как в "
+                },
+                {
+                  "type": "text",
+                  "text": "отдельном руководстве",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-multiple-telegram-bots"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · новое учебное приложение",
+                  "code": "composer create-project \"laravel/laravel:^13.0\" language-bot\ncd language-bot\nphp artisan lang:publish"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте тестового бота через "
+                },
+                {
+                  "type": "text",
+                  "text": "BotFather",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-botfather"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". В .env задайте значения ниже и параметры своей БД. BOT_WEBHOOK_SECRET должен быть случайной строкой, например 64 шестнадцатеричных символа; приведённые обозначения не являются рабочими секретами. Корнем сайта будет public, а .env и база SQLite останутся вне него."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "ENV · дополнение .env",
+                  "code": "APP_URL=https://language-bot.example.com\nAPP_DEBUG=false\nAPP_LOCALE=en\nAPP_FALLBACK_LOCALE=en\nBOT_TOKEN=TOKEN_FROM_BOTFATHER\nBOT_WEBHOOK_SECRET=RANDOM_SECRET_GENERATED_FOR_THIS_BOT"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · config/guidebot.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nreturn ['token' => env('BOT_TOKEN'), 'secret' => env('BOT_WEBHOOK_SECRET')];"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте каталог app/GuideBot для классов диалога и транспорта, app/Console/Commands — для команд. Каждый блок ниже является отдельным файлом с указанным именем. Скопируйте миграцию в database/migrations; таблицы demo_* предназначены для этого отдельного приложения, не для вставки в существующую БД BotGate."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · database/migrations/2026_11_20_000001_create_language_bot_tables.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nuse Illuminate\\Database\\Migrations\\Migration;\nuse Illuminate\\Database\\Schema\\Blueprint;\nuse Illuminate\\Support\\Facades\\Schema;\n\nreturn new class () extends Migration {\n    public function up(): void\n    {\n        Schema::create('demo_users', function (Blueprint $t): void {\n            $t->bigInteger('chat_id')->primary();\n            $t->string('locale', 5);\n            $t->string('locale_source', 10);\n            $t->string('name', 60)->nullable();\n            $t->boolean('awaiting_name')->default(false);\n        });\n        Schema::create('demo_updates', fn (Blueprint $t) => $t->bigInteger('update_id')->primary());\n        Schema::create('demo_outbox', function (Blueprint $t): void {\n            $t->id();\n            $t->bigInteger('chat_id');\n            $t->string('event_key')->unique();\n            $t->text('payload');\n            $t->string('kind');\n            $t->unsignedInteger('revision')->default(0);\n            $t->string('state');\n            $t->unsignedInteger('attempts');\n            $t->bigInteger('next_at');\n            $t->bigInteger('message_id')->nullable();\n            $t->integer('error_code')->nullable();\n            $t->index(['state', 'next_at']);\n        });\n    }\n    public function down(): void\n    {\n        Schema::dropIfExists('demo_outbox');\n        Schema::dropIfExists('demo_updates');\n        Schema::dropIfExists('demo_users');\n    }\n};"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "chat_id хранится в bigint, имя может отсутствовать, awaiting_name показывает шаг диалога. locale_source различает первоначальное определение и ручное переключение. demo_updates защищает повтор обработки события, demo_outbox сохраняет исходящий ответ независимо от текущего HTTP-запроса. Не очищайте журнал событий при каждом перезапуске: это снова разрешит обработку старых повторов."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "dictionaries",
+        "label": "Переведите весь словарь диалога",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Переведите весь словарь диалога"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Laravel поддерживает PHP-файлы словарей в lang/ru и lang/en. В свежем приложении lang может отсутствовать, поэтому выше выполнен lang:publish. Создайте в каждом языковом каталоге файл bot.php. Ключи — смысловые идентификаторы, а не исходные русские предложения: редактура фразы не должна ломать вызовы из кода. "
+                },
+                {
+                  "type": "text",
+                  "text": "Локализация Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/framework/docs/13.x/localization"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-multiple-languages/language-dialogue.jpg",
+                  "alt": "Одни и те же просьба ввести имя, ошибка и кнопки на русском и английском; ручной выбор языка сохраняется.",
+                  "caption": "Поясняющая схема диалога. Подписи взяты из словарей статьи; интерфейс Telegram условно не воспроизводится.",
+                  "width": 1080,
+                  "height": 836,
+                  "mobile_src": "/images/guides/telegram-bot-multiple-languages/language-dialogue-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1202
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · lang/ru/bot.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nreturn [\n    'welcome' => \"Здравствуйте! Это учебный бот записи.\\nКак к вам обращаться? Напишите имя длиной от 2 до 60 символов.\",\n    'ask_name' => 'Напишите имя длиной от 2 до 60 символов.',\n    'saved' => 'Спасибо, :name. Имя сохранено. Это демонстрация: реальная запись на приём не создаётся.',\n    'choose_language' => 'Выберите язык. Он будет сохранён для следующих сообщений.',\n    'language_saved' => 'Язык изменён на русский.',\n    'language_button' => 'Изменить язык',\n    'help_button' => 'Помощь',\n    'help' => '/start — начать диалог; /language — выбрать язык; /help — помощь. Уведомления придут на сохранённом языке.',\n    'bad_name' => 'Имя должно содержать от 2 до 60 символов. Попробуйте ещё раз.',\n    'unknown' => 'Не удалось распознать команду. Используйте /start, /language или /help.',\n    'stale' => 'Эта кнопка больше не поддерживается. Откройте /language или /start.',\n    'notice' => 'Учебное уведомление по заявке :reference: статус обновлён. Ответьте /help, если нужна помощь.',\n];"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · lang/en/bot.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nreturn [\n    'welcome' => \"Hello! This is a booking demo bot.\\nWhat should we call you? Enter a name between 2 and 60 characters.\",\n    'ask_name' => 'Enter a name between 2 and 60 characters.',\n    'saved' => 'Thank you, :name. Your name has been saved. This is a demo: no real appointment has been booked.',\n    'choose_language' => 'Choose your language. We will remember it for future messages.',\n    'language_saved' => 'Language changed to English.',\n    'language_button' => 'Change language',\n    'help_button' => 'Help',\n    'help' => '/start — start the conversation; /language — choose a language; /help — help. Notifications use your saved language.',\n    'bad_name' => 'Your name must contain between 2 and 60 characters. Please try again.',\n    'unknown' => 'Command not recognized. Use /start, /language or /help.',\n    'stale' => 'This button is no longer supported. Open /language or /start.',\n    'notice' => 'Demo notification for request :reference: the status has changed. Send /help if you need assistance.',\n];"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Словарь включает ошибки имени, неизвестные команды, устаревшие кнопки и уведомление по заявке. Это тот же пользовательский диалог, поэтому не оставляйте эти строки в контроллере. Напротив, текст CLI для администратора и технические записи журнала не показываются клиенту и не обязаны следовать его языку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Имя и номер заявки вставляются через :name и :reference. Не склеивайте предложение из кусочков: в другом языке меняются порядок слов и пунктуация. Пользовательское имя не переводится. Отправка в примере идёт без parse_mode, поэтому символы < и & остаются обычным текстом; при переходе к HTML понадобится отдельное экранирование значений для Telegram."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если добавите счётчики, даты или цены, продумайте их отдельно: формы числа задают через trans_choice, даты форматируют с явно выбранным часовым поясом, денежные суммы — с валютой и правилами округления. Язык интерфейса не даёт оснований конвертировать цену или менять юридические условия. Для текущего диалога таких данных нет."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "translator",
+        "label": "Сделайте предсказуемый запасной перевод",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сделайте предсказуемый запасной перевод"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/BotText.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Support\\Facades\\Lang;\n\nfinal class BotText\n{\n    public static function initial(string $tag): string\n    {\n        $base = explode('-', strtolower(str_replace('_', '-', $tag)))[0];\n        return in_array($base, ['ru', 'en'], true) ? $base : 'en';\n    }\n\n    /** @param array<string, string> $replace */\n    public static function get(string $key, string $locale, array $replace = []): string\n    {\n        if (!in_array($locale, ['ru', 'en'], true)) {\n            $locale = 'en';\n        }\n        $full = 'bot.'.$key;\n        if (!Lang::hasForLocale($full, $locale)) {\n            logger()->warning('Missing bot translation', ['key' => $full, 'locale' => $locale]);\n            $locale = 'en';\n        }\n        $value = Lang::get($full, $replace, $locale, false);\n        if (is_string($value) && $value !== $full) {\n            return $value;\n        }\n        logger()->error('Missing fallback translation', ['key' => $full]);\n        return 'Message unavailable. Please use /language or try again later.';\n    }\n\n    /** @return array<string, mixed> */\n    public static function menu(string $locale): array\n    {\n        return ['inline_keyboard' => [[\n            ['text' => self::get('language_button', $locale), 'callback_data' => 'language'],\n            ['text' => self::get('help_button', $locale), 'callback_data' => 'help'],\n        ]]];\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotText проверяет наличие строки именно в выбранном языке, затем обращается к английскому. Обычный Laravel fallback полезен, но сам по себе не обнаруживает проблему: при отсутствии строки во всех словарях наружу может попасть ключ. Обёртка отмечает пропуск в журнале и не показывает клиенту bot.notice. Полный английский словарь остаётся обязательным, а запасная фраза — защитой от ошибки выкладки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Локаль передаётся в каждый вызов Lang явно. Мы не меняем глобальный App::setLocale и не надеемся, что другой обработчик или долгоживущий worker сбросит язык. Это особенно важно, когда один процесс последовательно обслуживает русского и английского пользователя. В проектах с глобальным переключением локали её нужно восстанавливать в finally."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Меню строится заново на выбранном языке. В callback_data находятся language и help, а не переведённый текст кнопки. Поэтому старое русское «Помощь» продолжит работать после переключения на английский и вызовет актуальную английскую справку. Случайное значение lang:de не добавляет язык в список поддерживаемых."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "dialogue",
+        "label": "Свяжите язык со всеми шагами диалога",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Свяжите язык со всеми шагами диалога"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Dialogue.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Dialogue\n{\n    // Called inside the webhook transaction, without HTTP requests.\n    public function handle(Event $event): void\n    {\n        DB::table('demo_users')->insertOrIgnore([\n            'chat_id' => $event->chatId, 'locale' => BotText::initial($event->language), 'locale_source' => 'telegram',\n        ]);\n        $user = DB::table('demo_users')->where('chat_id', $event->chatId)->lockForUpdate()->first();\n        if (!$user) {\n            throw new \\RuntimeException('Missing user');\n        }\n        $locale = (string) $user->locale;\n        $action = $event->action;\n        $key = 'unknown';\n        $replace = [];\n        $buttons = BotText::menu($locale);\n        if (in_array($action, ['/language', 'language'], true)) {\n            $key = 'choose_language';\n            $buttons = ['inline_keyboard' => [[\n                ['text' => 'Русский', 'callback_data' => 'lang:ru'],\n                ['text' => 'English', 'callback_data' => 'lang:en'],\n            ]]];\n        } elseif ($event->callbackId !== null && in_array($action, ['lang:ru', 'lang:en'], true)) {\n            $locale = substr($action, 5);\n            DB::table('demo_users')->where('chat_id', $event->chatId)->update(['locale' => $locale, 'locale_source' => 'manual']);\n            $key = 'language_saved';\n            $buttons = BotText::menu($locale);\n        } elseif ($action === '/start') {\n            DB::table('demo_users')->where('chat_id', $event->chatId)->update(['awaiting_name' => true]);\n            $key = 'welcome';\n        } elseif (in_array($action, ['/help', 'help'], true)) {\n            $key = 'help';\n        } elseif ($event->callbackId !== null) {\n            $key = 'stale';\n        } elseif ((bool) $user->awaiting_name && !str_starts_with($action, '/')) {\n            $key = 'bad_name';\n            if (mb_strlen($action) >= 2 && mb_strlen($action) <= 60) {\n                DB::table('demo_users')->where('chat_id', $event->chatId)->update(['name' => $action, 'awaiting_name' => false]);\n                $key = 'saved';\n                $replace = ['name' => $action];\n            }\n        }\n        $text = BotText::get($key, $locale, $replace);\n        if ($key === 'language_saved' && (bool) $user->awaiting_name) {\n            $text .= \"\\n\".BotText::get('ask_name', $locale);\n        }\n        Outbox::add($event->chatId, 'update:'.$event->updateId, ['text' => $text, 'reply_markup' => $buttons]);\n    }\n\n    public function notify(int $chatId, string $reference): void\n    {\n        DB::transaction(function () use ($chatId, $reference): void {\n            $user = DB::table('demo_users')->where('chat_id', $chatId)->lockForUpdate()->first();\n            if (!$user) {\n                throw new \\RuntimeException('User must start the bot first');\n            }\n            Outbox::add($chatId, 'notice:'.$chatId.':'.$reference, [\n                'text' => BotText::get('notice', (string) $user->locale, ['reference' => $reference]),\n                'reply_markup' => BotText::menu((string) $user->locale),\n            ]);\n        });\n    }\n\n    public function canSend(\\stdClass $row): bool\n    {\n        return true;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При первом событии создаётся пользователь. Далее строка блокируется внутри внешней транзакции webhook, чтобы сохранение имени и переключение языка не потеряли изменения друг друга. Команда /start начинает ввод имени, но не сбрасывает язык. /language не отменяет ввод: после выбора бот снова напоминает, что ждёт имя, уже на новом языке."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ввод имени принимается только на соответствующем шаге. Команда с начальным / не превращается в имя; callback тоже проходит отдельную ветку. После слишком короткого или длинного текста шаг остаётся прежним, и пользователь может исправить ввод. Неизвестная кнопка получает понятный переведённый ответ, а не PHP-ошибку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Уведомление собирается по locale из БД в момент создания outbox. Текст затем заморожен: повтор отправки не меняет язык и содержание. Поэтому сообщение, уже стоявшее в очереди до переключения, может прийти на старом языке. Новые уведомления будут на новом. Если продукт требует менять и ожидающие сообщения, храните ключ шаблона и параметры, определяйте язык при отправке и отдельно проектируйте поведение при повторе."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Уже отправленные сообщения и кнопки в истории автоматически не переводятся. Здесь бот присылает новый ответ, сохраняя понятную историю. Редактирование предыдущего сообщения возможно, но потребует хранения message_id и отдельной обработки недоступного сообщения; для смены языка это не обязательное условие."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Подключите проверенный входящий webhook",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключите проверенный входящий webhook"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Входящий webhook работает только с личными чатами. Идентификатор владельца берём из from.id и проверяем его совпадение с chat.id, а не читаем из callback_data. Сначала проверяем секретный заголовок, затем в одной транзакции отмечаем update_id, изменяем состояние и создаём ответ. При ошибке транзакция откатывается, успешного подтверждения нет: Telegram сможет повторить событие. Повтор уже сохранённого Update ничего не меняет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Event.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nfinal readonly class Event\n{\n    public function __construct(\n        public int $updateId,\n        public int $chatId,\n        public string $action,\n        public string $language,\n        public ?string $callbackId,\n    ) {\n    }\n\n    /** @param array<string, mixed> $update */\n    public static function from(array $update): ?self\n    {\n        $callback = $update['callback_query'] ?? null;\n        $message = is_array($callback) ? ($callback['message'] ?? null) : ($update['message'] ?? null);\n        $from = is_array($callback) ? ($callback['from'] ?? null) : (is_array($message) ? ($message['from'] ?? null) : null);\n        $chat = is_array($message) ? ($message['chat'] ?? null) : null;\n        if (!is_array($from) || !is_array($chat) || ($chat['type'] ?? '') !== 'private'\n            || !is_int($from['id'] ?? null) || $from['id'] <= 0 || ($chat['id'] ?? null) !== $from['id']\n            || !is_int($update['update_id'] ?? null)) {\n            return null;\n        }\n        $action = is_array($callback) ? ($callback['data'] ?? '') : ($message['text'] ?? '');\n        $callbackId = is_array($callback) ? ($callback['id'] ?? null) : null;\n        return new self(\n            $update['update_id'],\n            $from['id'],\n            is_string($action) ? trim($action) : '',\n            is_string($from['language_code'] ?? null) ? $from['language_code'] : '',\n            is_string($callbackId) ? $callbackId : null\n        );\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Http\\JsonResponse;\nuse Illuminate\\Http\\Request;\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Webhook\n{\n    public function __invoke(Request $request, Dialogue $dialogue): JsonResponse\n    {\n        $secret = config('guidebot.secret');\n        $provided = $request->header('X-Telegram-Bot-Api-Secret-Token');\n        abort_unless(is_string($secret) && $secret !== ''\n            && is_string($provided) && hash_equals($secret, $provided), 403);\n        abort_if(strlen($request->getContent()) > 131072, 413);\n        $update = $request->json()->all();\n        $event = Event::from($update);\n        if ($event === null) {\n            return response()->json(['ok' => true]);\n        }\n        DB::transaction(function () use ($event, $dialogue): void {\n            if (!DB::table('demo_updates')->insertOrIgnore(['update_id' => $event->updateId])) {\n                return;\n            }\n            $dialogue->handle($event);\n        }, 3);\n        // Telegram executes this method after receiving the webhook response.\n        // Its result is not available here; business replies use the outbox.\n        return response()->json($event->callbackId === null ? ['ok' => true] : [\n            'method' => 'answerCallbackQuery', 'callback_query_id' => $event->callbackId,\n        ]);\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · routes/api.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nuse App\\GuideBot\\Webhook;\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::post('/telegram', Webhook::class);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · добавьте api в существующий withRouting в bootstrap/app.php",
+                  "code": "->withRouting(\n    web: __DIR__.'/../routes/web.php',\n    api: __DIR__.'/../routes/api.php',\n    commands: __DIR__.'/../routes/console.php',\n    health: '/up',\n)"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для кнопок возвращаем answerCallbackQuery прямо в JSON-ответе webhook, чтобы убрать индикатор ожидания. Это поддержанный Telegram способ вызова метода, но результат такого вызова приложению недоступен. Поэтому в нём нет важных подтверждений: они отправляются отдельными сообщениями через outbox. Если обработчик надолго зависнет, индикатор может остаться; не помещайте в транзакцию запросы к CRM или другим API. "
+                },
+                {
+                  "type": "text",
+                  "text": "Ответ методом на webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#making-requests-when-getting-updates"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Webhook — отдельный API-маршрут без браузерной сессии; секретный заголовок заменяет здесь браузерный CSRF-токен, а не отменяет CSRF для сайта. Не отключайте защиту web-маршрутов целиком. Ограничение тела есть и в коде; на веб-сервере также нужен разумный лимит запроса. Не журналируйте BOT_TOKEN, весь URL Telegram или сырые заголовки. Для чтения таблиц используйте закрытый административный доступ."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В bootstrap/app.php добавьте api к уже существующему withRouting, сохранив остальные параметры своего приложения. URL будет /api/telegram. Не добавляйте произвольный chat_id из формы или строки запроса: весь диалог привязан к проверенному событию Telegram."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "delivery",
+        "label": "Отправляйте ответы и уведомления из сохранённых данных",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправляйте ответы и уведомления из сохранённых данных"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Исходящие сообщения сохраняются в demo_outbox вместе с изменением состояния. Отдельная Artisan-команда читает эту таблицу и отправляет их. В примере это небольшая очередь в БД: Laravel queue:work её не обслуживает. Для учебной нагрузки запустите один bot:deliver --watch; при росте нагрузки понадобятся ограничения частоты и распределение работы между процессами. Здесь важнее увидеть границу между сохранением ответа и его доставкой."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Outbox.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Outbox\n{\n    /** @param array<string, mixed> $payload */\n    public static function add(int $chatId, string $key, array $payload, string $kind = 'reply', int $revision = 0): void\n    {\n        DB::table('demo_outbox')->insertOrIgnore([\n            'chat_id' => $chatId, 'event_key' => $key,\n            'payload' => json_encode(['chat_id' => $chatId] + $payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),\n            'kind' => $kind, 'revision' => $revision, 'state' => 'pending',\n            'attempts' => 0, 'next_at' => now()->getTimestamp(),\n        ]);\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Telegram.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Support\\Facades\\Http;\n\nfinal class Telegram\n{\n    /** @param array<string, mixed> $payload\n     *  @return array{state:string, delay:int, message_id:?int, code:?int} */\n    public function call(string $method, array $payload): array\n    {\n        $unknown = ['state' => 'unknown', 'delay' => 0, 'message_id' => null, 'code' => null];\n        $token = config('guidebot.token');\n        if (!is_string($token) || $token === '') {\n            throw new \\LogicException('BOT_TOKEN is missing');\n        }\n        try {\n            $response = Http::connectTimeout(5)->timeout(20)\n                ->post('https://api.telegram.org/bot'.$token.'/'.$method, $payload);\n            $body = $response->json();\n        } catch (\\Throwable) {\n            return $unknown;\n        }\n        if (!is_array($body) || $response->serverError()) {\n            return $unknown;\n        }\n        $result = $body['result'] ?? null;\n        $messageId = is_array($result) && is_int($result['message_id'] ?? null) ? $result['message_id'] : null;\n        if ($response->successful() && ($body['ok'] ?? null) === true\n            && ($method !== 'sendMessage' || $messageId !== null)) {\n            return ['state' => 'sent', 'delay' => 0, 'message_id' => $messageId, 'code' => null];\n        }\n        $code = $body['error_code'] ?? null;\n        $parameters = $body['parameters'] ?? null;\n        $delay = is_array($parameters) ? ($parameters['retry_after'] ?? null) : null;\n        if (($body['ok'] ?? null) === false && $code === 429 && is_int($delay) && $delay > 0) {\n            return ['state' => 'retry', 'delay' => $delay, 'message_id' => null, 'code' => 429];\n        }\n        if (($body['ok'] ?? null) === false && is_int($code) && $code >= 400 && $code < 500) {\n            return ['state' => 'failed', 'delay' => 0, 'message_id' => null, 'code' => $code];\n        }\n        return $unknown;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Console/Commands/Deliver.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Console\\Commands;\n\nuse App\\GuideBot\\{Dialogue, Telegram};\nuse Illuminate\\Console\\Command;\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Deliver extends Command\n{\n    protected $signature = 'bot:deliver {--watch}';\n    protected $description = 'Deliver persisted demo messages';\n\n    public function handle(Telegram $telegram, Dialogue $dialogue): int\n    {\n        do {\n            $ids = DB::table('demo_outbox')->whereIn('state', ['pending', 'retry'])\n                ->where('next_at', '<=', now()->getTimestamp())->orderBy('id')->limit(50)->pluck('id');\n            foreach ($ids as $id) {\n                $row = DB::transaction(function () use ($id, $dialogue): ?\\stdClass {\n                    $row = DB::table('demo_outbox')->where('id', $id)->lockForUpdate()->first();\n                    if (!$row || !in_array($row->state, ['pending', 'retry'], true)\n                        || (int) $row->next_at > now()->getTimestamp()) {\n                        return null;\n                    }\n                    if (!$dialogue->canSend($row)) {\n                        DB::table('demo_outbox')->where('id', $id)->update(['state' => 'cancelled']);\n                        return null;\n                    }\n                    DB::table('demo_outbox')->where('id', $id)->update([\n                        'state' => 'sending', 'attempts' => (int) $row->attempts + 1,\n                    ]);\n                    return $row;\n                });\n                if (!$row instanceof \\stdClass) {\n                    continue;\n                }\n                try {\n                    /** @var array<string, mixed> $payload */\n                    $payload = json_decode((string) $row->payload, true, 512, JSON_THROW_ON_ERROR);\n                    $result = $telegram->call('sendMessage', $payload);\n                } catch (\\Throwable) {\n                    $result = ['state' => 'unknown', 'delay' => 0, 'message_id' => null, 'code' => null];\n                }\n                if ($result['state'] === 'retry' && (int) $row->attempts + 1 >= 5) {\n                    $result['state'] = 'failed';\n                }\n                DB::table('demo_outbox')->where('id', $id)->update([\n                    'state' => $result['state'], 'next_at' => now()->getTimestamp() + $result['delay'],\n                    'message_id' => $result['message_id'], 'error_code' => $result['code'],\n                ]);\n            }\n            if ($this->option('watch')) {\n                usleep(500000);\n            }\n        } while ($this->option('watch'));\n        return self::SUCCESS;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP-клиент не вызывает retry(). Подтверждённый Telegram 429 переносит попытку на retry_after, максимум — пять попыток. Таймаут, 5xx или непонятное тело дают unknown: ответ мог потеряться после отправки. Статус sending после аварии процесса тоже требует проверки. Уникальный event_key предотвращает повторное создание строки, но не превращает Telegram и вашу БД в одну транзакцию. "
+                },
+                {
+                  "type": "text",
+                  "text": "HTTP-клиент Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/framework/docs/13.x/http-client"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Console/Commands/Notify.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Console\\Commands;\n\nuse App\\GuideBot\\Dialogue;\nuse Illuminate\\Console\\Command;\n\nfinal class Notify extends Command\n{\n    protected $signature = 'bot:notify {chat} {reference}';\n    protected $description = 'Queue one translated demo notification';\n    public function handle(Dialogue $dialogue): int\n    {\n        $chat = filter_var($this->argument('chat'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);\n        $reference = $this->argument('reference');\n        if ($chat === false || !is_string($reference) || !preg_match('/^[A-Za-z0-9-]{1,40}$/D', $reference)) {\n            $this->error('Use a positive chat ID and a short reference.');\n            return self::FAILURE;\n        }\n        $dialogue->notify($chat, $reference);\n        $this->info('Stored in outbox; this does not confirm delivery.');\n        return self::SUCCESS;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Команда bot:notify нужна для проверки фонового уведомления без нового сообщения пользователя. Она принимает уже известный chat_id и короткий номер учебной заявки. Повтор той же пары не создаст новую строку. В настоящей системе ключ должен содержать идентификатор конкретного события смены статуса, иначе второе законное обновление той же заявки будет ошибочно признано повтором."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Эта команда доступна администратору в CLI. Не превращайте её в публичный HTTP endpoint без проверки полномочий и принадлежности заявки. В рабочем приложении вызывайте notify из обработчика подтверждённого бизнес-события. Отправлять уведомления произвольному Telegram ID, который ещё не начал диалог с ботом, этот пример не позволяет."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "run",
+        "label": "Запустите и пройдите русский и английский сценарии",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запустите и пройдите русский и английский сценарии"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Console/Commands/SetupWebhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Console\\Commands;\n\nuse App\\GuideBot\\Telegram;\nuse Illuminate\\Console\\Command;\n\nfinal class SetupWebhook extends Command\n{\n    protected $signature = 'bot:webhook';\n    protected $description = 'Register this demo webhook';\n    public function handle(Telegram $telegram): int\n    {\n        $url = config('app.url');\n        $secret = config('guidebot.secret');\n        if (!is_string($url) || !str_starts_with($url, 'https://') || !is_string($secret)\n            || !preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $secret)) {\n            $this->error('Set HTTPS APP_URL and a random BOT_WEBHOOK_SECRET first.');\n            return self::FAILURE;\n        }\n        $result = $telegram->call('setWebhook', [\n            'url' => rtrim($url, '/').'/api/telegram', 'secret_token' => $secret,\n            'allowed_updates' => ['message', 'callback_query'], 'max_connections' => 1,\n        ]);\n        $this->line($result['state']);\n        return $result['state'] === 'sent' ? self::SUCCESS : self::FAILURE;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · запуск в каталоге учебного приложения",
+                  "code": "php artisan migrate\nphp artisan route:list --path=api/telegram\nphp artisan bot:webhook\nphp artisan bot:deliver --watch"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "migrate создаёт таблицы, route:list должен показать POST api/telegram, bot:webhook при подтверждённой регистрации выводит sent. Последняя команда остаётся работающим процессом: держите её в отдельном терминале, а в рабочем окружении используйте менеджер процессов. APP_URL должен уже открываться по HTTPS. После изменения config-кэша обновите его обычным способом и перезапустите долгоживущий отправитель."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте тестового бота и отправьте /start. На русском языке Telegram должно появиться русское приглашение ввести имя."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введите один символ: бот покажет русскую ошибку и продолжит ждать имя."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте /language, выберите English, затем снова введите один символ. Ошибка и кнопки должны стать английскими."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введите Anna: получите английское подтверждение с именем. После перезапуска приложения /help останется английским."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Для уведомления найдите собственный chat_id в demo_users и выполните команду ниже. Она действительно поставит сообщение вашему тестовому пользователю в очередь."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · замените CHAT_ID своим тестовым chat_id",
+                  "code": "php artisan bot:notify CHAT_ID DEMO-001"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте второй тестовый диалог на другом языке: уведомления обоим пользователям должны использовать разные сохранённые локали. Повторите DEMO-001 для первого чата — новой строки быть не должно. Для ещё одного уведомления используйте новый номер DEMO-002. Так проверяется не только приветствие, но и путь без входящего Update."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "fallback-checks",
+        "label": "Проверьте отсутствие перевода и типовые ошибки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте отсутствие перевода и типовые ошибки"
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Проверка"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ожидаемый результат"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "language_code отсутствует или равен неподдерживаемому тегу"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Первый ответ по-английски; ручной выбор доступен"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Повтор одного update_id"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Нет повторного сохранения и второй строки outbox"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Удалена одна русская строка в тестовом словаре"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Английский текст и Missing bot translation в журнале"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ключ отсутствует в обоих словарях"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Запасная фраза без имени внутреннего ключа"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Одинаковый worker обслуживает ru и en"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Каждый ответ использует явную локаль"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "В очередь попал старый текст до смены языка"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Он сохраняет прежний язык; новые сообщения используют новый"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверку удаления строки делайте в тестовой копии и верните словарь после опыта. При изменении PHP-словарей учитывайте долгоживущие процессы и OPcache: одной правки файла может быть недостаточно, если приложение продолжает держать старый перевод в памяти. Сравнивайте наборы ключей ru/en и имена placeholders при проверке изменений; одинаковое число строк ещё не доказывает совпадение смысла."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · состояние исходящих сообщений",
+                  "code": "SELECT id, chat_id, event_key, state, attempts, next_at, message_id, error_code\nFROM demo_outbox\nORDER BY id DESC\nLIMIT 20;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если строки остаются pending, сначала проверьте процесс bot:deliver, его окружение и доступ к той же БД. retry с будущим next_at означает ожидание разрешённой попытки. failed с 403 обычно требует проверки доступности чата и отношений пользователя с ботом; повтор по таймеру здесь не поможет. В failed сохраняется код ошибки, но не сырое описание с возможными данными запроса. unknown и зависшее sending разбирайте отдельно по конкретной операции и чату."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После выяснения причины можно повторить конкретную строку: остановите отправитель, проверьте ID, payload и отсутствие уже полученного сообщения, затем верните только её в pending с attempts=0 и next_at=текущему Unix-времени. Если Telegram мог принять первый запрос, повтор способен создать дубль — это осознанное решение оператора. Не возвращайте массово все sending/unknown в очередь. Для уже доставленного сообщения сохраните подтверждённый message_id и состояние sent, затем возобновите отправитель."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если диалог переведён, а меню команд Telegram осталось на другом языке, это отдельный механизм setMyCommands со scope и language_code. Ручной выбор в вашей БД не меняет язык клиента Telegram. Для меню, которое должно следовать ручному выбору, потребуется подходящий chat scope и управление ранее заданными списками. Это разобрано в "
+                },
+                {
+                  "type": "text",
+                  "text": "статье о меню команд",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-command-scopes"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Если отправка идёт через BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если отправка идёт через BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Словари, locale и состояние диалога остаются в вашем Laravel-приложении. BotGate отвечает за транспорт запросов к Telegram и не выбирает язык клиента. При подключении используйте "
+                },
+                {
+                  "type": "text",
+                  "text": "документацию BotGate",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "Laravel-интеграцию",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-telegram-notifications"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", сохранив ту же политику повторов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не заменяйте только URL в приведённом Telegram-клиенте: у BotGate другая авторизация и собственные транспортные ошибки. Входящие события сервиса также проверяются по его контракту подписи, а не по X-Telegram-Bot-Api-Secret-Token этого прямого webhook. Не регистрируйте два конкурирующих webhook у одного тестового бота. Сам перевод диалога от выбранного транспорта не меняется."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

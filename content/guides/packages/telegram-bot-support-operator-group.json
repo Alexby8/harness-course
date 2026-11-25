@@ -1,0 +1,649 @@
+[
+  {
+    "slug": "telegram-bot-support-operator-group",
+    "title": "Как сделать Telegram-бота для поддержки: ответы оператора из группы",
+    "seo_title": "Как сделать Telegram-бота для поддержки: ответы оператора из группы",
+    "description": "Соединяем личный чат с рабочей группой: привязка ответа к обращению, пересылка вложений, права операторов и закрытие диалога без отправки служебных сообщений клиенту.",
+    "card_description": "Соединяем личный чат с рабочей группой: привязка ответа к обращению, пересылка вложений, права операторов и закрытие диалога без отправки служебных сообщений клиенту.",
+    "category": "Практика",
+    "topics": "PHP · Поддержка · Рабочая группа",
+    "reading_time": "12 минут",
+    "published_at": "2026-11-02",
+    "is_published": true,
+    "sort_order": 26,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера сделаем поддержку небольшого сервиса: клиент пишет боту в личный чат, а менеджер отвечает из закрытой Telegram-группы. Клиент получает ответ от бота и не вступает в рабочую группу. Разберём, как связать сообщения с обращением, передать фото или документ и не отправить клиенту внутреннее обсуждение."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "scenario",
+        "label": "Как проходит обращение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как проходит обращение"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пусть клиент спрашивает о доставке и прикладывает фотографию. Приложение создаёт обращение №1042, публикует в группе карточку с номером и копирует сообщения клиента. Оператор выбирает «Ответить» на карточке или скопированном сообщении. Только такой ответ становится кандидатом на отправку клиенту. Обычные сообщения группы остаются внутренними."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-support-operator-group/operator-reply.jpg",
+                  "alt": "Ответ оператора через Reply на карточку №1042 приходит клиенту от бота, а внутреннее сообщение без Reply остаётся в рабочей группе.",
+                  "caption": "Схема маршрутизации из статьи. Переписка вымышленная; Reply показан условно, это не снимок Telegram.",
+                  "width": 1080,
+                  "height": 983,
+                  "mobile_src": "/images/guides/telegram-bot-support-operator-group/operator-reply-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1152
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для этого сценария не нужны Telegram Business и доступ к личному аккаунту менеджера. Нужны обычный бот, закрытая группа, сервер с БД и уже настроенный приём обновлений. PHP-примеры ниже рассчитаны на PHP 8.3+ на 64-битной системе и PDO SQLite. Это ядро маршрутизации: HTTP-приёмник, хранилище обращений и worker отправки подключаются в вашем приложении."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Начните с одного открытого обращения на сочетание bot_id и private_chat_id. Новые сообщения клиента дополняют его, пока оператор не закрыл диалог. Если нужны несколько одновременных обращений одного клиента, добавьте явный выбор обращения в личном чате; угадывание по последнему сообщению быстро приводит к ошибкам."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настройку входящих событий разбираем отдельно в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-webhook-not-working"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". При прямом подключении проверяйте secret_token Telegram; успешный HTTP-ответ возвращайте после надёжного сохранения update, а не перед ним."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "group",
+        "label": "Настраиваем рабочую группу и операторов",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настраиваем рабочую группу и операторов"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавьте бота в отдельную закрытую группу и проверьте, что он может отправлять сообщения и нужные виды вложений. Не используйте общую группу компании, если доступ к обращениям нужен только поддержке. Участники такой группы увидят скопированное содержимое клиентов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При включённом Privacy Mode бот получает ответы на свои сообщения. Поэтому карточку и копии публикует именно бот, а оператор отвечает на них через Reply. Для этого режима не требуется отключать приватность только ради чтения всего обсуждения. Исключения и взаимодействие нескольких ботов описаны в "
+                },
+                {
+                  "type": "text",
+                  "text": "официальном FAQ Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/faq#what-messages-will-my-bot-get"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Право писать в группе и право отвечать клиенту — разные вещи. Храните отдельный список разрешённых Telegram user_id операторов для конкретного бота. Проверяйте его при каждом ответе и закрытии обращения. Username меняется, а присутствие в группе само по себе не даёт прикладное право отправки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отклоняйте сообщения с sender_chat: так может выглядеть ответ анонимного администратора, за которым нельзя надёжно определить конкретного оператора. Для поддержки попросите менеджеров отвечать от личного профиля. Не обрабатывайте сообщения других ботов как ответы клиентов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если ответ не приходит на сервер, проверьте тип update, allowed_updates и Reply на сообщение именно вашего бота. Дополнительная диагностика есть в статье "
+                },
+                {
+                  "type": "text",
+                  "text": "почему бот не видит сообщения группы",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-not-reading-group-messages"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "mapping",
+        "label": "Сохраняем связь между сообщением и обращением",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраняем связь между сообщением и обращением"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не извлекайте chat_id клиента из подписи, пересланного профиля или произвольного текста «Заявка №1042». Маршрут берётся только из БД. Message ID уникален внутри чата, поэтому ключ связи включает бота, рабочую группу и сообщение в ней."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · минимальная таблица привязок",
+                  "code": "CREATE TABLE support_message_map (\n    bot_id TEXT NOT NULL,\n    group_chat_id INTEGER NOT NULL,\n    group_message_id INTEGER NOT NULL,\n    ticket_id INTEGER NOT NULL,\n    PRIMARY KEY (bot_id, group_chat_id, group_message_id)\n);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В отдельной таблице support_tickets храните id, bot_id, private_chat_id и status со значениями open/closed. В таблице операторов — bot_id, user_id и active. Поддерживайте создание единственного открытого обращения транзакцией и ограничением, подходящим вашей БД. Telegram chat_id сохраняйте в signed BIGINT: у группы он может быть отрицательным."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала sendMessage создаёт служебную карточку. Сохраните result.message_id этой карточки в support_message_map. Затем copyMessage копирует клиентское сообщение; его result.message_id тоже привяжите к тому же ticket_id. Так Reply работает и на карточке, и на фотографии ниже неё."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · параметры copyMessage из личного чата в группу",
+                  "code": "{\n  \"chat_id\": -1001234567890,\n  \"from_chat_id\": 123456789,\n  \"message_id\": 57,\n  \"reply_parameters\": {\"message_id\": 901}\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Здесь 57 — сообщение клиента, 901 — уже созданная карточка в целевой группе. Числа демонстрационные. Для sendMessage результатом служит Message, для copyMessage — MessageId: в обоих случаях нужный идентификатор находится в result.message_id. Записывайте привязку только после успешного ответа API."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если API создал сообщение, а сохранение привязки не удалось, ответ оператора на него нельзя безопасно направить клиенту. Покажите служебную ошибку и восстановите связь по журналу операции. Не подставляйте «последнего клиента», даже если сейчас он один."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "reply",
+        "label": "Проверяем ответ оператора до отправки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем ответ оператора до отправки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Следующая функция не обращается к Telegram. Она проверяет сообщение и возвращает параметры copyMessage либо null. Вызовите её для message из уже проверенного update; edited_message здесь намеренно не обрабатывается, чтобы редактирование не стало второй отправкой."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · support-route.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/** @param array<string, mixed> $message\n *  @param list<int> $operatorIds\n *  @return array{chat_id: int, from_chat_id: int, message_id: int}|null\n */\nfunction operatorReply(\n    PDO $db, string $botId, int $groupId,\n    array $operatorIds, array $message,\n): ?array {\n    if (($message['chat']['id'] ?? null) !== $groupId\n        || isset($message['sender_chat'])\n        || ($message['from']['is_bot'] ?? true)\n        || !in_array($message['from']['id'] ?? null, $operatorIds, true)) {\n        return null;\n    }\n    $parentId = $message['reply_to_message']['message_id'] ?? null;\n    $messageId = $message['message_id'] ?? null;\n    if (!is_int($parentId) || !is_int($messageId)) {\n        return null;\n    }\n    $supported = isset($message['text']) || isset($message['photo'])\n        || isset($message['document']) || isset($message['voice'])\n        || isset($message['video']) || isset($message['audio']);\n    if (!$supported || str_starts_with(trim($message['text'] ?? ''), '/')) {\n        return null;\n    }\n    $query = $db->prepare(\n        'SELECT t.private_chat_id FROM support_message_map m\n         JOIN support_tickets t ON t.id = m.ticket_id AND t.bot_id = m.bot_id\n         WHERE m.bot_id = ? AND m.group_chat_id = ? AND m.group_message_id = ?\n         AND t.status = ?'\n    );\n    $query->execute([$botId, $groupId, $parentId, 'open']);\n    $chatId = $query->fetchColumn();\n    return $chatId === false ? null : [\n        'chat_id' => (int) $chatId,\n        'from_chat_id' => $groupId,\n        'message_id' => $messageId,\n    ];\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Список operatorIds загружайте из актуального хранилища прав. Возвращённый массив — параметры copyMessage из рабочей группы в личный чат клиента. Null означает «не отправлять клиенту»: для неподдерживаемого вложения или закрытого обращения лучше дать оператору отдельное служебное объяснение."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед реальной отправкой worker повторно проверяет статус обращения и права оператора. Само разрешение, полученное при приёме update, может устареть, пока операция ждёт очереди. В очередь сохраняйте bot_id, ticket_id, user_id оператора и исходные group_chat_id/message_id, а не только готовый адрес назначения."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "attachments",
+        "label": "Передаём вложения и не теряем контекст",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Передаём вложения и не теряем контекст"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "copyMessage удобен для текста, фото, документов, голоса и видео: не нужно сначала скачивать файл на ваш сервер. Копия не содержит ссылки на исходное сообщение. В карточке явно укажите, кто клиент, и не считайте копирование способом анонимизации самого содержимого: имя, телефон или подпись могут находиться в тексте и файле."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Метод не универсален для всех сообщений: ограничения перечислены в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации copyMessage",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#copymessage"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". В примере есть явный список поддерживаемых типов. На отклонённое вложение сообщите оператору причину и предложите отправить обычный документ или текст; не отвечайте клиенту, что файл доставлен."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Один альбом приходит несколькими message с общим media_group_id. Если копировать каждую часть отдельно, содержимое передастся отдельными сообщениями, а исходное оформление альбома не сохранится. Для сохранения группировки нужен отдельный накопитель частей и copyMessages с упорядоченными message_id. Каждый полученный ID свяжите с обращением; не обещайте сохранение альбома кодом одиночного copyMessage."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция выше также не переносит историю диалога автоматически. Если менеджер отвечает на своё прежнее сообщение, которого нет в support_message_map, маршрут не найдётся. Либо просите отвечать на карточку/копию клиента, либо отдельно добавляйте в таблицу такие сообщения после подтверждённой отправки."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "close",
+        "label": "Закрываем диалог и учитываем повторную доставку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Закрываем диалог и учитываем повторную доставку"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выделите команду /close, отправляемую Reply на карточку. Обработчик команды выполняется до обычной маршрутизации: проверяет группу, личность оператора и привязку, затем атомарно меняет open на closed. Команду не копируют клиенту. Повторное закрытие возвращает оператору «Обращение уже закрыто» и не запускает новое уведомление."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для команды с упоминанием бота распознавайте /close@имя_вашего_бота, проверяя адресата. Уведомление клиенту о закрытии — отдельная отправка с собственным состоянием, а не обязательный побочный эффект каждого повторного update. После закрытия новый входящий текст создаёт новое обращение по выбранному правилу; старые карточки остаются привязанными к старому ticket_id."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Входящие обновления сохраняйте с уникальным ключом (bot_id, update_id), а операцию ответа — с ключом (bot_id, group_chat_id, group_message_id). Повтор webhook должен находить уже созданную операцию, а не заново копировать сообщение. При этом уникальность в БД не делает Telegram-отправку однократной: после таймаута результат может быть неизвестен."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Храните состояния pending, sending, sent, failed и unknown. При ok=true запишите ID отправленного сообщения. При подтверждённом лимите планируйте повтор по retry_after; после потери ответа переводите в unknown и разбирайте ситуацию, прежде чем повторять. Подробнее — "
+                },
+                {
+                  "type": "text",
+                  "text": "диагностика дублей сообщений",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-duplicate-messages"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "check",
+        "label": "Проверяем поддержку на двух клиентах",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем поддержку на двух клиентах"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Два тестовых клиента пишут почти одновременно. Ответ на карточку первого приходит только первому; ответ на фото второго — только второму."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сообщение без Reply, ответ постороннего участника и ответ анонимного администратора не уходят клиентам."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Текст, фото с подписью и документ доходят в обе стороны. Для неподдерживаемого типа оператор видит понятное сообщение."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "После /close старый Reply не отправляется, а новое обращение получает другую карточку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повтор одного update не создаёт второй операции; таймаут отправки виден в журнале как неизвестный результат."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если используете BotGate, меняется транспорт вызовов Telegram и проверка входящего webhook. Связи сообщений, права операторов, обращения и журнал отправок остаются в вашем приложении. Входящую подпись проверяйте по исходным байтам тела согласно "
+                },
+                {
+                  "type": "text",
+                  "text": "документации webhook BotGate",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#webhook"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "; не подменяйте её проверкой Telegram secret_token. Для исходящих методов см. "
+                },
+                {
+                  "type": "text",
+                  "text": "подключение API",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#proxy"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,911 @@
+[
+  {
+    "slug": "telegram-mini-app-share-message",
+    "title": "Как добавить кнопку «Поделиться» в Telegram Mini App",
+    "seo_title": "Как добавить кнопку «Поделиться» в Telegram Mini App",
+    "description": "Публичная карточка товара через savePreparedInlineMessage и shareMessage: серверная подготовка, окно отправки, срок действия, отмена и защита личных данных.",
+    "card_description": "Публичная карточка товара через savePreparedInlineMessage и shareMessage: серверная подготовка, окно отправки, срок действия, отмена и защита личных данных.",
+    "category": "Практика",
+    "topics": "Telegram Mini Apps · shareMessage · Карточки товаров · PHP",
+    "reading_time": "23 минут",
+    "published_at": "2026-11-12",
+    "is_published": true,
+    "sort_order": 59,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера пользователь магазина отправит другу карточку синей кружки: название, публичную цену и ссылку. Сервер подготовит сообщение через Bot API, а Mini App откроет выбор чата по кнопке «Поделиться». Пользователь сам решает, куда отправить карточку, и может закрыть окно. В сообщение не попадут его корзина, адрес и сведения о заказе."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "flow",
+        "label": "Что именно отправляет кнопка «Поделиться»",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что именно отправляет кнопка «Поделиться»"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Связка состоит из двух операций: сервер создаёт PreparedInlineMessage для конкретного пользователя, затем браузер передаёт его ID в shareMessage. Этот ID не равен message_id из обычной отправки ботом. Создание заготовки ещё не отправляет сообщение в чужой чат и не означает, что пользователь чем-то поделился."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В статье используем публичную карточку товара. Тот же порядок подходит для приглашения на мероприятие или обезличенного результата расчёта. Для каждого типа заранее определите разрешённые поля. Превращать произвольный JSON из клиентского экрана в сообщение опасно: вместе с видимым названием в объекте могут находиться телефон, персональная скидка или токен доступа."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сервер принимает только идентификатор публичного объекта и самостоятельно собирает сообщение."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "ID пользователя берётся из проверенного initData, а не из тела POST."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Перед отправкой показываем текст, который получит друг."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отмена окна не запускает sendMessage и не записывается как успешная отправка."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Здесь не нужен запрос requestWriteAccess: он относится к праву бота писать пользователю, а не к выбору чата для подготовленной карточки. Не запрашивайте лишнее разрешение как условие кнопки «Поделиться»."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовим Mini App и сервер",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовим Mini App и сервер"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нужен отдельный тестовый бот, PHP 8.3+ с cURL и HTTPS-сайт. Создайте папку public для публичных файлов; common.php, auth.php, telegram.php и card.php оставьте на уровень выше. База данных для этого примера не требуется: каталог из двух товаров задан на сервере, а заготовку хранит Telegram."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение · значения процесса",
+                  "code": "BOT_TOKEN=TOKEN_FROM_BOTFATHER\nPUBLIC_SHOP_URL=https://shop.example.com"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настройте эти переменные в PHP-FPM. Самостоятельный PHP не загружает .env автоматически. PUBLIC_SHOP_URL замените на действующий адрес своего магазина; страницы /products/mug-blue и /products/notebook должны быть публичными и показывать актуальную цену. Токен бота в HTML не вставляется."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В BotFather настройте кнопку меню на HTTPS-адрес share.html. Открывайте страницу через эту кнопку Mini App: просто открыть URL в браузере недостаточно для авторизации. shareMessage требует поддержки версии 8.0; ниже есть проверка и запасной вариант с обычной публичной ссылкой."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction setting(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing setting: '.$name);\n    }\n    return $value;\n}\n\n/** @return array<string, mixed> */\nfunction jsonBody(): array\n{\n    $raw = file_get_contents('php://input', length: 65537);\n    if ($raw === false || strlen($raw) > 65536) {\n        throw new InvalidArgumentException('Request too large');\n    }\n    $data = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);\n    if (!is_array($data) || array_is_list($data)) {\n        throw new InvalidArgumentException('Expected JSON object');\n    }\n    $result = [];\n    foreach ($data as $key => $value) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Invalid JSON key');\n        }\n        $result[$key] = $value;\n    }\n    return $result;\n}\n\n/** @param array<string, mixed> $data */\nfunction reply(array $data, int $status = 200): never\n{\n    http_response_code($status);\n    header('Content-Type: application/json; charset=utf-8');\n    header('Cache-Control: no-store');\n    echo json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n    exit;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запросы страницы передают исходную строку "
+                },
+                {
+                  "type": "text",
+                  "text": "Telegram.WebApp.initData",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " в заголовке "
+                },
+                {
+                  "type": "text",
+                  "text": "X-Telegram-Init-Data",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Сервер проверяет HMAC и срок действия и берёт Telegram ID только из подписанных данных. В этом небольшом примере нет cookie-сессии: каждый POST заново авторизуется, поэтому отдельный CSRF-токен не нужен. Не включайте разрешающий CORS, не переносите авторизацию в query string и не сохраняйте этот заголовок в журналах."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Через десять минут после запуска сервер попросит открыть Mini App заново. Это выбранный срок нашего примера, а не лимит Telegram. Для долгой работы обменяйте проверенный "
+                },
+                {
+                  "type": "text",
+                  "text": "initData",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " на серверную сессию с CSRF-защитой по "
+                },
+                {
+                  "type": "text",
+                  "text": "отдельному руководству",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-initdata-auth-php-laravel"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Проверка подписи подтверждает пользователя, но не назначает ему права сотрудника."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · auth.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction miniUser(string $raw, string $token, int $now): int\n{\n    if ($raw === '' || strlen($raw) > 16384) {\n        throw new InvalidArgumentException('Open Mini App again');\n    }\n    $fields = [];\n    foreach (explode('&', $raw) as $part) {\n        $pair = explode('=', $part, 2);\n        if (count($pair) !== 2) {\n            throw new InvalidArgumentException('Invalid initData');\n        }\n        $key = urldecode($pair[0]);\n        if (array_key_exists($key, $fields)) {\n            throw new InvalidArgumentException('Duplicate initData field');\n        }\n        $fields[$key] = urldecode($pair[1]);\n    }\n    $hash = $fields['hash'] ?? '';\n    unset($fields['hash']);\n    ksort($fields, SORT_STRING);\n    $lines = [];\n    foreach ($fields as $key => $value) {\n        $lines[] = $key.'='.$value;\n    }\n    $secret = hash_hmac('sha256', $token, 'WebAppData', true);\n    $expected = hash_hmac('sha256', implode(\"\\n\", $lines), $secret);\n    $date = $fields['auth_date'] ?? '';\n    if (!preg_match('/^[a-f0-9]{64}$/D', $hash) || !hash_equals($expected, $hash)\n        || !ctype_digit($date) || (int) $date < $now - 600 || (int) $date > $now + 30) {\n        throw new InvalidArgumentException('Expired or invalid initData');\n    }\n    $user = json_decode($fields['user'] ?? '', true, 16, JSON_THROW_ON_ERROR);\n    if (!is_array($user) || !is_int($user['id'] ?? null) || $user['id'] < 1) {\n        throw new InvalidArgumentException('Missing Telegram user');\n    }\n    return $user['id'];\n}\n\nfunction authenticatedUser(): int\n{\n    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {\n        reply(['error' => 'POST required'], 405);\n    }\n    $raw = $_SERVER['HTTP_X_TELEGRAM_INIT_DATA'] ?? '';\n    try {\n        return miniUser(is_string($raw) ? $raw : '', setting('BOT_TOKEN'), time());\n    } catch (InvalidArgumentException|JsonException) {\n        reply(['error' => 'Откройте Mini App заново'], 401);\n    }\n}"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "public-data",
+        "label": "Соберём только публичную карточку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Соберём только публичную карточку"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · card.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/** @return array{sku:string,title:string,text:string,url:string} */\nfunction publicCard(string $sku): array\n{\n    // Replace this catalog with a SELECT of public fields and publication status.\n    $products = [\n        'mug-blue' => ['title' => 'Синяя кружка, 350 мл', 'price' => 650],\n        'notebook' => ['title' => 'Блокнот для заметок', 'price' => 390],\n    ];\n    $product = $products[$sku] ?? null;\n    if ($product === null) {\n        throw new DomainException('Товар не опубликован');\n    }\n    $base = rtrim(setting('PUBLIC_SHOP_URL'), '/');\n    if (!str_starts_with($base, 'https://')) {\n        throw new RuntimeException('HTTPS public shop URL required');\n    }\n    $url = $base.'/products/'.rawurlencode($sku);\n    return ['sku' => $sku, 'title' => $product['title'],\n        'text' => $product['title'].\"\\nЦена на момент подготовки: \".$product['price'].\" ₽\\n\".$url,\n        'url' => $url];\n}\n\n/**\n * @param array{sku:string,title:string,text:string,url:string} $card\n * @return array<string,mixed>\n */\nfunction preparedPayload(int $user, array $card): array\n{\n    return [\n        'user_id' => $user,\n        'result' => [\n            'type' => 'article', 'id' => hash('sha256', $card['sku'].'|'.$card['text']),\n            'title' => $card['title'],\n            'input_message_content' => ['message_text' => $card['text']],\n            'reply_markup' => ['inline_keyboard' => [[['text' => 'Открыть товар', 'url' => $card['url']]]]],\n        ],\n        'allow_user_chats' => true, 'allow_group_chats' => true,\n        'allow_bot_chats' => false, 'allow_channel_chats' => false,\n    ];\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В рабочем проекте замените массив на выборку разрешённых полей товара с условием is_published. Для закрытого товара верните 404, даже если пользователь знает его SKU. Ссылка строится из серверной настройки домена; URL из браузера не принимается, чтобы кнопку магазина нельзя было подменить ссылкой на чужой ресурс."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "У результата тип article, а текст находится в input_message_content.message_text. Parse mode не задаётся: название вроде «Кружка <лето>» останется обычным текстом. ID результата ограничен хешем; он нужен для описания результата и не заменяет ID PreparedInlineMessage из ответа Telegram."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Параметры allow_user_chats и allow_group_chats разрешают личные диалоги и группы. Ботов и каналы в этом сценарии исключаем явно. Это выбор продукта: для приглашений в сообщество можно разрешить каналы, но сначала проверьте, что содержимое действительно допустимо публиковать широко."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Цена в отправленном сообщении — снимок на момент подготовки, поэтому прямо подписываем её так. При изменении цены старые сообщения у друзей сами не обновятся. Финальная цена и наличие должны проверяться на странице товара и сервере оформления заказа."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "prepare",
+        "label": "Подготовим сообщение через Bot API",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовим сообщение через Bot API"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · telegram.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/**\n * @param array<string, mixed> $params\n * @return array{state: string, result?: mixed, code?: int, retry_after?: int}\n */\nfunction telegram(string $method, array $params, bool $multipart = false): array\n{\n    $curl = curl_init('https://api.telegram.org/bot'.setting('BOT_TOKEN').'/'.$method);\n    curl_setopt_array($curl, [\n        CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 8,\n        CURLOPT_POSTFIELDS => $multipart ? $params : json_encode($params, JSON_THROW_ON_ERROR),\n        CURLOPT_HTTPHEADER => $multipart ? [] : ['Content-Type: application/json'],\n    ]);\n    $raw = curl_exec($curl);\n    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    if (!is_string($raw) || $status >= 500) {\n        return ['state' => 'unknown'];\n    }\n    $data = json_decode($raw, true);\n    if (!is_array($data)) {\n        return ['state' => 'unknown'];\n    }\n    if (($data['ok'] ?? null) === true) {\n        return ['state' => 'ok', 'result' => $data['result'] ?? null];\n    }\n    if (($data['ok'] ?? null) !== false || !is_int($data['error_code'] ?? null)) {\n        return ['state' => 'unknown'];\n    }\n    $parameters = $data['parameters'] ?? null;\n    $delay = is_array($parameters) ? ($parameters['retry_after'] ?? null) : null;\n    return ['state' => 'rejected', 'code' => $data['error_code'],\n        'retry_after' => is_int($delay) && $delay > 0 ? $delay : 60];\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/prepare.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/auth.php';\nrequire dirname(__DIR__).'/telegram.php';\nrequire dirname(__DIR__).'/card.php';\n$user = authenticatedUser();\ntry {\n    $body = jsonBody();\n    if (!is_string($body['sku'] ?? null) || !preg_match('/^[a-z0-9-]{1,40}$/D', $body['sku'])) {\n        reply(['error' => 'Неверный товар'], 422);\n    }\n    $card = publicCard($body['sku']);\n    $result = telegram('savePreparedInlineMessage', preparedPayload($user, $card));\n    if ($result['state'] !== 'ok') {\n        if (($result['code'] ?? 0) === 429) {\n            header('Retry-After: '.($result['retry_after'] ?? 60));\n            reply(['error' => 'Слишком много запросов. Попробуйте позже.'], 429);\n        }\n        reply(['error' => 'Не удалось подготовить карточку. Повторите подготовку.'], 502);\n    }\n    $prepared = $result['result'] ?? null;\n    if (!is_array($prepared) || !is_string($prepared['id'] ?? null)\n        || !is_int($prepared['expiration_date'] ?? null) || $prepared['expiration_date'] <= time()) {\n        reply(['error' => 'Получен неверный ответ Telegram'], 502);\n    }\n    reply(['id' => $prepared['id'], 'expires_at' => $prepared['expiration_date'],\n        'valid_for' => max(0, $prepared['expiration_date'] - time()), 'preview' => $card['text'], 'url' => $card['url']]);\n} catch (DomainException $e) {\n    reply(['error' => $e->getMessage()], 404);\n} catch (InvalidArgumentException|JsonException) {\n    reply(['error' => 'Неверный JSON'], 422);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "savePreparedInlineMessage получает user_id, result и разрешённые типы чатов. При JSON-запросе result передаём вложенным объектом: наш транспорт сериализует весь запрос один раз. Не превращайте вложенный объект в строку без необходимости и не отправляйте токен Telegram из браузера."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Из ответа возвращаем только ID, срок действия, публичный предпросмотр и ссылку. Срок берём из expiration_date; не придумываем «заготовка живёт ровно сутки». Дополнительно сервер отдаёт valid_for, чтобы интерфейс не полагался на правильно выставленные часы телефона. Перед самым вызовом всё равно проверяем, что срок не вышел."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Таймаут подготовки отличается от таймаута отправки сообщения: savePreparedInlineMessage не доставляет карточку получателю. Повторная явная подготовка допустима — получится ещё одна заготовка, но не лишнее сообщение другу. При 429 отдаём Retry-After, чтобы кнопка не создавала бесконечные повторные запросы."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В рабочем приложении ограничьте частоту подготовки по авторизованному пользователю и добавьте короткий кэш по пользователю, объекту и версии содержимого. Не делайте один глобальный prepared_id на весь товар: заготовка выдана конкретному user_id. Не храните её в общем HTML-кэше, который обслуживает всех посетителей."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "screen",
+        "label": "Откроем окно отправки после нажатия",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Откроем окно отправки после нажатия"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "HTML и JavaScript · public/share.html",
+                  "code": "<!doctype html>\n<html lang=\"ru\"><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Поделиться товаром</title>\n<script src=\"https://telegram.org/js/telegram-web-app.js\"></script>\n<style>\nbody{font:17px system-ui;padding:16px;color:var(--tg-theme-text-color,#111);background:var(--tg-theme-bg-color,#fff)}\nbutton,input{padding:14px;margin:12px 0;width:100%;box-sizing:border-box;font:inherit}\npre{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}button{min-height:48px}\n</style>\n<h1>Поделиться товаром</h1>\n<p>Друг получит только эту публичную карточку:</p>\n<pre id=\"preview\">Подготовка…</pre>\n<button id=\"prepare\">Подготовить заново</button>\n<button id=\"share\" disabled>Поделиться</button>\n<label>Публичная ссылка <input id=\"link\" readonly aria-label=\"Публичная ссылка\"></label>\n<p id=\"status\" role=\"status\" aria-live=\"polite\"></p>\n<script>\nconst tg = window.Telegram?.WebApp;\nconst el = id => document.getElementById(id);\nlet prepared = null, preparing = false, sharing = false;\nlet retryAt = 0;\nconst supported = Boolean(tg?.isVersionAtLeast('8.0') && typeof tg.shareMessage === 'function');\nasync function prepare() {\n  if (preparing || sharing) return;\n  if (performance.now() < retryAt) {el('status').textContent = 'Подождите перед повтором.'; return;}\n  preparing = true; prepared = null;\n  el('share').disabled = true; el('prepare').disabled = true;\n  const started = performance.now();\n  try {\n    const response = await fetch('prepare.php', {method:'POST',\n      headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg?.initData || ''},\n      body:JSON.stringify({sku:'mug-blue'})});\n    if (response.status === 429) retryAt = performance.now() + Number(response.headers.get('Retry-After') || 60) * 1000;\n    const data = await response.json();\n    if (!response.ok) throw new Error(data.error || 'Ошибка подготовки');\n    prepared = {id:data.id, deadline:started + Math.max(0, data.valid_for - 5) * 1000};\n    el('preview').textContent = data.preview; el('link').value = data.url;\n    el('share').disabled = !supported;\n    el('status').textContent = supported ? 'Карточка готова. Выберите «Поделиться».' : 'Обновите Telegram или выделите и скопируйте публичную ссылку.';\n  } catch (error) {el('status').textContent = error.message;}\n  finally {preparing = false; el('prepare').disabled = false;}\n}\nel('prepare').onclick = prepare;\nel('link').onclick = () => el('link').select();\nel('share').onclick = () => {\n  if (sharing || !prepared || !supported) return;\n  if (performance.now() >= prepared.deadline) {\n    el('share').disabled = true; prepared = null;\n    el('status').textContent = 'Срок карточки истёк. Подготовьте её заново.'; return;\n  }\n  sharing = true; el('share').disabled = true; el('prepare').disabled = true;\n  try {\n    tg.shareMessage(prepared.id, sent => {\n      sharing = false; el('share').disabled = false; el('prepare').disabled = false;\n      el('status').textContent = sent ? 'Telegram подтвердил отправку карточки.' : 'Отправка не подтверждена: окно закрыто или произошла ошибка. Можно повторить.';\n    });\n  } catch (error) {\n    sharing = false; prepared = null; el('prepare').disabled = false;\n    el('status').textContent = 'Не удалось открыть отправку. Подготовьте карточку заново.';\n  }\n};\ntg?.ready(); prepare();\n</script></html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Страница сначала готовит карточку и показывает текст. Кнопка «Поделиться» становится доступной после успешного ответа. Нативное окно открывается непосредственно по нажатию, без промежуточного сетевого запроса. Пока окно открыто, повторное нажатие заблокировано."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-mini-app-share-message/share-public-card.jpg",
+                  "alt": "Публичная карточка синей кружки за 650 ₽ в HTML-примере, выбор получателя и сообщение с кнопкой Открыть товар; отмена не означает отправку.",
+                  "caption": "Увеличенный фрагмент HTML статьи с тестовой карточкой. Выбор чата и сообщение показаны схемой, не снимками Telegram. Домен магазина условный.",
+                  "width": 1080,
+                  "height": 934,
+                  "mobile_src": "/images/guides/telegram-mini-app-share-message/share-public-card-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1149
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда срок истёк, предлагаем подготовить карточку заново. Новая заготовка может содержать изменившуюся цену или описание: пользователь снова увидит предпросмотр перед отправкой. Кнопка повторной подготовки также полезна после ошибки Telegram; автоматической серии вызовов здесь нет."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "На старом клиенте отображается публичная ссылка в поле для выделения и копирования. Это более скромный сценарий: пользователь сам вставляет её в сообщение, а приложение не получает подтверждения отправки. Не вызывайте shareMessage без проверки версии и не маскируйте копирование ссылки сообщением «Карточка отправлена»."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "cancel",
+        "label": "Отмена, ошибка и аналитика",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отмена, ошибка и аналитика"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Callback shareMessage передаёт признак успешной отправки. true позволяет показать подтверждение Telegram. false нельзя надёжно трактовать только как осознанную отмену: интерфейс пишет, что отправка не подтверждена, и разрешает повтор. Если клиент выбросил исключение до открытия окна, заготовка сбрасывается и предлагается подготовка заново."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не вызывайте от имени бота sendMessage после false, чтобы «дослать» карточку: пользователь мог специально отказаться, а выбранного получателя у вашего сервера вообще нет. Закрытие Mini App до callback также оставляет результат неизвестным. Не превращайте отсутствие события в доказанную ошибку доставки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для продуктовой аналитики можно различать подготовку, нажатие и callback с подтверждением. Эти события приходят из клиентского JavaScript, их можно подделать. Не начисляйте деньги или реферальные баллы за такой callback. Для "
+                },
+                {
+                  "type": "text",
+                  "text": "реферальной программы",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-referral-program"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " основанием служит подтверждённое действие нового клиента на сервере."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нативное окно не даёт приложению право читать выбранный диалог или утверждать, что друг открыл карточку. Переход по публичной ссылке — отдельное событие; связывайте его с кампанией только через безопасные публичные параметры и действующие правила аналитики."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "privacy",
+        "label": "Приглашение или расчёт без утечки личных данных",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Приглашение или расчёт без утечки личных данных"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для приглашения отправляйте общедоступную страницу события или реферальный код, предназначенный для распространения. Нельзя использовать вместо него одноразовую ссылку входа в кабинет, QR-билет для прохода или URL восстановления пароля: получатель получит соответствующее право, а сообщение может быть переслано дальше."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для результата расчёта заведите отдельную публичную версию: тип услуги, ориентировочная сумма и краткие параметры без ФИО, адреса, телефона и внутренних комментариев. Публичный идентификатор должен быть случайным, а сервер — возвращать только поля этой версии. Приватный заказ остаётся за проверкой владельца, как в "
+                },
+                {
+                  "type": "text",
+                  "text": "статье о ссылках на товары и заказы",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-product-order-links"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Видимая пользователю карточка не всегда совпадает с тем, что разрешено распространять. Например, цена по персональному договору или индивидуальная скидка могут быть доступны владельцу, но не его друзьям. Поэтому publicCard — отдельная серверная функция с белым списком полей, а не сериализация всей модели заказа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Уже отправленное сообщение и его копии нельзя считать отзываемыми вместе с истечением prepared_id. Истечение запрещает дальнейшее использование заготовки, но не удаляет сообщения в чужих чатах. Не помещайте туда данные, которые вы обещаете автоматически скрыть через час."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверим подготовку и отправку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверим подготовку и отправку"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте Mini App тестовым аккаунтом. Убедитесь, что предпросмотр совпадает с сообщением, отправленным в свой тестовый чат."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Подмените user_id и text в POST: сервер должен их игнорировать, используя подписанного пользователя и каталог."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Передайте неизвестный SKU: получите 404 без заготовки. Поддельный или просроченный initData должен дать 401."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Закройте окно выбора чата: интерфейс не сообщает об успешной отправке и не отправляет ничего ботом."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте страницу двумя пользователями: каждому готовится свой ID. Не копируйте prepared_id между аккаунтами."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте ветку истечения, подставив прошедший deadline только в тестовой копии интерфейса: окно не вызывается до повторной подготовки."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте старый клиент или отключённую поддержку shareMessage: остаётся доступная для копирования публичная ссылка."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В автоматических тестах подменяйте ответ savePreparedInlineMessage и callback интерфейса. Реальное окно выбора чата и фактическое сообщение проверяются отдельно в Telegram на iPhone и Android; HTTP 200 вашего prepare.php этого не доказывает."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "BotGate и документация методов",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate и документация методов"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate может выступать транспортом серверного запроса к Bot API. Подготовка полей, проверка initData и решение о публичности данных остаются в вашем приложении; shareMessage вызывается в клиенте Telegram. Параметры подключения сервиса приведены в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Подключение шлюза не заменяет подтверждение пользователя в окне отправки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Первичные источники: "
+                },
+                {
+                  "type": "text",
+                  "text": "shareMessage",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps#initializing-mini-apps"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "savePreparedInlineMessage",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#savepreparedinlinemessage"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "PreparedInlineMessage и expiration_date",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#preparedinlinemessage"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "InlineQueryResultArticle",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#inlinequeryresultarticle"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

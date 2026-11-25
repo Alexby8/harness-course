@@ -1,0 +1,820 @@
+[
+  {
+    "slug": "telegram-bot-customer-reviews",
+    "title": "Как собирать оценки и отзывы клиентов через Telegram-бота",
+    "seo_title": "Как собирать оценки и отзывы клиентов через Telegram-бота",
+    "description": "Бот отзывов на PHP: приглашение после заказа, оценка и комментарий, защита от повторов, уведомление о низкой оценке и отдельное разрешение на публикацию.",
+    "card_description": "Бот отзывов на PHP: приглашение после заказа, оценка и комментарий, защита от повторов, уведомление о низкой оценке и отдельное разрешение на публикацию.",
+    "category": "Практика",
+    "topics": "Telegram · PHP · Обратная связь",
+    "reading_time": "33 минуты",
+    "published_at": "2026-11-19",
+    "is_published": true,
+    "sort_order": 72,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера мастерская закрывает заказ R-1042 и предлагает клиенту оценить работу от 1 до 5. Клиент может добавить комментарий или пропустить его. Низкая оценка создаёт уведомление менеджеру, а публикация текста на сайте требует отдельного выбора. Соберём обработчик на PHP с привязкой к заказу и устойчивым хранением ответов."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "scenario",
+        "label": "Отделите оценку, поддержку и публикацию",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отделите оценку, поддержку и публикацию"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Кнопка с числом фиксирует качество конкретного выполненного заказа. Комментарий помогает понять причину, а разрешение на публикацию определяет допустимость вывода текста на сайт. Эти три события не должны автоматически означать друг друга. Клиент может поставить низкую оценку без комментария или оставить полезный текст только для внутренней работы."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Приглашение отправляется после бизнес-события «заказ выполнен», а не после любой оплаты или сообщения. В базе уже должна быть подтверждённая связь заказа с Telegram user_id. Бот не может начать личный диалог с произвольным человеком: сначала клиент должен открыть его, например при оформлении или "
+                },
+                {
+                  "type": "text",
+                  "text": "привязке аккаунта",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-link-website-account"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В примере одна оценка относится к одному заказу. Первый принятый ответ сохраняется, повторное нажатие не меняет её. Это простое правило для воспроизводимого сценария; если бизнес разрешает редактирование, добавьте версии, время изменения и повторную модерацию, а не заменяйте значение без истории."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовьте тестового бота и структуру",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте тестового бота и структуру"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нужны PHP 8.3+, cURL, mbstring и PDO SQLite. Код рассчитан на один бот, одну БД и один worker на сервере. В production при нескольких экземплярах понадобятся общие блокировки и очередь; простого flock между разными машинами недостаточно."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "public/webhook.php\nvalues.php\ncommon.php\ntransport.php\nschema.sql\ninit.php\nreviews.php\ninvite.php\ndemo-order.php\nsetup-webhook.php\nworker.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · значения-примеры",
+                  "code": "APP_DB=/private/customer-reviews.sqlite\nBOT_TOKEN=TOKEN_FROM_BOTFATHER\nWEBHOOK_SECRET=RANDOM_HEX_64\nWEBHOOK_URL=https://example.com/webhook.php\nMANAGER_CHAT_ID=TEST_MANAGER_CHAT_ID"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · values.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n *\n * @return array<string,mixed>\n */\nfunction objectValue(mixed $value): array\n{\n    if (!is_array($value)) {\n        throw new InvalidArgumentException('Expected object');\n    }\n    $result = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected object keys');\n        }\n        $result[$key] = $item;\n    }\n    return $result;\n}\n\nfunction stringValue(mixed $value): string\n{\n    if (!is_string($value)) {\n        throw new InvalidArgumentException('Expected string');\n    }\n    return $value;\n}\n\nfunction intValue(mixed $value): int\n{\n    if (!is_int($value) && !is_string($value)) {\n        throw new InvalidArgumentException('Expected integer');\n    }\n    $integer = filter_var($value, FILTER_VALIDATE_INT);\n    if ($integer === false) {\n        throw new InvalidArgumentException('Invalid integer');\n    }\n    return $integer;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/values.php';\n\nfunction envRequired(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing environment: '.$name);\n    }\n    return $value;\n}\n\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.envRequired('APP_DB'), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA busy_timeout=5000');\n    return $db;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE orders (id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,status TEXT NOT NULL,completed_at INTEGER NOT NULL);\nCREATE TABLE reviews (\n id INTEGER PRIMARY KEY AUTOINCREMENT,order_id TEXT NOT NULL UNIQUE,user_id INTEGER NOT NULL,\n token TEXT NOT NULL UNIQUE,expires_at INTEGER NOT NULL,score INTEGER,comment TEXT,\n prompt_message_id INTEGER,publication_allowed INTEGER NOT NULL DEFAULT 0,\n consent_version TEXT,consent_at INTEGER,completed_at INTEGER\n);\nCREATE TABLE inbox (update_id INTEGER PRIMARY KEY,payload TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending');\nCREATE TABLE outbox (\n id INTEGER PRIMARY KEY AUTOINCREMENT,dedupe_key TEXT NOT NULL UNIQUE,review_id INTEGER,\n kind TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',attempts INTEGER NOT NULL DEFAULT 0,\n next_attempt_at INTEGER NOT NULL DEFAULT 0,message_id INTEGER,error_code INTEGER\n);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\ndatabase()->exec(stringValue(file_get_contents(__DIR__.'/schema.sql')));\necho \"Database ready\\n\";"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Токен и БД находятся вне public. MANAGER_CHAT_ID задаёт сотрудник на сервере; callback клиента не может заменить получателя тревоги. Для первого опыта используйте свой тестовый аккаунт и отдельный менеджерский чат, чтобы низкая оценка не попала реальной команде."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity",
+        "label": "Свяжите приглашение с заказом и владельцем",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Свяжите приглашение с заказом и владельцем"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "reviews.order_id уникален, а случайный token служит коротким идентификатором в callback_data. В нём нет телефона или внутреннего текста заказа. При обработке дополнительно проверяется user_id: пересланная кнопка не даёт другому человеку права оценить чужую работу."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Интерфейс хранит token в кнопках, но это не замена авторизации. Входящий webhook проверяется секретом Telegram; затем from.id сравнивается с личным chat.id, а запрос к reviews содержит token и user_id одновременно. Правило работает даже если чужой token уже известен."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Приглашение действует 14 дней. Истечение срока блокирует новую оценку и комментарий, но не мешает отозвать разрешение на публикацию уже завершённого текста. Дата выполнения заказа и дата ответа хранятся отдельно: отчёт по качеству должен ясно выбирать, по какой из них он считает период."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "logic",
+        "label": "Реализуйте оценку и комментарий",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Реализуйте оценку и комментарий"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · reviews.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @param array<string,mixed> $payload\n */\nfunction enqueue(PDO $db, string $key, ?int $reviewId, string $kind, array $payload): void\n{\n    $db->prepare('INSERT OR IGNORE INTO outbox(dedupe_key,review_id,kind,payload) VALUES(?,?,?,?)')\n        ->execute([$key,$reviewId,$kind,json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)]);\n}\nfunction invite(PDO $db, string $orderId): void\n{\n    $db->beginTransaction();\n    try {\n        $q = $db->prepare(\"SELECT * FROM orders WHERE id=? AND status='completed'\");\n        $q->execute([$orderId]);\n        $order = $q->fetch(PDO::FETCH_ASSOC);\n        if (!is_array($order)) {\n            throw new RuntimeException('Completed order not found');\n        }\n        $token = bin2hex(random_bytes(8));\n        $db->prepare('INSERT OR IGNORE INTO reviews(order_id,user_id,token,expires_at) VALUES(?,?,?,?)')\n            ->execute([$orderId,$order['user_id'],$token,time() + 14 * 86400]);\n        $q = $db->prepare('SELECT * FROM reviews WHERE order_id=?');\n        $q->execute([$orderId]);\n        $r = objectValue($q->fetch(PDO::FETCH_ASSOC));\n        $buttons = [];\n        for ($score = 1;$score <= 5;$score++) {\n            $buttons[] = ['text' => (string)$score,'callback_data' => 'rate:'.stringValue($r['token']).':'.$score];\n        }\n        enqueue($db, 'invite:'.intValue($r['id']), intValue($r['id']), 'invite', [\n            'chat_id' => $order['user_id'],'text' => 'Заказ '.$orderId.' выполнен. Оцените работу от 1 (плохо) до 5 (отлично). Ответ добровольный, публикация обсуждается отдельно.',\n            'reply_markup' => ['inline_keyboard' => [$buttons]]]);\n        $db->commit();\n    } catch (Throwable $e) {\n        $db->rollBack();\n        throw $e;\n    }\n}\n\n/**\n * Вызывается внутри транзакции inbox.\n *\n * @param array<string,mixed> $update\n */\nfunction reviewUpdate(PDO $db, array $update): void\n{\n    $callback = $update['callback_query'] ?? null;\n    $isCallback = is_array($callback);\n    $message = $isCallback ? ($callback['message'] ?? null) : ($update['message'] ?? null);\n    if (!is_array($message) || !is_array($message['chat'] ?? null) || $message['chat']['type'] !== 'private') {\n        return;\n    }\n    $user = intValue($message['chat']['id']);\n    $from = $isCallback ? ($callback['from'] ?? null) : ($message['from'] ?? null);\n    if (!is_array($from) || ($from['id'] ?? null) !== $user) {\n        return;\n    }\n    $text = $isCallback ? ($callback['data'] ?? '') : ($message['text'] ?? '');\n    if (!is_string($text)) {\n        return;\n    }\n    $action = '';\n    $value = '';\n    $token = '';\n    if ($isCallback && preg_match('/^(rate|skip|publish):([a-f0-9]{16})(?::([0-5]))?$/D', $text, $m)) {\n        $action = $m[1];\n        $token = $m[2];\n        $value = $m[3] ?? '';\n    } elseif (!$isCallback && preg_match('/^\\/comment ([a-f0-9]{16}) ([\\s\\S]+)$/uD', $text, $m)) {\n        $action = 'comment';\n        $token = $m[1];\n        $value = trim($m[2]);\n    } elseif (!$isCallback && is_array($message['reply_to_message'] ?? null)) {\n        $q = $db->prepare('SELECT token FROM reviews WHERE user_id=? AND prompt_message_id=? AND completed_at IS NULL');\n        $q->execute([$user,intValue($message['reply_to_message']['message_id'] ?? 0)]);\n        $found = $q->fetchColumn();\n        if (is_string($found)) {\n            $action = 'comment';\n            $token = $found;\n            $value = trim($text);\n        }\n    }\n    $updateId = intValue($update['update_id']);\n    $reply = static function (string $text) use ($db, $user, $updateId): void {\n        enqueue($db, 'ack:'.$updateId, null, 'reply', ['chat_id' => $user,'text' => $text]);\n    };\n    if ($token === '') {\n        $reply('Откройте приглашение к вашему заказу. Комментарий отправляйте ответом на вопрос бота.');\n        return;\n    }\n    $q = $db->prepare('SELECT * FROM reviews WHERE token=? AND user_id=?');\n    $q->execute([$token,$user]);\n    $r = $q->fetch(PDO::FETCH_ASSOC);\n    if (!is_array($r)) {\n        $reply('Приглашение недоступно.');\n        return;\n    }\n    $id = intValue($r['id']);\n    if ($action !== 'publish' && intValue($r['expires_at']) < time()) {\n        $reply('Срок приглашения истёк.');\n        return;\n    }\n    if ($action === 'rate') {\n        $score = (int)$value;\n        if ($score < 1 || $score > 5) {\n            return;\n        }\n        if ($r['score'] !== null) {\n            $reply('Оценка уже принята и не изменена. Ответьте на вопрос о комментарии или используйте /comment '.$token.' ваш текст');\n            return;\n        }\n        $db->prepare('UPDATE reviews SET score=? WHERE id=?')->execute([$score,$id]);\n        enqueue($db, 'prompt:'.$id, $id, 'prompt', ['chat_id' => $user,\n            'text' => 'Оценка '.$score.' для заказа '.stringValue($r['order_id']).' сохранена. Ответьте на это сообщение комментарием до 2000 символов. Если ответ не привязался: /comment '.$token.' ваш текст',\n            'reply_markup' => ['force_reply' => true,'input_field_placeholder' => 'Что понравилось или стоит улучшить?']]);\n        enqueue($db, 'skip:'.$id, $id, 'reply', ['chat_id' => $user,'text' => 'Комментарий необязателен.',\n            'reply_markup' => ['inline_keyboard' => [[['text' => 'Без комментария','callback_data' => 'skip:'.$token]]]]]);\n        if ($score <= 2) {\n            enqueue($db, 'low:'.$id, $id, 'manager', ['chat_id' => envRequired('MANAGER_CHAT_ID'),\n                'text' => 'Низкая оценка '.$score.'/5 · заказ '.stringValue($r['order_id']).' · отзыв №'.$id.'. Проверьте обращение в рабочей системе.']);\n        }\n        return;\n    }\n    if ($action === 'comment' || $action === 'skip') {\n        if ($r['score'] === null) {\n            $reply('Сначала поставьте оценку.');\n            return;\n        }\n        if ($r['completed_at'] !== null) {\n            $reply('Отзыв уже завершён. Текст не изменён.');\n            return;\n        }\n        $comment = $action === 'skip' ? '' : $value;\n        if ($action === 'comment' && (mb_strlen($comment) < 1 || mb_strlen($comment) > 2000)) {\n            $reply('Комментарий должен содержать от 1 до 2000 символов.');\n            return;\n        }\n        $db->prepare('UPDATE reviews SET comment=?,completed_at=? WHERE id=?')->execute([$comment,time(),$id]);\n        if ($comment === '') {\n            $reply('Спасибо! Оценка сохранена без комментария.');\n            return;\n        }\n        enqueue($db, 'consent:'.$id, $id, 'reply', ['chat_id' => $user,\n            'text' => 'Спасибо! Разрешаете опубликовать этот текст и оценку на сайте компании без Telegram ID и username? По умолчанию отзыв остаётся внутренним. Выбор можно изменить этими же кнопками.',\n            'reply_markup' => ['inline_keyboard' => [[['text' => 'Разрешаю','callback_data' => 'publish:'.$token.':1'],['text' => 'Не публиковать / отозвать','callback_data' => 'publish:'.$token.':0']]]]]);\n        return;\n    }\n    if ($action === 'publish' && in_array($value, ['0','1'], true)) {\n        if ($r['completed_at'] === null || $r['comment'] === '') {\n            $reply('Нет завершённого комментария для публикации.');\n            return;\n        }\n        $db->prepare('UPDATE reviews SET publication_allowed=?,consent_version=?,consent_at=? WHERE id=?')->execute([(int)$value,'site-text-score-anonymous-v1',time(),$id]);\n        $reply($value === '1' ? 'Разрешение сохранено. Публикация возможна после проверки менеджером.' : 'Публикация запрещена. Ранее опубликованный отзыв нужно снять с сайта.');\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "invite создаёт review и исходящее приглашение одной транзакцией. Повтор события завершения заказа читает ту же запись и не добавляет ещё один invite в outbox. Подготовка сетевого сообщения отделена от отправки: транзакция не держится открытой во время Telegram API."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После оценки бот задаёт вопрос с ForceReply. Успешно отправленный prompt_message_id сохраняется, а ответ ищет review по владельцу и ID именно этого сообщения. Так комментарии к двум заказам одного клиента не смешиваются. Обычный текст без reply не прикрепляется автоматически к «последнему заказу»."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В приглашении к комментарию есть запасная команда /comment TOKEN текст. Она нужна, если клиент не использовал ответ на сообщение или результат отправки prompt оказался неизвестен. Эта команда проходит ту же проверку владельца, срока и состояния; знание кода не позволяет писать отзыв за другого пользователя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Комментарий ограничен 2000 символами, а кнопка «Без комментария» завершает отзыв с пустым текстом. Поздний текст после завершения не заменяет уже сохранённый. Пользователь получает понятное сообщение; оператор при необходимости разбирает исправление отдельно, сохраняя исходный ответ."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "permission",
+        "label": "Запросите разрешение отдельной кнопкой",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запросите разрешение отдельной кнопкой"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После непустого комментария бот показывает точную формулировку: текст и оценка могут быть опубликованы на сайте без Telegram ID и username. По умолчанию publication_allowed=0. Ни высокая оценка, ни факт отправки комментария не меняют это поле."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-customer-reviews/rating-and-permission.jpg",
+                  "width": 1080,
+                  "height": 875,
+                  "alt": "Сначала клиент оценивает заказ и пишет комментарий; затем отдельными кнопками разрешает или запрещает публикацию.",
+                  "caption": "Поясняющая схема по сценарию статьи, не снимок Telegram. Вопрос о публикации сокращён; в коде приведён полный текст отдельного согласия.",
+                  "mobile_src": "/images/guides/telegram-bot-customer-reviews/rating-and-permission-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1238
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разрешение сохраняется вместе с consent_version и consent_at. Версия должна однозначно соответствовать показанному тексту. Если меняете цель, площадку, авторство или состав публикуемых данных, не трактуйте прежний выбор как разрешение на новые условия. Для реального продукта формулировку и сроки хранения согласуйте с ответственным за обработку данных."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Кнопка «Не публиковать / отозвать» остаётся доступной и после согласия. Код сразу меняет текущий запрет; публикационный процесс обязан учитывать его при чтении и удалять уже выведенный материал. Если сайт использует кеш, поисковый индекс или отдельный экспорт, дополнительно организуйте их обновление. Ответ бота сам по себе не удаляет копии из другой системы."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · внутренний отбор для проверки менеджером",
+                  "code": "SELECT id,order_id,score,comment,consent_version,consent_at\nFROM reviews\nWHERE publication_allowed=1 AND completed_at IS NOT NULL AND comment<>'';"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Эта выборка — список кандидатов для внутренней проверки, не публичный API. На сайт передавайте только разрешённые поля и экранируйте текст. Не публикуйте order_id, user_id, token и служебные отметки; проверьте также, не написал ли клиент телефон или адрес внутри самого комментария. Статья реализует сбор и текущее разрешение, а не автоматическую публикацию отзывов."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "manager",
+        "label": "Отправьте менеджеру сигнал о низкой оценке",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправьте менеджеру сигнал о низкой оценке"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Оценки 1 и 2 создают строку outbox с ключом low:review_id. Повтор callback не создаёт второй сигнал. В сообщение входят оценка, номер заказа и внутренний номер отзыва; полный комментарий не пересылается автоматически в общий чат. По номеру сотрудник открывает разрешённую рабочую систему."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не блокируйте сохранение отзыва из-за недоступного менеджерского чата. Клиент уже ответил, и это бизнес-событие нужно сохранить независимо от доставки тревоги. Ошибка Telegram меняет состояние outbox, а не score. Если менеджерский бот удалён или лишён прав, оператор увидит failed и восстановит доставку после проверки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сигнал должен вести к понятному действию: проверить заказ, связаться с клиентом по разрешённому каналу и зафиксировать результат. Не обещайте автоматическую компенсацию и не отправляйте агрессивные предложения изменить оценку. Для полноценного разговора поддержки подходит "
+                },
+                {
+                  "type": "text",
+                  "text": "операторская группа",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-support-operator-group"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Принимайте обновления и обрабатывайте очередь",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Принимайте обновления и обрабатывайте очередь"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\n$secret = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';\nif (!is_string($secret) || !hash_equals(envRequired('WEBHOOK_SECRET'), $secret)) {\n    http_response_code(403);\n    exit;\n}\n$raw = file_get_contents('php://input', false, null, 0, 65537);\nif (!is_string($raw) || strlen($raw) > 65536) {\n    http_response_code(413);\n    exit;\n}\ntry {\n    $update = objectValue(json_decode($raw, true, 32, JSON_THROW_ON_ERROR));\n    if (!is_int($update['update_id'] ?? null)) {\n        http_response_code(400);\n        exit;\n    }\n    database()->prepare('INSERT OR IGNORE INTO inbox(update_id,payload) VALUES(?,?)')->execute([$update['update_id'],$raw]);\n    http_response_code(200);\n} catch (Throwable) {\n    http_response_code(503);\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · transport.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @param array<string,mixed> $params\n *\n * @return array{state:string,retry_after:int,message_id:?int,code:?int}\n */\nfunction sendTelegram(string $method, array $params): array\n{\n    $curl = curl_init('https://api.telegram.org/bot'.envRequired('BOT_TOKEN').'/'.$method);\n    if ($curl === false) {\n        throw new RuntimeException('HTTP init failed');\n    }\n    curl_setopt_array($curl, [CURLOPT_POST => true,CURLOPT_POSTFIELDS => json_encode($params, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),\n        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],CURLOPT_RETURNTRANSFER => true,CURLOPT_CONNECTTIMEOUT => 5,CURLOPT_TIMEOUT => 20]);\n    $raw = curl_exec($curl);\n    $http = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    return classifyTelegram($http, is_string($raw) ? $raw : null);\n}\n\n/**\n * @return array{state:string,retry_after:int,message_id:?int,code:?int}\n */\nfunction classifyTelegram(int $http, ?string $raw): array\n{\n    $unknown = ['state' => 'unknown','retry_after' => 0,'message_id' => null,'code' => null];\n    if ($raw === null || $http >= 500) {\n        return $unknown;\n    }\n    $body = json_decode($raw, true);\n    if (!is_array($body)) {\n        return $unknown;\n    }\n    $result = $body['result'] ?? null;\n    if ($http === 200 && ($body['ok'] ?? false) === true) {\n        $id = is_array($result) && is_int($result['message_id'] ?? null) ? $result['message_id'] : null;\n        return ['state' => 'sent','retry_after' => 0,'message_id' => $id,'code' => null];\n    }\n    if (($body['ok'] ?? null) !== false || !is_int($body['error_code'] ?? null)) {\n        return $unknown;\n    }\n    $code = $body['error_code'];\n    $parameters = $body['parameters'] ?? null;\n    if ($code === 429 && is_array($parameters) && is_int($parameters['retry_after'] ?? null) && $parameters['retry_after'] > 0) {\n        return ['state' => 'retry','retry_after' => $parameters['retry_after'],'message_id' => null,'code' => $code];\n    }\n    return ['state' => $code >= 400 && $code < 500 ? 'failed' : 'unknown','retry_after' => 0,'message_id' => null,'code' => $code];\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · worker.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/reviews.php';\nrequire __DIR__.'/transport.php';\n$lock = fopen(envRequired('APP_DB').'.worker.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    exit(0);\n}\n$db = database();\n$q = $db->prepare(\"SELECT * FROM inbox WHERE state='pending' ORDER BY update_id LIMIT 20\");\n$q->execute();\nforeach ($q->fetchAll(PDO::FETCH_ASSOC) as $data) {\n    $row = objectValue($data);\n    $update = objectValue(json_decode(stringValue($row['payload']), true, 32, JSON_THROW_ON_ERROR));\n    $callback = $update['callback_query'] ?? null;\n    if (is_array($callback) && is_string($callback['id'] ?? null)) {\n        try {\n            sendTelegram('answerCallbackQuery', ['callback_query_id' => $callback['id']]);\n        } catch (Throwable) {\n        }\n    }\n    $db->beginTransaction();\n    try {\n        reviewUpdate($db, $update);\n        $db->prepare(\"UPDATE inbox SET state='done' WHERE update_id=?\")->execute([$row['update_id']]);\n        $db->commit();\n    } catch (Throwable) {\n        $db->rollBack();\n        $db->prepare(\"UPDATE inbox SET state='review' WHERE update_id=?\")->execute([$row['update_id']]);\n    }\n}\n$q = $db->prepare(\"SELECT * FROM outbox WHERE state IN ('pending','retry') AND next_attempt_at<=? ORDER BY id LIMIT 20\");\n$q->execute([time()]);\nforeach ($q->fetchAll(PDO::FETCH_ASSOC) as $data) {\n    $row = objectValue($data);\n    $db->prepare(\"UPDATE outbox SET state='sending',attempts=attempts+1 WHERE id=?\")->execute([$row['id']]);\n    try {\n        $r = sendTelegram('sendMessage', objectValue(json_decode(stringValue($row['payload']), true, 32, JSON_THROW_ON_ERROR)));\n    } catch (Throwable) {\n        $r = ['state' => 'unknown','retry_after' => 0,'message_id' => null,'code' => null];\n    }\n    if ($r['state'] === 'sent' && $r['message_id'] === null) {\n        $r['state'] = 'unknown';\n    }\n    if ($r['state'] === 'retry' && intValue($row['attempts']) + 1 >= 5) {\n        $r['state'] = 'failed';\n    }\n    $db->beginTransaction();\n    try {\n        $db->prepare('UPDATE outbox SET state=?,next_attempt_at=?,message_id=?,error_code=? WHERE id=?')\n            ->execute([$r['state'],time() + $r['retry_after'],$r['message_id'],$r['code'],$row['id']]);\n        if ($row['kind'] === 'prompt' && $r['state'] === 'sent') {\n            $db->prepare('UPDATE reviews SET prompt_message_id=? WHERE id=?')->execute([$r['message_id'],$row['review_id']]);\n        }\n        $db->commit();\n    } catch (Throwable $e) {\n        $db->rollBack();\n        throw $e;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Webhook подтверждает приём после сохранения update_id и сырого JSON. Worker в транзакции изменяет review, создаёт исходящие сообщения и отмечает inbox как done. Авария до commit откатывает все три действия, а повторный update_id не добавляет новую входящую запись."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "answerCallbackQuery нужен для завершения индикатора кнопки. Здесь он выполняется в начале обработки; ошибка или просроченность подтверждения не отменяют уже полученную оценку. Держите worker работающим постоянно и не ставьте его на минутный cron. Для большой очереди нужен отдельный быстрый путь подтверждения кнопок и ограничение нагрузки. "
+                },
+                {
+                  "type": "text",
+                  "text": "CallbackQuery",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#callbackquery"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправитель фиксирует sending перед сетью. Подтверждённый 429 переносит попытку на retry_after, максимум пять попыток. Таймаут или 5xx оставляют unknown. Состояние sending после аварии тоже требует проверки: Telegram мог принять сообщение до записи message_id. Повтор приглашения, prompt и тревоги нельзя считать одинаково безвредным."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Плохой входящий формат переводит запись в review; после исправления причины можно вернуть конкретный inbox в pending. Сетевые unknown в outbox автоматически не переигрываются. Уникальность ключа защищает постановку задачи, но не гарантирует однократную физическую доставку."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "launch",
+        "label": "Пройдите полный сценарий на своём аккаунте",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пройдите полный сценарий на своём аккаунте"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · demo-order.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$user = intValue($argv[1] ?? '');\nif ($user <= 0) {\n    throw new InvalidArgumentException('Use your test Telegram user ID');\n}\ndatabase()->prepare(\"INSERT INTO orders(id,user_id,status,completed_at) VALUES('R-1042',?,'completed',?)\")->execute([$user,time()]);\necho \"Test order R-1042 created\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · invite.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/reviews.php';\n$id = $argv[1] ?? '';\nif (!preg_match('/^[A-Z0-9-]{1,40}$/D', $id)) {\n    throw new InvalidArgumentException('Usage: php invite.php R-1042');\n}\ninvite(database(), $id);\necho \"Invitation queued\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/transport.php';\n$result = sendTelegram('setWebhook', ['url' => envRequired('WEBHOOK_URL'),'secret_token' => envRequired('WEBHOOK_SECRET'),'allowed_updates' => ['message','callback_query']]);\nif ($result['state'] !== 'sent') {\n    throw new RuntimeException('Webhook configuration not confirmed');\n}\necho \"Webhook configured\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · подготовка теста",
+                  "code": "php init.php\nphp setup-webhook.php\nphp demo-order.php YOUR_TEST_TELEGRAM_USER_ID\nphp invite.php R-1042\nphp worker.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед invite.php откройте тестового бота и нажмите Start. В demo-order.php вместо placeholder передайте числовой ID своего аккаунта, связанного с заказом. После worker.php ожидается одно приглашение с пятью кнопками. Эта команда уже отправляет сообщения в настроенные тестовые чаты."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · обработка во время проверки",
+                  "code": "while true; do\n  php worker.php\n  sleep 1\ndone"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Поставьте 2, ответьте на вопрос комментарием, затем выберите «Не публиковать». В БД должна быть одна оценка, один комментарий, publication_allowed=0 и одна менеджерская задача. Потом нажмите «Разрешаю» и снова отзовите разрешение: score и comment должны остаться прежними."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · проверить ответ и доставку",
+                  "code": "SELECT id,order_id,user_id,score,comment,publication_allowed,consent_version FROM reviews;\nSELECT id,dedupe_key,kind,state,attempts,message_id,error_code FROM outbox ORDER BY id;"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверьте повторы, чужие кнопки и два заказа",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте повторы, чужие кнопки и два заказа"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повтор invite.php для того же заказа оставляет один review и одно приглашение."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повтор оценки 2, затем нажатие 5 не перезаписывают первый ответ и не удваивают тревогу."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Другой Telegram-пользователь не оценивает заказ по известному token."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Комментарии к двум разным prompt_message_id попадают в свои заказы."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Комментарий без reply получает инструкцию, а не случайную привязку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Публикация запрещена по умолчанию; явное разрешение и отзыв меняют только соответствующее поле."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ошибка отправки менеджеру не стирает клиентскую оценку."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для рабочей нагрузки добавьте срок хранения переписки, частотные ограничения и мониторинг зависших sending/unknown. Не отправляйте новые просьбы об оценке после каждого повторного бизнес-события и не превращайте необязательный отзыв в условие выдачи результата заказа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Основной код использует прямой Telegram webhook. При подключении BotGate заменяются исходящий транспорт и проверка входящего HMAC; схема заказов, разрешений и очереди остаётся вашей. Не запускайте setup-webhook.php поверх управляемого подключения BotGate. "
+                },
+                {
+                  "type": "text",
+                  "text": "Формат webhook сервиса",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " отличается от X-Telegram-Bot-Api-Secret-Token."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

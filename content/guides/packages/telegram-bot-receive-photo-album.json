@@ -1,0 +1,523 @@
+[
+  {
+    "slug": "telegram-bot-receive-photo-album",
+    "title": "Как принять альбом фотографий от пользователя Telegram-бота",
+    "seo_title": "Как принять альбом фотографий от пользователя Telegram-бота",
+    "description": "Собираем входящие фотографии по media_group_id, сохраняем порядок и привязываем альбом к одной заявке. Разбираем повторы webhook, поздние фото и подтверждение загрузки.",
+    "card_description": "Собираем входящие фотографии по media_group_id, сохраняем порядок и привязываем альбом к одной заявке. Разбираем повторы webhook, поздние фото и подтверждение загрузки.",
+    "category": "Практика",
+    "topics": "PHP · Фотоальбомы · Вложения",
+    "reading_time": "11 минут",
+    "published_at": "2026-11-03",
+    "is_published": true,
+    "sort_order": 32,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера клиент отправляет фотографии повреждённого устройства для оценки ремонта. В интерфейсе Telegram это один альбом, но приложение получит несколько сообщений. Соберём их в одну группу вложений, сохраним связь с заявкой и не отправим менеджеру отдельную заявку на каждую фотографию."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "messages",
+        "label": "Почему один альбом приходит несколькими событиями",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Почему один альбом приходит несколькими событиями"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "У каждого элемента есть собственные message_id и update_id, а сообщения одного альбома объединяет строковый media_group_id. Входящий webhook не содержит готовый массив всех элементов с признаком «это последняя фотография». Эти поля описаны в "
+                },
+                {
+                  "type": "text",
+                  "text": "структуре Message",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#message"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Массив message.photo — это варианты размера одной фотографии, а не фотографии альбома. Из него выбирайте один подходящий PhotoSize для хранения или скачивания. Если сохранить каждый элемент photo как самостоятельное вложение, одна фотография превратится в несколько дублей."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ниже используем PHP 8.3+, PDO SQLite и уже настроенный приём обновлений. Пример показывает накопление метаданных в БД. Скачивание файлов и доставка менеджеру выполняются отдельными заданиями после сохранения; webhook не ждёт весь альбом."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправку исходящего альбома разбирает "
+                },
+                {
+                  "type": "text",
+                  "text": "другое руководство",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-send-photo-album"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Здесь задача обратная: надёжно принять несколько независимых событий от пользователя."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "storage",
+        "label": "Задаём ключи и привязываем альбом к заявке",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задаём ключи и привязываем альбом к заявке"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Составной ключ альбома: bot_id, chat_id и media_group_id. Не приводите media_group_id к целому числу. Для элемента нужен уникальный ключ (bot_id, chat_id, message_id), а для приёма update — (bot_id, update_id). Эти ключи защищают разные уровни обработки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При первом элементе определите активную заявку пользователя и сохраните request_id в строке альбома. Последующие элементы ищут уже созданную группу и наследуют её request_id. Нельзя каждый раз брать «текущую заявку»: пользователь мог успеть открыть другую анкету между доставками."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · минимальное хранилище SQLite",
+                  "code": "CREATE TABLE incoming_albums (\n  bot_id TEXT NOT NULL, chat_id INTEGER NOT NULL, media_group_id TEXT NOT NULL,\n  request_id INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'collecting',\n  revision INTEGER NOT NULL DEFAULT 0, ready_at INTEGER NOT NULL,\n  PRIMARY KEY (bot_id, chat_id, media_group_id)\n);\nCREATE TABLE album_items (\n  bot_id TEXT NOT NULL, chat_id INTEGER NOT NULL, message_id INTEGER NOT NULL,\n  media_group_id TEXT NOT NULL, file_id TEXT NOT NULL, caption TEXT NOT NULL,\n  PRIMARY KEY (bot_id, chat_id, message_id)\n);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В рабочей схеме дополнительно храните отправителя, время первого элемента, срок ожидания подтверждения и связь с вашей таблицей заявок. Проверяйте, что заявка принадлежит этому пользователю и принимает вложения. В примере используется личный чат; сценарий общей группы потребует учёта отправителя и выбранного обращения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Текстовая подпись может прийти с одним из элементов, и полагаться на порядок доставки нельзя. Сохраните caption возле исходного message_id. Для карточки заявки используйте подписи в порядке сообщений, а не «подпись первого пришедшего update»."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "collect",
+        "label": "Добавляем фотографию без повторного вложения",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавляем фотографию без повторного вложения"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция ниже принимает уже проверенные bot_id, chat_id, message_id, media_group_id и request_id. FileId выбирается из message.photo по нужному размеру; caption может быть пустым. Параметр now — Unix timestamp времени приёма. Для SQLite захват записи выполняется BEGIN IMMEDIATE; вызывать функцию внутри другой транзакции не нужно."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · collect-photo.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction collectPhoto(\n    PDO $db, string $botId, int $chatId, string $groupId,\n    int $requestId, int $messageId, string $fileId, string $caption, int $now,\n): bool {\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $q = $db->prepare('INSERT INTO incoming_albums\n            (bot_id, chat_id, media_group_id, request_id, ready_at)\n            VALUES (?, ?, ?, ?, ?) ON CONFLICT DO NOTHING');\n        $q->execute([$botId, $chatId, $groupId, $requestId, $now + 2]);\n        $q = $db->prepare('SELECT state FROM incoming_albums\n            WHERE bot_id = ? AND chat_id = ? AND media_group_id = ?');\n        $q->execute([$botId, $chatId, $groupId]);\n        if ($q->fetchColumn() !== 'collecting') {\n            throw new LogicException('Альбом уже закрыт: обработайте поздний элемент отдельно');\n        }\n        $q = $db->prepare('INSERT INTO album_items\n            (bot_id, chat_id, message_id, media_group_id, file_id, caption)\n            VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING');\n        $q->execute([$botId, $chatId, $messageId, $groupId, $fileId, $caption]);\n        $added = $q->rowCount() === 1;\n        if ($added) {\n            $q = $db->prepare('UPDATE incoming_albums\n                SET revision = revision + 1, ready_at = ?\n                WHERE bot_id = ? AND chat_id = ? AND media_group_id = ?');\n            $q->execute([$now + 2, $botId, $chatId, $groupId]);\n        }\n        $db->exec('COMMIT');\n        return $added;\n    } catch (Throwable $error) {\n        $db->exec('ROLLBACK');\n        throw $error;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключение PDO должно использовать ERRMODE_EXCEPTION. При повторе одного message_id функция возвращает false и не продлевает ожидание. Request_id существующего альбома не переписывается. Для MySQL/PostgreSQL перенесите алгоритм на их синтаксис и блокировку строки: буквальная копия SQLite-команд туда не подходит."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Приёмник сначала надёжно сохраняет update, затем подтверждает доставку. Обработчик может повторить локальную обработку после временной ошибки БД. Для уже закрытого альбома LogicException — сигнал отдельной ветки поздних сообщений, а не причина бесконечно повторять webhook. Сохранённое исходное событие позволяет разобрать ситуацию без потери фотографии."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "finish",
+        "label": "Ожидаем паузу и подтверждаем состав альбома",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ожидаем паузу и подтверждаем состав альбома"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После каждого нового элемента ready_at сдвигается на две секунды. Worker выбирает collecting с ready_at <= now(). Это лишь удобная задержка для интерфейса: Telegram не обещает, что через две секунды будут доставлены все фотографии. Значение выбирайте по нагрузке, а не выдавайте его за признак полноты."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для оценки ремонта лучше показывать предварительный список после паузы: «Получено 4 фото. Всё добавлено?» с кнопкой «Готово». Новая фотография увеличивает revision и обновляет предварительный состав. В callback подтверждения передайте ссылку на альбом и revision, проверьте владельца заявки и действующий шаг."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Закрытие выполняйте короткой транзакцией: заново загрузите альбом, проверьте revision и отсутствие новых элементов, затем измените collecting на confirmed и создайте одно задание обработки с уникальным ключом альбома. Если revision изменилась, покажите обновлённый состав и попросите подтвердить его. Сетевые операции выполняются после commit."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если после подтверждения пришёл неизвестный message_id той же группы, сохраните его как позднее вложение, свяжите с прежним request_id и уведомите пользователя или оператора. Не создавайте новую заявку автоматически и не добавляйте файл молча к уже отправленному менеджеру набору. Повтор ранее принятого message_id отбрасывайте до этой ветки по уникальному ключу."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не оставляйте collecting навсегда: например, через 30 минут без подтверждения переведите группу в expired, сохранив принятые вложения на установленный срок. Пользователь должен видеть возможность вернуться к черновику или начать заново. Для сценария без кнопки «Готово» заранее определите такую же политику поздних элементов."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "files",
+        "label": "Сохраняем порядок и скачиваем нужные файлы",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраняем порядок и скачиваем нужные файлы"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Читать элементы нужно с ORDER BY message_id, а не по времени получения webhook. Это даёт порядок сообщений в исходном чате. Для нескольких групп одной заявки дополнительно сохраните порядок самих групп. Уникальный media_group_id не заменяет порядок элементов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для отправки и getFile нужен file_id; file_unique_id пригоден для сопоставления, но не для скачивания. File_id относится к тому боту, который получил файл. Не переносите его в запросы другого бота. Подробный путь загрузки разобран в "
+                },
+                {
+                  "type": "text",
+                  "text": "статье о получении и сохранении файлов",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-receive-and-save-files"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Worker скачивает файлы по одному, проверяет ограничения размера и сохраняет результат под собственным безопасным именем. Исходное имя и подпись не используйте как путь. Ошибка одной загрузки должна оставаться видимой: статус заявки «все фото сохранены» ставится только после подтверждения нужных файлов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Альбом может содержать неподдерживаемые вашим сценарием типы. Если принимаете только фото, обработайте video/document явно: сообщите, что этот элемент не вошёл в набор. Одиночное фото без media_group_id принимайте отдельной веткой вложений, не объединяя все такие сообщения под пустым ключом."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "check",
+        "label": "Проверяем задержки и повторную доставку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем задержки и повторную доставку"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отправьте три фотографии одним альбомом: получится одна группа и три вложения, а не по записи на каждый размер photo."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Обработайте события в обратном порядке: итоговый список отсортирован по message_id."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторите update и message_id: число вложений и revision не меняются."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Перезапустите worker после первого фото: накопленные данные остаются в БД."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Пришлите последнюю фотографию после паузы и после подтверждения: обе ситуации проходят предусмотренные ветки."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте другую заявку до прихода задержанного элемента: прежний альбом остаётся у первоначальной заявки."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Через BotGate входящие части альбома также обрабатывает ваше приложение. Сборщик, таймер и подтверждение пользователя не заменяются транспортом webhook. Проверяйте подпись по "
+                },
+                {
+                  "type": "text",
+                  "text": "документации сервиса",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#webhook"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", а неизвестный результат исходящей отправки менеджеру разбирайте отдельно от повторной доставки входящих фотографий."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

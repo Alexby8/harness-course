@@ -1,0 +1,1316 @@
+[
+  {
+    "slug": "telegram-bot-waiting-list",
+    "title": "Как организовать лист ожидания через Telegram-бота",
+    "seo_title": "Как организовать лист ожидания через Telegram-бота",
+    "description": "Лист ожидания на PHP: очередь клиентов, предложение освободившегося времени, срок подтверждения, отказ и передача места следующему участнику.",
+    "card_description": "Лист ожидания на PHP: очередь клиентов, предложение освободившегося времени, срок подтверждения, отказ и передача места следующему участнику.",
+    "category": "Практика",
+    "topics": "Telegram Bot API · PHP · Запись",
+    "reading_time": "34 минуты",
+    "published_at": "2026-11-23",
+    "is_published": true,
+    "sort_order": 78,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера кабинет консультаций уже занят на нужное клиенту время. Клиент вступает в лист ожидания, а после отмены записи бот предлагает место первому участнику. На подтверждение даётся десять минут, затем предложение переходит следующему. Реализуем очередь, защиту от чужих кнопок, повторной отмены и одновременного подтверждения."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "rules",
+        "label": "Определите, на какое место стоит очередь",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Определите, на какое место стоит очередь"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В этом примере очередь относится к конкретному слоту: специалисту и заранее выбранному времени, представленному одним slot_id. Команда /join 1 означает «ждать слот 1», а не «записать меня на любое свободное время». Это позволяет точно определить порядок и не предложить клиенту неподходящий день."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-waiting-list/waiting-offer.jpg",
+                  "alt": "Анна получает единственное предложение на десять минут; после отказа или истечения срока очередь переходит к Борису, затем к Вере.",
+                  "caption": "Поясняющая схема FIFO-очереди одного конкретного времени. Имена вымышлены; нативный интерфейс Telegram не воспроизводится.",
+                  "width": 1080,
+                  "height": 668,
+                  "mobile_src": "/images/guides/telegram-bot-waiting-list/waiting-offer-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1023
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для общего списка по услуге потребуются интервалы доступности клиента, длительность процедуры, подходящий филиал и правила приоритета. Один и тот же человек может подходить нескольким слотам; тогда нужен общий контроль активных предложений. Не переносите простую FIFO-очередь одного времени на такой сценарий без модели соответствия."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Состояние"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что означает"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "waiting"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Клиент ожидает предложения"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "offered"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Место предложено этому клиенту до expires_at"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "accepted"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Клиент подтвердил, слот получил booking_user"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "declined / left"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Отказ от предложения или выход из ожидания"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "expired"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Время подтверждения закончилось"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Порядок определяется монотонным ID вступления. Повтор /join не меняет место активного участника. После пропущенного предложения человек не возвращается в начало: он может вступить заново и попадёт в конец. Эта политика должна быть видна пользователю заранее, особенно если уведомления могут быть отключены."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "У нас предложение действует десять минут от его создания в БД, включая доставку сообщения, но не позже начала приёма. Это простое и проверяемое правило. Для срока «десять минут после подтверждённой отправки» потребуются отдельные состояния доставки; таймаут sendMessage всё равно не доказывает, увидел ли клиент сообщение."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Создайте хранилище очереди и записей",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте хранилище очереди и записей"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример — отдельное небольшое приложение на PHP 8.3+ в 64-битной среде. Нужны PDO SQLite, mbstring и HTTPS; для отправки сообщений также расширение curl. Composer не требуется. Веб-сервер открывает только public, база и CLI-файлы находятся выше публичного корня. Не переносите эти учебные таблицы в рабочую БД BotGate."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "public/webhook.php\nvalues.php\ncommon.php\ndomain.php\nschema.sql\noutbox.sql\noutbox.php\ntransport.php\nworker.php\nsetup-webhook.php\nadmin.php\ninit.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · замените значения",
+                  "code": "APP_DB=/private/telegram-bot-waiting-list.sqlite\nBOT_TOKEN=TOKEN_FROM_BOTFATHER\nWEBHOOK_URL=https://waiting.example.com/webhook.php\nWEBHOOK_SECRET=RANDOM_SECRET_FOR_THIS_BOT"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обычный PHP сам не читает .env. Передайте окружение PHP-FPM и CLI через свою конфигурацию или экспортируйте переменные в тестовом терминале. Каталог базы должен существовать и быть доступен пользователю PHP, но не посторонним пользователям сервера. Для первого опыта используйте отдельного тестового бота."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · values.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n *\n * @return array<string,mixed>\n */\nfunction objectValue(mixed $value): array\n{\n    if (!is_array($value)) {\n        throw new InvalidArgumentException('Expected object');\n    }\n    $result = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected object keys');\n        }\n        $result[$key] = $item;\n    }\n    return $result;\n}\n\nfunction stringValue(mixed $value): string\n{\n    if (!is_string($value)) {\n        throw new InvalidArgumentException('Expected string');\n    }\n    return $value;\n}\n\nfunction intValue(mixed $value): int\n{\n    if (!is_int($value) && !is_string($value)) {\n        throw new InvalidArgumentException('Expected integer');\n    }\n    $integer = filter_var($value, FILTER_VALIDATE_INT);\n    if ($integer === false) {\n        throw new InvalidArgumentException('Invalid integer');\n    }\n    return $integer;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/values.php';\n\nfunction envRequired(string $key): string\n{\n    $value = getenv($key);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing '.$key);\n    }\n    return $value;\n}\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.envRequired('APP_DB'), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);\n    $db->exec('PRAGMA foreign_keys=ON');\n    $db->exec('PRAGMA busy_timeout=5000');\n    return $db;\n}\n/**\n * @param list<int|string|null> $params\n */\nfunction run(PDO $db, string $sql, array $params = []): PDOStatement\n{\n    $query = $db->prepare($sql);\n    $query->execute($params);\n    return $query;\n}\n/**\n * @param list<int|string|null> $params\n * @return array<string,mixed>|null\n */\nfunction row(PDO $db, string $sql, array $params = []): ?array\n{\n    $value = run($db, $sql, $params)->fetch();\n    return $value === false ? null : objectValue($value);\n}\n/**\n * @template T\n * @param callable():T $action\n * @return T\n */\nfunction atomic(PDO $db, callable $action): mixed\n{\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $result = $action();\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $e) {\n        $db->exec('ROLLBACK');\n        throw $e;\n    }\n}\nfunction positive(mixed $value, int $max = 100000000): int\n{\n    $n = intValue($value);\n    if ($n < 1 || $n > $max) {\n        throw new DomainException('Число вне допустимого диапазона');\n    } return $n;\n}\nfunction token(mixed $value): string\n{\n    $v = stringValue($value);\n    if (!preg_match('/^[A-Za-z0-9_-]{8,80}$/D', $v)) {\n        throw new DomainException('Неверный ключ операции');\n    } return $v;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "atomic выполняет BEGIN IMMEDIATE: проверка состояния и запись проходят под одной короткой транзакцией SQLite. Эта БД допускает только одного пишущего участника одновременно; busy_timeout даёт время дождаться блокировки. Сетевые запросы внутри транзакции не выполняются. При переходе на другую БД понадобится её механизм блокировки нужных строк, а не механическая замена DSN. "
+                },
+                {
+                  "type": "text",
+                  "text": "Транзакции SQLite",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.sqlite.org/lang_transaction.html"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE slots(id INTEGER PRIMARY KEY,starts_at INTEGER NOT NULL,booking_user INTEGER,booking_key TEXT);\nCREATE TABLE waiting(id INTEGER PRIMARY KEY,slot_id INTEGER NOT NULL REFERENCES slots(id),user_id INTEGER NOT NULL,state TEXT NOT NULL);\nCREATE UNIQUE INDEX waiting_active ON waiting(slot_id,user_id) WHERE state IN ('waiting','offered');\nCREATE TABLE offers(id INTEGER PRIMARY KEY,token TEXT UNIQUE NOT NULL,entry_id INTEGER UNIQUE NOT NULL REFERENCES waiting(id),slot_id INTEGER NOT NULL REFERENCES slots(id),user_id INTEGER NOT NULL,expires_at INTEGER NOT NULL,state TEXT NOT NULL);\nCREATE UNIQUE INDEX one_offer ON offers(slot_id) WHERE state='offered';\nCREATE TABLE cancellations(booking_key TEXT PRIMARY KEY,slot_id INTEGER NOT NULL,created_at INTEGER NOT NULL);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · outbox.sql",
+                  "code": "CREATE TABLE updates(update_id INTEGER PRIMARY KEY);\nCREATE TABLE outbox(\n id INTEGER PRIMARY KEY, event_key TEXT UNIQUE NOT NULL, chat_id INTEGER NOT NULL,\n payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,\n next_at INTEGER NOT NULL DEFAULT 0, message_id INTEGER, error_code INTEGER,\n guard_kind TEXT NOT NULL DEFAULT '', guard_id INTEGER, guard_version INTEGER\n);\nCREATE INDEX outbox_due ON outbox(state,next_at);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$db = database();\nforeach (['schema.sql','outbox.sql'] as $name) {\n    if (!is_file(__DIR__.'/'.$name)) {\n        continue;\n    }\n    $sql = file_get_contents(__DIR__.'/'.$name);\n    if ($sql === false) {\n        throw new RuntimeException('Cannot read schema');\n    }$db->exec($sql);\n}\necho \"Tables created\\n\";"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "slots хранит текущее занятие ресурса: booking_user и booking_key. waiting — порядок желающих, offers — отдельные попытки предложения с владельцем и сроком. Частичные уникальные индексы запрещают две активные заявки одного клиента на один слот и два активных предложения одного слота."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "cancellations запоминает ключ уже обработанной отмены. Это защита от важной ошибки: повтор отмены старой записи не должен освободить слот, который уже подтвердил новый клиент. Для реальной системы используйте неизменяемый ID исходного бронирования из календаря или CRM, а не только номер слота."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "queue",
+        "label": "Выдавайте предложение следующему участнику",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выдавайте предложение следующему участнику"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · domain.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nfunction slotTime(int $value): string\n{\n    return (new DateTimeImmutable('@'.$value))->setTimezone(new DateTimeZone('Europe/Moscow'))->format('d.m.Y H:i').' МСК';\n}\nfunction promote(PDO $db, int $slotId, int $now): void\n{\n    $slot = row($db, 'SELECT * FROM slots WHERE id=?', [$slotId]);\n    if (!$slot) {\n        throw new DomainException('Такого времени нет');\n    }\n    $active = row($db, \"SELECT * FROM offers WHERE slot_id=? AND state='offered'\", [$slotId]);\n    if ($active && (intValue($active['expires_at']) <= $now || intValue($slot['starts_at']) <= $now)) {\n        run($db, \"UPDATE offers SET state='expired' WHERE id=?\", [intValue($active['id'])]);\n        run($db, \"UPDATE waiting SET state='expired' WHERE id=?\", [intValue($active['entry_id'])]);\n        $active = null;\n    }\n    if ($slot['booking_user'] !== null || $active !== null || intValue($slot['starts_at']) <= $now) {\n        return;\n    }\n    $next = row($db, \"SELECT * FROM waiting WHERE slot_id=? AND state='waiting' ORDER BY id LIMIT 1\", [$slotId]);\n    if (!$next) {\n        return;\n    }\n    $token = bin2hex(random_bytes(16));\n    $end = min($now + 600, intValue($slot['starts_at']));\n    run($db, \"INSERT INTO offers(token,entry_id,slot_id,user_id,expires_at,state) VALUES(?,?,?,?,?,'offered')\", [$token,intValue($next['id']),$slotId,intValue($next['user_id']),$end]);\n    $id = (int)$db->lastInsertId();\n    run($db, \"UPDATE waiting SET state='offered' WHERE id=?\", [intValue($next['id'])]);\n    enqueue(\n        $db,\n        intValue($next['user_id']),\n        'offer:'.$id,\n        'Освободилось время: '.slotTime(intValue($slot['starts_at'])).\"\\nПодтвердите до \".slotTime($end).'. Предложение только для вас.',\n        [[['text' => 'Подтвердить','callback_data' => 'offer:'.$token.':yes'],['text' => 'Отказаться','callback_data' => 'offer:'.$token.':no']]],\n        'offer',\n        $id\n    );\n}\nfunction cancelBooking(PDO $db, int $slotId, string $key, int $now): void\n{\n    $old = row($db, 'SELECT slot_id FROM cancellations WHERE booking_key=?', [$key]);\n    if ($old) {\n        if (intValue($old['slot_id']) !== $slotId) {\n            throw new DomainException('Конфликт отмены');\n        }return;\n    }\n    $slot = row($db, 'SELECT * FROM slots WHERE id=? AND booking_key=?', [$slotId,$key]);\n    if (!$slot) {\n        throw new DomainException('Отмена относится к другой записи');\n    }\n    run($db, 'INSERT INTO cancellations(booking_key,slot_id,created_at) VALUES(?,?,?)', [$key,$slotId,$now]);\n    run($db, 'UPDATE slots SET booking_user=NULL,booking_key=NULL WHERE id=?', [$slotId]);\n    promote($db, $slotId, $now);\n}\nfunction handle(PDO $db, int $user, string $action, bool $callback, int $update, int $now): void\n{\n    $text = 'Команды: /join НОМЕР — ждать конкретное время; /status НОМЕР — проверить очередь; /leave НОМЕР — выйти.';\n    if (preg_match('~^/(join|status|leave) ([1-9][0-9]*)$~D', $action, $m)) {\n        $slotId = positive($m[2]);\n        $slot = row($db, 'SELECT * FROM slots WHERE id=?', [$slotId]);\n        if (!$slot) {\n            throw new DomainException('Слот не найден');\n        }\n        if (intValue($slot['starts_at']) <= $now) {\n            throw new DomainException('Это время уже прошло');\n        }\n        promote($db, $slotId, $now);\n        $entry = row($db, \"SELECT * FROM waiting WHERE slot_id=? AND user_id=? AND state IN ('waiting','offered')\", [$slotId,$user]);\n        if ($m[1] === 'join') {\n            if ($slot['booking_user'] !== null && intValue($slot['booking_user']) === $user) {\n                throw new DomainException('Вы уже записаны на это время');\n            }\n            if (!$entry) {\n                run($db, \"INSERT INTO waiting(slot_id,user_id,state) VALUES(?,?,'waiting')\", [$slotId,$user]);\n            }\n            promote($db, $slotId, $now);\n            $text = 'Заявка в листе ожидания сохранена. /status '.$slotId.' покажет состояние. Сообщение о свободном времени ещё не означает запись.';\n        } elseif ($m[1] === 'leave') {\n            if ($entry) {\n                run($db, \"UPDATE waiting SET state='left' WHERE id=?\", [intValue($entry['id'])]);\n                run($db, \"UPDATE offers SET state='declined' WHERE entry_id=? AND state='offered'\", [intValue($entry['id'])]);\n            }\n            promote($db, $slotId, $now);\n            $text = 'Ожидание отменено. Подтверждённую запись эта команда не отменяет.';\n        } else {\n            $offer = row($db, \"SELECT * FROM offers WHERE slot_id=? AND user_id=? AND state='offered'\", [$slotId,$user]);\n            $current = row($db, 'SELECT * FROM slots WHERE id=?', [$slotId]) ?? throw new RuntimeException('Slot missing');\n            if ($current['booking_user'] !== null && intValue($current['booking_user']) === $user) {\n                $text = 'Вы записаны: '.slotTime(intValue($current['starts_at']));\n            } elseif ($offer) {\n                $t = stringValue($offer['token']);\n                enqueue($db, $user, 'status:'.$update, 'Ваше предложение действует до '.slotTime(intValue($offer['expires_at'])), [[['text' => 'Подтвердить','callback_data' => 'offer:'.$t.':yes'],['text' => 'Отказаться','callback_data' => 'offer:'.$t.':no']]], 'offer', intValue($offer['id']));\n                return;\n            } elseif ($entry && $entry['state'] === 'waiting') {\n                $ahead = intValue(run($db, \"SELECT COUNT(*) FROM waiting WHERE slot_id=? AND state IN ('waiting','offered') AND id<?\", [$slotId,intValue($entry['id'])])->fetchColumn());\n                $text = 'Перед вами: '.$ahead.'. Время: '.slotTime(intValue($slot['starts_at']));\n            } else {\n                $text = 'Активного ожидания нет. Просроченное предложение не возвращает вас в начало очереди; можно заново отправить /join '.$slotId;\n            }\n        }\n    } elseif ($callback && preg_match('/^offer:([a-f0-9]{32}):(yes|no)$/D', $action, $m)) {\n        $offer = row($db, 'SELECT * FROM offers WHERE token=? AND user_id=?', [$m[1],$user]);\n        if (!$offer) {\n            throw new DomainException('Предложение не найдено');\n        }\n        $slotId = intValue($offer['slot_id']);\n        promote($db, $slotId, $now);\n        $offer = row($db, 'SELECT * FROM offers WHERE id=?', [intValue($offer['id'])]) ?? throw new RuntimeException('Offer missing');\n        if ($offer['state'] === 'accepted') {\n            $text = 'Вы уже подтвердили это предложение. Проверьте /status '.$slotId;\n        } elseif ($offer['state'] !== 'offered' || intValue($offer['expires_at']) <= $now) {\n            $text = 'Предложение уже закрыто. Проверьте /status '.$slotId;\n        } else {\n            $accepted = $m[2] === 'yes';\n            $state = $accepted ? 'accepted' : 'declined';\n            if ($accepted) {\n                $changed = run($db, 'UPDATE slots SET booking_user=?,booking_key=? WHERE id=? AND booking_user IS NULL', [$user,stringValue($offer['token']),$slotId])->rowCount();\n                if ($changed !== 1) {\n                    throw new DomainException('Время уже занято');\n                }\n            }\n            run($db, 'UPDATE offers SET state=? WHERE id=?', [$state,intValue($offer['id'])]);\n            run($db, 'UPDATE waiting SET state=? WHERE id=?', [$state,intValue($offer['entry_id'])]);\n            if (!$accepted) {\n                promote($db, $slotId, $now);\n            }$text = $accepted ? 'Запись подтверждена. /status '.$slotId.' покажет время.' : 'Вы отказались. Предложение передано следующему участнику.';\n        }\n    }\n    enqueue($db,$user,'reply:'.$update,$text);\n}\n/**\n * @param array<string,mixed> $r\n */\nfunction canDeliver(PDO $db,array $r,int $now): bool\n{\n    return $r['guard_kind'] !== 'offer' || row($db,\"SELECT id FROM offers WHERE id=? AND state='offered' AND expires_at>?\",[intValue($r['guard_id']),$now]) !== null;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "promote сначала закрывает истёкшее предложение, затем проверяет занятость слота и наличие нового активного предложения. Только свободному слоту выбирается первый waiting по ID. Создание offers, изменение waiting и сообщение в outbox выполняются вместе; между проверкой и записью другой процесс SQLite не сможет назначить конкурирующего победителя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В callback_data передаётся случайный токен попытки, но сам токен не является полной авторизацией. При нажатии offers выбирается одновременно по token и user_id проверенного отправителя. Скопированная кнопка или угаданный номер слота не позволяют подтвердить чужое предложение."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подтверждение дополнительно проверяет state=offered, срок и отсутствие booking_user у слота. На границе now=expires_at предложение уже недействительно. Повтор принятого предложения возвращает прежнее подтверждение и не создаёт вторую запись. Отказ закрывает текущую попытку и сразу вызывает promote для следующего участника."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Окончательное подтверждение нужно хранить в том же источнике бронирований, которым пользуются сайт, администратор и бот. В учебном коде этим источником служит slots. Если сайт может независимо занять время в другой БД, SQLite-индекс бота не защитит общий ресурс: потребуется атомарное резервирование в основной системе. Не объявляйте место свободным только по локальной копии календаря."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Во время offered слот также должен считаться зарезервированным для внешних каналов записи. booking_user ещё пуст, но это не разрешение продать место другому клиенту. Любой другой обработчик бронирования обязан проверять действующее предложение или пользоваться тем же сервисом резервирования."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "commands",
+        "label": "Дайте клиенту понятные команды восстановления",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Дайте клиенту понятные команды восстановления"
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Команда"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Результат"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/join 1"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Встать в очередь конкретного времени"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/status 1"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Узнать очередь, получить действующие кнопки или увидеть подтверждённую запись"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/leave 1"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Выйти из ожидания, не отменяя уже подтверждённую запись"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Кнопка «Подтвердить»"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Проверить владельца и срок, занять слот"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Кнопка «Отказаться»"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Закрыть предложение и передать место дальше"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "/status важна после потери сообщения или перезапуска бота. Если предложение ещё действует, команда повторно показывает кнопки того же token и тот же срок, а не создаёт новые десять минут. Если клиент уже записан, он увидит время. Если предложение истекло, бот объяснит, как вернуться в конец очереди."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Позиция — количество активных участников перед вами, включая получателя текущего предложения. Это не обещание времени ожидания: до отмены исходного бронирования место вообще может не освободиться. Не показывайте чужие имена, телефоны или причины отмены. Клиенту достаточно своей позиции и параметров слота."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В личном диалоге Telegram ID совпадает с ID чата. Для групп или общих каналов это допущение неверно; данный обработчик сознательно принимает только private. Если уведомление не доставилось, запись ожидания не теряется, но срок предложения продолжает идти. Пользователь может проверить /status."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Подключите входящие события и регистрацию webhook",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключите входящие события и регистрацию webhook"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Webhook принимает только личные чаты. Проверяется секретный заголовок, а from.id должен совпадать с chat.id. В одной транзакции отмечаем update_id, выполняем действие и создаём ответы. Повтор сохранённого Update ничего не меняет. Ошибка предметной области откатывает действие до SAVEPOINT и становится понятным сообщением; внутренняя ошибка откатывает весь Update и возвращает 503."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/outbox.php';\nrequire dirname(__DIR__).'/domain.php';\nheader('Content-Type: application/json; charset=utf-8');\ntry {\n    if (!hash_equals(envRequired('WEBHOOK_SECRET'), stringValue($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? ''))) {\n        http_response_code(403);\n        exit;\n    }\n    $raw = file_get_contents('php://input');\n    if ($raw === false || strlen($raw) > 131072) {\n        http_response_code(413);\n        exit;\n    }\n    $u = objectValue(json_decode($raw, true, 32, JSON_THROW_ON_ERROR));\n    $cb = is_array($u['callback_query'] ?? null) ? objectValue($u['callback_query']) : null;\n    $msg = is_array($cb['message'] ?? $u['message'] ?? null) ? objectValue($cb['message'] ?? $u['message']) : [];\n    $from = is_array($cb['from'] ?? $msg['from'] ?? null) ? objectValue($cb['from'] ?? $msg['from']) : [];\n    $chat = is_array($msg['chat'] ?? null) ? objectValue($msg['chat']) : [];\n    $ack = $cb !== null ? ['method' => 'answerCallbackQuery','callback_query_id' => stringValue($cb['id'])] : ['ok' => true];\n    if (($chat['type'] ?? '') === 'private' && is_int($from['id'] ?? null) && $from['id'] > 0 && ($chat['id'] ?? null) === $from['id']) {\n        $db = database();\n        $uid = positive($u['update_id'], PHP_INT_MAX);\n        $actor = $from['id'];\n        $action = stringValue($cb['data'] ?? $msg['text'] ?? '');\n        atomic($db, function () use ($db, $uid, $actor, $action, $cb): void {\n            if (run($db, 'INSERT OR IGNORE INTO updates(update_id) VALUES(?)', [$uid])->rowCount() === 0) {\n                return;\n            }\n            // Domain errors become readable replies; internal errors roll back the Update.\n            run($db, 'SAVEPOINT action');\n            try {\n                handle($db, $actor, trim($action), $cb !== null, $uid, time());\n                run($db, 'RELEASE action');\n            } catch (DomainException $e) {\n                run($db, 'ROLLBACK TO action');\n                run($db, 'RELEASE action');\n                enqueue($db, $actor, 'error:'.$uid, $e->getMessage());\n            }\n        });\n    }\n    echo json_encode($ack, JSON_THROW_ON_ERROR);\n} catch (Throwable) {\n    http_response_code(503);\n    echo '{\"ok\":false}';\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/transport.php';\n$url = envRequired('WEBHOOK_URL');\n$secret = envRequired('WEBHOOK_SECRET');\nif (!str_starts_with($url, 'https://') || !preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $secret)) {\n    throw new RuntimeException('Check HTTPS and secret');\n}\n$settings = sendTelegram('setMySettings', ['callback_query_mode' => 'default']);\nif ($settings['state'] !== 'sent') {\n    throw new RuntimeException('Callback settings not confirmed');\n}\n$result = sendTelegram('setWebhook', ['url' => $url,'secret_token' => $secret,'allowed_updates' => ['message','callback_query'],'max_connections' => 1]);\necho $result['state'].PHP_EOL;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В setup-webhook.php явно выбран callback_query_mode=default: обработчик использует message.chat из callback_query. Режимы auto и inline могут передавать inline_message_id вместо message и требуют другого разрешения контекста. Настройка выполняется для отдельного учебного бота. answerCallbackQuery возвращается в HTTP-ответе webhook только для снятия индикатора; подтверждение бизнес-действия идёт через outbox. "
+                },
+                {
+                  "type": "text",
+                  "text": "CallbackQuery",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#callbackquery"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "setMySettings",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#setmysettings"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "WEBHOOK_SECRET задайте случайной строкой допустимого формата, например 64 hex-символа. Сначала разместите обработчик по HTTPS, затем запускайте регистрацию. Не используйте токен рабочего бота другого приложения: setWebhook заменяет его текущий адрес. Ошибки аутентификации не должны приводить к изменению очереди."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "cancel",
+        "label": "Обрабатывайте отмену конкретной записи",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обрабатывайте отмену конкретной записи"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · admin.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/outbox.php';\nrequire __DIR__.'/domain.php';\n$argv = $argv ?? [];\n$db = database();\natomic($db, function () use ($db, $argv): void {\n    if (($argv[1] ?? '') === 'slot') {\n        $id = positive($argv[2] ?? 0);\n        $start = positive($argv[3] ?? 0, PHP_INT_MAX);\n        $user = positive($argv[4] ?? 0, PHP_INT_MAX);\n        $key = token($argv[5] ?? '');\n        run($db, 'INSERT INTO slots(id,starts_at,booking_user,booking_key) VALUES(?,?,?,?)', [$id,$start,$user,$key]);\n    } elseif (($argv[1] ?? '') === 'cancel') {\n        cancelBooking($db, positive($argv[2] ?? 0), token($argv[3] ?? ''), time());\n    } elseif (($argv[1] ?? '') === 'tick') {\n        foreach (run($db, \"SELECT id FROM slots WHERE starts_at>? OR id IN (SELECT slot_id FROM offers WHERE state='offered') ORDER BY id\", [time()])->fetchAll() as $value) {\n            promote($db, intValue(objectValue($value)['id']), time());\n        }\n    } else {\n        throw new DomainException('slot ID START_UNIX BOOKED_USER BOOKING_KEY | cancel ID BOOKING_KEY | tick');\n    }\n});"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "admin.php демонстрирует доверенную сторону: slot создаёт занятое время, cancel отменяет конкретный booking_key, tick проверяет сроки. Это CLI, закрытый от HTTP. В рабочей системе cancelBooking вызывается после проверенного события отмены из основной системы записи, а не по запросу клиента с произвольным номером."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Первый cancel сохраняет ключ отмены, очищает booking_user и предлагает слот очереди. Повтор того же ключа ничего не очищает повторно. Если пришёл другой ключ, который не соответствует текущей записи, операция отклоняется. Так запоздавшее событие не отменяет уже принятую запись следующего человека."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Команда slot предназначена для первоначальной подготовки теста и не является обновлением расписания. Повторная вставка того же ID даст ошибку, сохранив прежние данные. Для переноса или удаления реального слота нужна отдельная операция, которая закрывает активные предложения и уведомляет участников; изменение starts_at вручную не решает эти задачи."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "delivery",
+        "label": "Отменяйте устаревшие сообщения до отправки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отменяйте устаревшие сообщения до отправки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Бизнес-операция сохраняет исходящее сообщение в outbox, а worker.php отправляет его позже. Уникальный event_key предотвращает повторное создание строки. Файловая блокировка защищает от двух локальных отправителей; она подходит одному серверу с общим APP_DB, но не заменяет распределённую блокировку в кластере."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · outbox.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n/**\n * @param list<list<array{text:string,callback_data:string}>> $buttons\n */\nfunction enqueue(PDO $db, int $chat, string $key, string $text, array $buttons = [], string $kind = '', ?int $id = null, ?int $version = null): void\n{\n    $payload = ['chat_id' => $chat,'text' => $text];\n    if ($buttons !== []) {\n        $payload['reply_markup'] = ['inline_keyboard' => $buttons];\n    }\n    run(\n        $db,\n        'INSERT OR IGNORE INTO outbox(event_key,chat_id,payload,guard_kind,guard_id,guard_version) VALUES(?,?,?,?,?,?)',\n        [$key,$chat,json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),$kind,$id,$version]\n    );\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · transport.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @param array<string,mixed> $params\n *\n * @return array{state:string,retry_after:int,message_id:?int,code:?int}\n */\nfunction sendTelegram(string $method, array $params): array\n{\n    $curl = curl_init('https://api.telegram.org/bot'.envRequired('BOT_TOKEN').'/'.$method);\n    if ($curl === false) {\n        throw new RuntimeException('HTTP init failed');\n    }\n    curl_setopt_array($curl, [CURLOPT_POST => true,CURLOPT_POSTFIELDS => json_encode($params, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),\n        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],CURLOPT_RETURNTRANSFER => true,CURLOPT_CONNECTTIMEOUT => 5,CURLOPT_TIMEOUT => 20]);\n    $raw = curl_exec($curl);\n    $http = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    return classifyTelegram($http, is_string($raw) ? $raw : null);\n}\n\n/**\n * @return array{state:string,retry_after:int,message_id:?int,code:?int}\n */\nfunction classifyTelegram(int $http, ?string $raw): array\n{\n    $unknown = ['state' => 'unknown','retry_after' => 0,'message_id' => null,'code' => null];\n    if ($raw === null || $http >= 500) {\n        return $unknown;\n    }\n    $body = json_decode($raw, true);\n    if (!is_array($body)) {\n        return $unknown;\n    }\n    $result = $body['result'] ?? null;\n    if ($http === 200 && ($body['ok'] ?? false) === true) {\n        $id = is_array($result) && is_int($result['message_id'] ?? null) ? $result['message_id'] : null;\n        return ['state' => 'sent','retry_after' => 0,'message_id' => $id,'code' => null];\n    }\n    if (($body['ok'] ?? null) !== false || !is_int($body['error_code'] ?? null)) {\n        return $unknown;\n    }\n    $code = $body['error_code'];\n    $parameters = $body['parameters'] ?? null;\n    if ($code === 429 && is_array($parameters) && is_int($parameters['retry_after'] ?? null) && $parameters['retry_after'] > 0) {\n        return ['state' => 'retry','retry_after' => $parameters['retry_after'],'message_id' => null,'code' => $code];\n    }\n    return ['state' => $code >= 400 && $code < 500 ? 'failed' : 'unknown','retry_after' => 0,'message_id' => null,'code' => $code];\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · worker.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/outbox.php';\nrequire __DIR__.'/transport.php';\nrequire __DIR__.'/domain.php';\n$db = database();\n$lock = fopen(envRequired('APP_DB').'.send.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    exit(0);\n}\nforeach (run($db, \"SELECT id FROM outbox WHERE state IN ('pending','retry') AND next_at<=? ORDER BY id LIMIT 30\", [time()])->fetchAll() as $candidate) {\n    $id = intValue(objectValue($candidate)['id']);\n    $message = atomic($db, function () use ($db, $id): ?array {\n        $r = row($db, \"SELECT * FROM outbox WHERE id=? AND state IN ('pending','retry') AND next_at<=?\", [$id,time()]);\n        if (!$r) {\n            return null;\n        }\n        if (!canDeliver($db, $r, time())) {\n            run($db, \"UPDATE outbox SET state='cancelled' WHERE id=?\", [$id]);\n            return null;\n        }\n        run($db, \"UPDATE outbox SET state='sending',attempts=attempts+1 WHERE id=?\", [$id]);\n        return $r;\n    });\n    if ($message === null) {\n        continue;\n    }\n    try {\n        $result = sendTelegram('sendMessage', objectValue(json_decode(stringValue($message['payload']), true, 512, JSON_THROW_ON_ERROR)));\n    } catch (Throwable) {\n        $result = ['state' => 'unknown','retry_after' => 0,'message_id' => null,'code' => null];\n    }\n    if ($result['state'] === 'sent' && $result['message_id'] === null) {\n        $result['state'] = 'unknown';\n    }\n    if ($result['state'] === 'retry' && intValue($message['attempts']) + 1 >= 5) {\n        $result['state'] = 'failed';\n    }\n    run($db, 'UPDATE outbox SET state=?,next_at=?,message_id=?,error_code=? WHERE id=?', [$result['state'],time() + $result['retry_after'],$result['message_id'],$result['code'],$id]);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Состояние pending означает ожидание, sent — подтверждённый ответ Telegram с message_id. Подтверждённый 429 переносит попытку на retry_after, не более пяти попыток. Таймаут, 5xx или потерянный ответ дают unknown: сообщение могло уже попасть в чат. Строка sending после падения процесса также требует проверки. Автоматического повтора таких сообщений нет; уникальность в БД не обеспечивает exactly-once между приложением и Telegram."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · диагностика доставки",
+                  "code": "SELECT id,event_key,chat_id,state,attempts,next_at,message_id,error_code\nFROM outbox ORDER BY id DESC LIMIT 20;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если pending не убывает, проверьте запуск worker.php, его окружение и путь к той же БД. Для unknown/sending сначала сопоставьте конкретную операцию с сообщениями в тестовом чате. Решение повторить отдельную строку принимается после проверки: остановите отправитель, сохраните причину, верните только нужный ID в pending с новым next_at. Повтор может дать дубль. Не сбрасывайте всю очередь одной командой."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед отправкой предложения canDeliver повторно проверяет offers. Если клиент уже отказался, подтвердил или время закончилось, сообщение становится cancelled. Аналогично проверяется восстановленная через /status карточка: она не должна приехать после передачи места следующему участнику."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Между проверкой и завершением HTTP-запроса остаётся окно: предложение может истечь, пока Telegram принимает сообщение. Поэтому кнопка всегда заново проверяется на сервере. Даже поздно пришедшее сообщение не позволяет занять уже переданное время. Это важнее попытки обеспечить идеальный порядок доставки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ошибка доставки не выдаёт место сразу второму человеку: текущая попытка остаётся до своего срока, чтобы первый мог проверить /status. После истечения tick передаст предложение дальше. Для конкретного бизнеса можно выбрать другую политику после подтверждённой недоступности чата, но она должна отличать явный отказ API от неизвестного исхода таймаута."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "run",
+        "label": "Проверьте очередь на двух тестовых клиентах",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте очередь на двух тестовых клиентах"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · первоначальная настройка",
+                  "code": "php init.php\nphp setup-webhook.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Регистрация webhook должна вывести sent. Для теста создайте слот с будущим Unix-временем. Ниже START_UNIX и BOOKED_USER_ID — обозначения: замените их будущим сроком и ID текущего учебного клиента. booking-original — уникальный ключ исходной записи."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · подготовка занятого слота",
+                  "code": "php admin.php slot 1 START_UNIX BOOKED_USER_ID booking-original"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Два тестовых пользователя открывают бота и отправляют /join 1 по очереди. /status 1 у второго должен показать одного участника впереди. После команды отмены запустите отправитель:"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · отмена исходной записи и доставка предложения",
+                  "code": "php admin.php cancel 1 booking-original\nphp worker.php"
+                }
+              }
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Первый клиент получает единственное предложение. Второй не может подтвердить его токен от своего имени."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Первый нажимает «Отказаться»: следующий проход worker.php отправляет предложение второму."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "В отдельном тесте первый ничего не нажимает. На expires_at команда tick закрывает попытку и выбирает следующего."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "После подтверждения второго повторите старый cancel: его запись должна остаться занятой."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторите callback и тот же update_id: новая запись и повторная бизнес-операция не появляются."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · проверка срока и отправка подготовленных сообщений",
+                  "code": "php admin.php tick\nphp worker.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для постоянной работы выполняйте tick и worker примерно каждую минуту или чаще в управляемом процессе. Пути и окружение обоих должны указывать на одну базу. Пропуск cron не разрешает просроченное подтверждение: срок также проверяется при нажатии. Но без tick следующему человеку предложение будет создано позже, поэтому контролируйте задержку планировщика."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · состояние конкретного слота",
+                  "code": "SELECT id,starts_at,booking_user,booking_key FROM slots WHERE id=1;\nSELECT id,user_id,state FROM waiting WHERE slot_id=1 ORDER BY id;\nSELECT id,user_id,expires_at,state FROM offers WHERE slot_id=1 ORDER BY id;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяйте согласованность: accepted должен соответствовать текущему booking_key либо уже зарегистрированной отмене; активное offered — единственное на слот. Не исправляйте очередь массовым переводом всех строк обратно в waiting: это нарушает порядок и повторно предлагает уже отклонённое время. Для внешней системы календаря понадобится периодическая сверка, а не доверие факту успешного сообщения."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Если бот работает через BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если бот работает через BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если запросы к Telegram идут через BotGate, бизнес-данные и решения остаются в вашем приложении. BotGate не пересчитывает стоимость, не исправляет баланс и не решает, кому доступно действие. Подключение описано в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по PHP SDK",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/php-telegram-bot-sdk"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не заменяйте только URL в прямом Telegram-клиенте: у сервиса другая авторизация и собственные транспортные ошибки. Прямой webhook из этой статьи и webhook BotGate проверяются по разным контрактам. При переносе сохраните один уровень повторов и проверку подписи входящих событий; не назначайте одному боту два конкурирующих webhook."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

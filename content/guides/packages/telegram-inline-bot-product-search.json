@@ -1,0 +1,630 @@
+[
+  {
+    "slug": "telegram-inline-bot-product-search",
+    "title": "Как сделать inline-бота: поиск товаров и отправка карточки в любой чат",
+    "seo_title": "Как сделать inline-бота: поиск товаров и отправка карточки в любой чат",
+    "description": "Включаем inline-режим Telegram, обрабатываем inline_query и отвечаем карточками публичных товаров. Поиск на PHP, пустые результаты, страницы и кэш.",
+    "card_description": "Включаем inline-режим Telegram, обрабатываем inline_query и отвечаем карточками публичных товаров. Поиск на PHP, пустые результаты, страницы и кэш.",
+    "category": "Практика",
+    "topics": "Telegram Bot API · Inline · Каталог",
+    "reading_time": "10 минут",
+    "published_at": "2026-11-05",
+    "is_published": true,
+    "sort_order": 41,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера магазин продаёт настольные лампы. Покупатель вводит @имя_бота лампа прямо в переписке, выбирает товар и отправляет собеседнику карточку со ссылкой. Здесь бот отвечает на поисковый запрос, а сообщение в выбранный чат отправляет пользователь."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "enable",
+        "label": "Включаем inline-режим и приём обновлений",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Включаем inline-режим и приём обновлений"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В BotFather выполните /setinline, выберите бота и задайте подсказку, например «Название товара». Затем проверьте ввод @username пробел запрос в тестовом чате, где разрешена отправка такого содержимого. Разрешения конкретного чата и клиента всё равно действуют: заголовок «в любой чат» описывает способ использования, а не обход запретов Telegram."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-inline-bot-product-search/inline-search.jpg",
+                  "alt": "Ввод @имя_бота лампа, два результата поиска и отправленная карточка «Лампа Луна» за 3 900 ₽ с кнопкой открытия товара.",
+                  "caption": "Схема, не снимок Telegram. Товары, цены, текст карточки и кнопка получены из PHP-примера статьи; username условный.",
+                  "width": 1080,
+                  "height": 919,
+                  "mobile_src": "/images/guides/telegram-inline-bot-product-search/inline-search-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 979
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В allowed_updates своего webhook включите inline_query, сохранив остальные нужные типы. Бота не нужно добавлять участником каждого чата, в котором пользователь ищет товар. Inline-режим отличается от inline-кнопок под сообщением: callback_query и answerCallbackQuery относятся к нажатию кнопок, а поиск использует inline_query и answerInlineQuery."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера нужен существующий обработчик проверенного webhook, PHP 8.3+ и mbstring. Если обновления не приходят, сначала проверьте "
+                },
+                {
+                  "type": "text",
+                  "text": "доставку webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-webhook-not-working"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Через BotGate входящие события получают по webhook, а не getUpdates."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "query",
+        "label": "Что приходит в inline_query",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что приходит в inline_query"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Событие содержит id запроса, from отправителя, query поисковой строки и offset для следующей страницы. Поле chat_type может подсказывать тип контекста, но точного chat_id назначения у такого запроса нет. Не пытайтесь отправлять результат через sendMessage на from.id: это будет другой сценарий и другой получатель."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · Сокращённое событие",
+                  "code": "{\n  \"update_id\": 910001,\n  \"inline_query\": {\n    \"id\": \"query-example-001\",\n    \"from\": {\"id\": 123456789, \"is_bot\": false, \"first_name\": \"Анна\"},\n    \"query\": \"лампа\",\n    \"offset\": \"\"\n  }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В ответе передаётся именно inline_query.id, а не update_id. По мере набора пользователь создаёт новые запросы. Ответ старого запроса не нужно считать ответом следующего: связывайте каждую выдачу с её исходным id."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "catalog",
+        "label": "Выбираем только публичные товары",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выбираем только публичные товары"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для inline-поиска используйте отдельную публичную проекцию каталога: ID, название, краткое описание, публичная цена и ссылка. Исключите закупочную стоимость, персональные скидки, адреса заказов, скрытые товары и внутренние комментарии. Выбранная карточка окажется у собеседников и может быть переслана дальше."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "is_personal ограничивает использование кэша другими запрашивающими пользователями, но не делает отправленное сообщение приватным. Не выдавайте через inline-режим личные счета и документы лишь потому, что запрос пришёл от авторизованного покупателя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ниже небольшой каталог прямо в PHP, чтобы показать весь поиск. В рабочем приложении замените массив запросом к публичным товарам с индексом, параметрами и устойчивой сортировкой. Не выполняйте долгую загрузку изображений или пересчёт цен на каждый введённый символ."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "code",
+        "label": "Формируем карточки и страницы на PHP",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Формируем карточки и страницы на PHP"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция возвращает параметры для answerInlineQuery. Она не отправляет запрос сама; вызовите метод вашим настроенным Telegram API-клиентом после проверки подлинности webhook. Пустой query показывает начало каталога. Неправильный offset возвращает пустую выдачу, а не используется как SQL или произвольный URL."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · inline-products.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction inlineProducts(array $query): array\n{\n    if (!is_string($query['id'] ?? null) || $query['id'] === ''\n        || !is_string($query['query'] ?? null)\n        || !is_string($query['offset'] ?? null)) {\n        throw new InvalidArgumentException('Invalid inline query');\n    }\n    $catalog = [\n        ['id' => 'lamp-101', 'title' => 'Лампа Луна',\n         'price' => '3 900 ₽', 'url' => 'https://shop.example.com/products/lamp-101'],\n        ['id' => 'lamp-102', 'title' => 'Лампа Север',\n         'price' => '4 500 ₽', 'url' => 'https://shop.example.com/products/lamp-102'],\n        ['id' => 'stand-201', 'title' => 'Подставка для ноутбука',\n         'price' => '2 100 ₽', 'url' => 'https://shop.example.com/products/stand-201'],\n    ];\n    $answer = ['inline_query_id' => $query['id'], 'results' => [],\n        'cache_time' => 30, 'is_personal' => false, 'next_offset' => ''];\n    $rawOffset = $query['offset'];\n    if ($rawOffset !== '' && !preg_match('/^(0|[1-9][0-9]{0,5})$/D', $rawOffset)) {\n        return $answer;\n    }\n    $offset = $rawOffset === '' ? 0 : (int) $rawOffset;\n    $search = mb_strtolower(trim($query['query']));\n    if (mb_strlen($search) > 256) {\n        return $answer;\n    }\n    $matches = array_values(array_filter($catalog, static fn (array $product): bool =>\n        $search === '' || mb_strpos(mb_strtolower($product['title']), $search) !== false));\n    $pageSize = 2;\n    foreach (array_slice($matches, $offset, $pageSize) as $product) {\n        $answer['results'][] = [\n            'type' => 'article', 'id' => $product['id'],\n            'title' => $product['title'], 'description' => $product['price'],\n            'input_message_content' => [\n                'message_text' => $product['title'].\"\\n\".$product['price'].\"\\n\".$product['url'],\n            ],\n            'reply_markup' => ['inline_keyboard' => [[\n                ['text' => 'Открыть товар', 'url' => $product['url']],\n            ]]],\n        ];\n    }\n    if ($offset + $pageSize < count($matches)) {\n        $answer['next_offset'] = (string) ($offset + $pageSize);\n    }\n    return $answer;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Замените демонстрационные домен, товары и цены перед реальным использованием. В примере article — тип inline-результата, а не статья сайта. title и description описывают строку в выдаче; input_message_content задаёт сообщение после выбора. parse_mode не задан, поэтому текст не интерпретируется как HTML."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Два результата на странице выбраны для наглядной проверки offset. Telegram разрешает до 50 результатов в одном ответе. ID карточки должен быть непустым и уникальным в выдаче, длиной до 64 байт. Стабильный короткий ID товара удобнее случайного значения на каждый запрос."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "empty",
+        "label": "Обрабатываем пустую выдачу и кэш",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обрабатываем пустую выдачу и кэш"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если совпадений нет, всё равно ответьте answerInlineQuery с results=[] и next_offset=\"\". Отсутствие ответа выглядит как зависший поиск. При желании добавьте кнопку над результатами, ведущую в личный чат:"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · Дополнительное поле button в answerInlineQuery",
+                  "code": "{\n  \"button\": {\n    \"text\": \"Помочь найти товар\",\n    \"start_parameter\": \"catalog_help\"\n  }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обработчик /start catalog_help должен существовать и давать понятный следующий шаг. Не создавайте фиктивный товар «Ничего не найдено», который пользователь случайно отправит собеседнику как карточку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "cache_time=30 в примере допускает краткий кэш Telegram. Для первоначальной отладки можно поставить 0. Это не отменяет кэш вашей базы или поискового сервиса. При is_personal=false ответ должен быть одинаково публичным для всех пользователей с таким запросом. Если результат зависит от языка, страны или аккаунта, задайте is_personal=true и учитывайте те же параметры в собственном кэше."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для большого живого каталога лучше непрозрачный курсор, связанный с запросом и стабильной сортировкой: числовое смещение при добавлении товаров может пропустить или повторить позиции. Ограничьте cursor длиной и проверяйте его на сервере; next_offset не должен превышать 64 байта."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sent",
+        "label": "Что происходит после выбора карточки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что происходит после выбора карточки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ответ answerInlineQuery ещё не означает отправку карточки собеседнику. Пользователь может закрыть выдачу. Для наблюдения за выборами включают /setinlinefeedback и принимают chosen_inline_result, если он нужен вашему сценарию. Эти события не следует считать покупками или гарантированным полным счётчиком всех отправок."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправленная карточка хранит текст на момент выбора. Изменение цены в каталоге не обновляет автоматически старые сообщения. Перед оформлением заказа магазин должен заново проверить цену и наличие. Внутренняя аналитика поиска не должна подменять учёт заказов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если ответ задержался и Telegram отклонил запрос как устаревший, не отправляйте вместо него личное сообщение пользователю. Уберите причину задержки: тяжёлый поиск, очередь, внешнюю зависимость. Долгий автоматический retry мало полезен для запроса, по которому пользователь уже продолжил ввод."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверяем сценарий в двух аккаунтах",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем сценарий в двух аккаунтах"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введите пустой запрос: первые две карточки доступны, следующая страница показывает оставшийся товар без повторов."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Найдите «ЛАМПА» и «лампа»: выдача совпадает; неизвестное слово даёт пустой ответ."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте отрицательный и слишком длинный offset: функция не запускает произвольную выборку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выберите карточку в отдельном тестовом диалоге: собеседник получает нужный текст и рабочую публичную ссылку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Измените цену и проверьте выдачу после истечения кэша; старое сообщение при этом остаётся прежним."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте другим аккаунтом, что в результатах нет личных данных и закрытых товаров."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Использование BotGate и источники",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Использование BotGate и источники"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Через BotGate вызывайте answerInlineQuery с теми же параметрами; подпись входящего webhook проверяйте по "
+                },
+                {
+                  "type": "text",
+                  "text": "документации сервиса",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#webhook"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Бизнес-поиск и фильтрация каталога выполняются вашим приложением. Само подключение шлюза не включает inline-режим в BotFather."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введение в inline-ботов",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/inline"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "answerInlineQuery",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#answerinlinequery"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ", "
+                        },
+                        {
+                          "type": "text",
+                          "text": "InlineQueryResultArticle",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#inlinequeryresultarticle"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " и "
+                        },
+                        {
+                          "type": "text",
+                          "text": "InlineQueryResultsButton",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#inlinequeryresultsbutton"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,1055 @@
+[
+  {
+    "slug": "telegram-bot-google-calendar",
+    "title": "Как связать Telegram-бота с Google Calendar",
+    "seo_title": "Как связать Telegram-бота с Google Calendar",
+    "description": "Интеграция Google Calendar на PHP: OAuth, связь бронирования с событием, создание, перенос, отмена, обработка повторов и синхронизация изменений.",
+    "card_description": "Интеграция Google Calendar на PHP: OAuth, связь бронирования с событием, создание, перенос, отмена, обработка повторов и синхронизация изменений.",
+    "category": "Практика",
+    "topics": "Telegram · Google Calendar · PHP",
+    "reading_time": "34 минуты",
+    "published_at": "2026-11-18",
+    "is_published": true,
+    "sort_order": 68,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера бот записывает клиентов на получасовую консультацию, а специалист видит встречи в отдельном Google Calendar. После подтверждения записи создаётся событие, при переносе меняется его время, при отмене оно удаляется. Разберём, как связать две системы так, чтобы повторная доставка события не порождала новую встречу, а ручная правка календаря не пропала."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "ownership",
+        "label": "Определите, где хранится запись",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Определите, где хранится запись"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В этом примере основная запись хранится в БД приложения. Календарь показывает её специалисту, но не заменяет таблицу бронирований. У записи есть booking_id, клиент, специалист, начало и конец в UTC, исходный часовой пояс, статус и версия. В учебной таблице bookings рядом хранятся event_id, etag и состояние синхронизации; calendar_id единого календаря задан в окружении. В многокалендарном приложении вынесите связь в отдельную таблицу и сохраняйте calendar_id для каждой записи."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Защита от двух клиентов на один слот должна работать в транзакции БД: ограничение на занятие слота или блокировка расписания. Проверка свободного времени и последующий events.insert не образуют единую транзакцию. Если специалист ведёт другие события в том же календаре, учитывайте их как занятость и повторно проверяйте перед подтверждением; полностью устранить гонку с ручной правкой только чтением календаря нельзя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для старта удобнее отдельный календарь консультаций. Запись и постановку операции синхронизации сохраняйте одной транзакцией. Пока worker не получил подтверждение, показывайте «Запись принята, календарь обновляется». Если добавление в календарь обязательно для подтверждения услуги, используйте промежуточный статус и уведомляйте клиента только после успеха."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выбор времени и конкурентные бронирования подробнее разобраны в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по записи через Telegram-бота",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-appointment-booking"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Здесь сосредоточимся на интеграции с календарём."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовьте отдельный PHP-проект",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте отдельный PHP-проект"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ниже рабочее ядро интеграции для одного специалиста и одного календаря. PHP 8.3+, cURL, PDO SQLite и sodium. В Telegram у вас уже должен быть сценарий подтверждения записи: в той же транзакции сохраните данные связи и sync_state=pending, как делает booking.php, затем разрешите отдельному worker синхронизацию. Не запускайте shell-команду из webhook и не держите бизнес-транзакцию открытой во время запроса Google. Команды CLI не заменяют выбор слота, проверку владельца и защиту от пересечений бронирования."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "public/oauth-callback.php\ncommon.php\nvalues.php\nschema.sql\ninit.php\ngoogle-token.php\noauth-start.php\ncalendar.php\nbooking.php\nsync.php\nsync-bookings.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · значения-примеры",
+                  "code": "APP_DB=/private/calendar-demo.sqlite\nGOOGLE_CLIENT_ID=YOUR_WEB_CLIENT_ID\nGOOGLE_CLIENT_SECRET=YOUR_CLIENT_SECRET\nGOOGLE_REDIRECT_URI=https://example.com/oauth-callback.php\nGOOGLE_CALENDAR_ID=YOUR_CALENDAR_ID\nOAUTH_STATE_PATH=/private/google-oauth-state.json\nGOOGLE_TOKEN_PATH=/private/google-refresh.enc\nTOKEN_KEY_HEX=RANDOM_HEX_64"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте закрытый каталог /private, доступный процессам приложения, и задайте реальные переменные окружения. TOKEN_KEY_HEX — случайный 32-байтный ключ в hex, который хранится отдельно от файла токена, например в секретах окружения. Не подставляйте в него Telegram-токен. Обычный PHP сам не читает .env."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "values.php проверяет типы на границе JSON и БД. Некорректные данные прерывают операцию; они не должны превращаться в ложный успешный результат."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · values.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @return array<string,mixed>\n */\nfunction objectValue(mixed $value): array\n{\n    if (!is_array($value)) {\n        throw new InvalidArgumentException('Expected object');\n    }\n    $result = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected object keys');\n        }\n        $result[$key] = $item;\n    }\n    return $result;\n}\n\nfunction stringValue(mixed $value): string\n{\n    if (!is_string($value)) {\n        throw new InvalidArgumentException('Expected string');\n    }\n    return $value;\n}\n\nfunction intValue(mixed $value): int\n{\n    if (!is_int($value) && !is_string($value)) {\n        throw new InvalidArgumentException('Expected integer');\n    }\n    $integer = filter_var($value, FILTER_VALIDATE_INT);\n    if ($integer === false) {\n        throw new InvalidArgumentException('Invalid integer');\n    }\n    return $integer;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/values.php';\n\nfunction envRequired(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing environment: '.$name);\n    }\n    return $value;\n}\n\n/**\n * @param array<string, mixed>|null $data\n * \n * @param list<string> $headers\n * \n * @return array{status:int, body:array<string, mixed>}\n */\nfunction jsonHttp(string $method, string $url, ?array $data = null, array $headers = []): array\n{\n    if ($method === '') {\n        throw new InvalidArgumentException('Empty HTTP method');\n    }\n    $curl = curl_init($url);\n    if ($curl === false) {\n        throw new RuntimeException('Cannot initialize HTTP client');\n    }\n    curl_setopt_array($curl, [\n        CURLOPT_CUSTOMREQUEST => $method,\n        CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 5,\n        CURLOPT_TIMEOUT => 40,\n        CURLOPT_FOLLOWLOCATION => false,\n        CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/json', ...$headers],\n    ]);\n    if ($data !== null) {\n        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));\n    }\n    $raw = curl_exec($curl);\n    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    if (!is_string($raw)) {\n        throw new RuntimeException('Transport result unknown');\n    }\n    if ($status === 204) {\n        return ['status' => 204, 'body' => []];\n    }\n    $body = objectValue(json_decode($raw, true, 64, JSON_THROW_ON_ERROR));\n    return ['status' => $status, 'body' => $body];\n}\n\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.envRequired('APP_DB'), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA busy_timeout=5000');\n    return $db;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE IF NOT EXISTS bookings (\n    id TEXT PRIMARY KEY,\n    event_id TEXT NOT NULL UNIQUE,\n    starts_at TEXT NOT NULL,\n    ends_at TEXT NOT NULL,\n    zone TEXT NOT NULL,\n    state TEXT NOT NULL DEFAULT 'active',\n    version INTEGER NOT NULL DEFAULT 1,\n    synced_version INTEGER NOT NULL DEFAULT 0,\n    etag TEXT,\n    sync_state TEXT NOT NULL DEFAULT 'pending'\n);\nCREATE TABLE IF NOT EXISTS calendar_snapshot (event_id TEXT PRIMARY KEY, body TEXT NOT NULL);\nCREATE TABLE IF NOT EXISTS calendar_cursor (id INTEGER PRIMARY KEY CHECK(id=1), token TEXT NOT NULL);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$sql = file_get_contents(__DIR__.'/schema.sql');\nif ($sql === false) {\n    throw new RuntimeException('Schema missing');\n}\ndatabase()->exec($sql);\necho \"Database ready\\n\";"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "access",
+        "label": "Настройте доступ Google",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настройте доступ Google"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Включите Calendar API в Google Cloud, настройте OAuth consent screen и OAuth-клиент веб-приложения с точным HTTPS redirect URI. В нашем варианте календарь подключает специалист через свой Google-аккаунт. Бот-клиент не должен получать токены Google и самостоятельно выбирать произвольный calendar_id."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для чтения и изменения событий используйте scope https://www.googleapis.com/auth/calendar.events. Он не заменяет права на сам календарь: у подключённого аккаунта должна быть возможность изменять события в выбранном календаре. В примере calendar_id вводится из настроек нужного календаря; если добавляете выбор через calendarList, отдельно подберите минимальный scope для списка. "
+                },
+                {
+                  "type": "text",
+                  "text": "Создание события и требования доступа",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/calendar/api/guides/create-events"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "OAuth state привяжите к сессии того сотрудника, который начал подключение, и проверяйте при возврате. Для фоновой работы запросите offline-доступ; refresh token храните зашифрованным на сервере, access token обновляйте по сроку действия. Ответ Calendar API 401 переводит запись в reconnect_required. Ошибка обновления токена, включая invalid_grant, останавливает проход до обработки записей: сотруднику нужно повторить подключение и затем вернуть разобранные записи в pending. Не зацикливайте задания с invalid_grant. "
+                },
+                {
+                  "type": "text",
+                  "text": "Серверный OAuth-поток Google",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/identity/protocols/oauth2/web-server"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Service account подходит лишь при явно предоставленном доступе к целевому календарю и разрешающей политике организации. Сам факт создания сервисного аккаунта не даёт ему календарь сотрудника. Для приглашения гостей действуют дополнительные ограничения, включая domain-wide delegation для service account; в этом примере гостей и рассылку email не добавляем."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для воспроизводимой настройки используем однократное подключение, которое запускается сотрудником из CLI. oauth-start.php создаёт случайный state с десятиминутным сроком и печатает URL согласия. Открыть его должен владелец выбранного календаря. Публичного маршрута «подключить любой аккаунт» здесь нет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · oauth-start.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\numask(0077);\n$state = bin2hex(random_bytes(32));\nif (file_put_contents(envRequired('OAUTH_STATE_PATH'), json_encode(['state' => $state,'expires' => time() + 600], JSON_THROW_ON_ERROR), LOCK_EX) === false) {\n    throw new RuntimeException('Cannot persist OAuth state');\n}\necho 'https://accounts.google.com/o/oauth2/v2/auth?'.http_build_query([\n    'client_id' => envRequired('GOOGLE_CLIENT_ID'),'redirect_uri' => envRequired('GOOGLE_REDIRECT_URI'),\n    'response_type' => 'code','scope' => 'https://www.googleapis.com/auth/calendar.events',\n    'access_type' => 'offline','prompt' => 'consent','state' => $state,\n]).PHP_EOL;"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · google-token.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @param array<string,string> $fields\n * @return array<string,mixed>\n */\nfunction googleTokenRequest(array $fields): array\n{\n    $curl = curl_init('https://oauth2.googleapis.com/token');\n    if ($curl === false) {\n        throw new RuntimeException('Cannot initialize cURL');\n    }\n    curl_setopt_array($curl, [CURLOPT_POST => true,CURLOPT_POSTFIELDS => http_build_query($fields),\n        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],\n        CURLOPT_RETURNTRANSFER => true,CURLOPT_CONNECTTIMEOUT => 5,CURLOPT_TIMEOUT => 20]);\n    $raw = curl_exec($curl);\n    $status = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    if (!is_string($raw)) {\n        throw new RuntimeException('OAuth network error');\n    }\n    $result = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);\n    if ($status !== 200 || !is_array($result)) {\n        throw new RuntimeException('OAuth failed; reconnect may be required');\n    }\n    return objectValue($result);\n}\n\nfunction accessToken(): string\n{\n    $raw = file_get_contents(envRequired('GOOGLE_TOKEN_PATH'));\n    $encrypted = is_string($raw) ? base64_decode($raw, true) : false;\n    if (!is_string($encrypted) || strlen($encrypted) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {\n        throw new RuntimeException('Connect Google first');\n    }\n    $nonce = substr($encrypted, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);\n    $refresh = sodium_crypto_secretbox_open(substr($encrypted, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES), $nonce, sodium_hex2bin(envRequired('TOKEN_KEY_HEX')));\n    if ($refresh === false) {\n        throw new RuntimeException('Cannot decrypt Google token');\n    }\n    $result = googleTokenRequest(['client_id' => envRequired('GOOGLE_CLIENT_ID'),\n        'client_secret' => envRequired('GOOGLE_CLIENT_SECRET'),\n        'refresh_token' => $refresh,'grant_type' => 'refresh_token']);\n    if (!is_string($result['access_token'] ?? null)) {\n        throw new RuntimeException('Missing access token');\n    }\n    return $result['access_token'];\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/oauth-callback.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/google-token.php';\nheader('Cache-Control: no-store');\nheader('Referrer-Policy: no-referrer');\ntry {\n    $state = $_GET['state'] ?? null;\n    $code = $_GET['code'] ?? null;\n    if (!is_string($state) || !is_string($code)) {\n        throw new RuntimeException('Missing OAuth result');\n    }\n    $file = fopen(envRequired('OAUTH_STATE_PATH'), 'r+');\n    if ($file === false || !flock($file, LOCK_EX)) {\n        throw new RuntimeException('OAuth session unavailable');\n    }\n    $saved = json_decode(stream_get_contents($file), true, 16, JSON_THROW_ON_ERROR);\n    if (!is_array($saved) || !is_string($saved['state'] ?? null) || !is_int($saved['expires'] ?? null)\n        || $saved['expires'] < time() || !hash_equals($saved['state'], $state)) {\n        throw new RuntimeException('Invalid OAuth state');\n    }\n    ftruncate($file, 0);\n    fflush($file);\n    flock($file, LOCK_UN);\n    fclose($file);\n    $result = googleTokenRequest(['client_id' => envRequired('GOOGLE_CLIENT_ID'),\n        'client_secret' => envRequired('GOOGLE_CLIENT_SECRET'),'redirect_uri' => envRequired('GOOGLE_REDIRECT_URI'),\n        'code' => $code,'grant_type' => 'authorization_code']);\n    $token = $result['refresh_token'] ?? null;\n    if (!is_string($token) || $token === '') {\n        throw new RuntimeException('Refresh token not returned');\n    }\n    $key = sodium_hex2bin(envRequired('TOKEN_KEY_HEX'));\n    if (strlen($key) !== SODIUM_CRYPTO_SECRETBOX_KEYBYTES) {\n        throw new RuntimeException('Invalid encryption key');\n    }\n    $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);\n    $encrypted = base64_encode($nonce.sodium_crypto_secretbox($token, $nonce, $key));\n    umask(0077);\n    $path = envRequired('GOOGLE_TOKEN_PATH');\n    if (file_put_contents($path.'.tmp', $encrypted, LOCK_EX) === false || !rename($path.'.tmp', $path)) {\n        throw new RuntimeException('Cannot persist token');\n    }\n    echo 'Календарь подключён. Можно закрыть страницу.';\n} catch (Throwable) {\n    http_response_code(400);\n    echo 'Подключение не завершено. Начните его заново с сервера.';\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · начало подключения Google",
+                  "code": "php init.php\nphp oauth-start.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавьте GOOGLE_REDIRECT_URI в разрешённые redirect URI OAuth-клиента, затем откройте выведенный URL. Callback должен показать «Календарь подключён», а вне public появится зашифрованный refresh token. Его содержимое не выводится в браузер или консоль. При отказе пользователя или отсутствии refresh token начните подключение заново, не затирая существующий файл токена пустой строкой."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "accessToken получает краткоживущий токен для одного прохода worker. Для большого потока сохраняйте срок действия и переиспользуйте access token, чтобы не обновлять его перед каждой операцией. В многопользовательском сервисе замените одноразовый файл state на запись, связанную с авторизованным сотрудником и календарём; один общий токен для разных организаций недопустим."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "time",
+        "label": "Сохраните время без двусмысленности",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните время без двусмысленности"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед подтверждением бот показывает дату, время и зону: «20 ноября, 15:00–15:30, Москва (Europe/Moscow)». В БД сохраните UTC и IANA-имя зоны. Число +03:00 описывает смещение на конкретную дату; оно не заменяет Europe/Moscow или Europe/Berlin для будущих преобразований."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В JSON события используйте dateTime в RFC 3339 со смещением и согласованный timeZone. Для дня целиком применяются другие поля — date; не используйте их для консультации на полчаса. При переводе локального времени в зоне с летним временем обрабатывайте несуществующий и двусмысленный час явно: предложите другой слот или уточните смещение."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · event.json для одной учебной записи",
+                  "code": "{\n  \"id\": \"7bf51ce780714d4e9060aa6e8c683a31\",\n  \"summary\": \"Консультация · B-1042\",\n  \"start\": {\"dateTime\":\"2026-11-20T15:00:00+03:00\",\"timeZone\":\"Europe/Moscow\"},\n  \"end\": {\"dateTime\":\"2026-11-20T15:30:00+03:00\",\"timeZone\":\"Europe/Moscow\"},\n  \"extendedProperties\": {\"private\":{\"booking_id\":\"B-1042\"}}\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В рабочем приложении сервер строит этот объект из подтверждённой записи. Не копируйте демонстрационный id для всех клиентов. Заголовок с номером записи достаточен: телефон, подробный запрос и медицинские сведения не стоит добавлять в календарь по умолчанию."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity",
+        "label": "Назначьте стабильный ID до первого запроса",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Назначьте стабильный ID до первого запроса"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Назначьте случайный ID один раз до обращения к Google. В booking.php это bin2hex(random_bytes(16)): 128 случайных битов в виде 32 hex-символов. Ещё один допустимый вариант — UUID без дефисов. Такой hex-ID укладывается в допустимый алфавит. Google принимает собственный id длиной 5–1024 символа из 0–9 и a–v; он уникален в календаре и отличается от iCalUID. "
+                },
+                {
+                  "type": "text",
+                  "text": "Параметр id",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/calendar/api/v3/reference/events/insert"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В учебной таблице id — первичный ключ, event_id — уникальный. Для отдельной таблицы связи наложите уникальность на booking_id и на пару calendar_id/event_id. Worker должен последовательно обрабатывать операции одной записи. При повторе сохраняйте event_id: новый случайный ID на каждой попытке как раз создаст дубликаты. При удалении и новом самостоятельном бронировании создаётся новая связь."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Стабильный ID помогает восстановиться после потерянного ответа, но не заменяет блокировку заданий: документация Google предупреждает об особенностях обнаружения коллизий в распределённой системе. Не отправляйте параллельные insert для одной записи и не используйте совпадение названия как ключ уникальности."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "create",
+        "label": "Создайте событие и восстановитесь после повтора",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте событие и восстановитесь после повтора"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CalendarClient получает HTTP-транспорт аргументом: в работе передаём jsonHttp, а в локальных проверках — функцию с подготовленными ответами. Сначала читается event_id из БД; при отсутствии события выполняется insert. Конфликт 409 проверяется повторным чтением того же ID."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · calendar.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nfinal class CalendarError extends RuntimeException\n{\n    public function __construct(public readonly int $status)\n    {\n        parent::__construct('Calendar HTTP '.$status);\n    }\n}\n\nfinal class CalendarClient\n{\n    /**\n     * @param Closure(string,string,?array<string,mixed>,list<string>):array{status:int,body:array<string,mixed>} $http\n     */\n    public function __construct(private readonly string $token, private readonly string $calendarId, private readonly Closure $http)\n    {\n    }\n\n    /**\n     * @param array<string,mixed>|null $data\n     * @return array<string,mixed>\n     */\n    private function request(string $method, string $suffix, ?array $data = null, ?string $etag = null): array\n    {\n        $headers = ['Authorization: Bearer '.$this->token];\n        if ($etag !== null) {\n            $headers[] = 'If-Match: '.$etag;\n        }\n        $result = ($this->http)($method, 'https://www.googleapis.com/calendar/v3/calendars/'.rawurlencode($this->calendarId).'/events'.$suffix, $data, $headers);\n        if ($result['status'] < 200 || $result['status'] >= 300) {\n            throw new CalendarError($result['status']);\n        }\n        return $result['body'];\n    }\n    /**\n     * @return array<string,mixed>\n     */\n    public function get(string $id): array\n    {\n        return $this->request('GET', '/'.rawurlencode($id));\n    }\n\n    /**\n     * @param array<string,mixed> $event\n     * @return array<string,mixed>\n     */\n    public function ensure(array $event): array\n    {\n        $id = stringValue($event['id']);\n        try {\n            return $this->owned($this->get($id), $event);\n        } catch (CalendarError $error) {\n            if ($error->status !== 404) {\n                throw $error;\n            }\n        }\n        try {\n            return $this->request('POST', '', $event);\n        } catch (CalendarError $error) {\n            if ($error->status !== 409) {\n                throw $error;\n            }\n            return $this->owned($this->get($id), $event);\n        }\n    }\n    /**\n     * @param array<string,mixed> $found\n     * @param array<string,mixed> $expected\n     * @return array<string,mixed>\n     */\n    private function owned(array $found, array $expected): array\n    {\n        if (($found['status'] ?? '') === 'cancelled' ||\n            self::bookingId($found) !== self::bookingId($expected)) {\n            throw new RuntimeException('Event ownership conflict');\n        }\n        return $found;\n    }\n    /**\n     * @param array<string,mixed> $event\n     * @return array<string,mixed>\n     */\n    public function move(string $id, array $event, string $etag): array\n    {\n        return $this->request('PATCH', '/'.rawurlencode($id), ['start' => $event['start'],'end' => $event['end']], $etag);\n    }\n    /**\n     * @param array<string,mixed> $event\n     */\n    public static function bookingId(array $event): string\n    {\n        $properties = objectValue($event['extendedProperties'] ?? []);\n        $private = objectValue($properties['private'] ?? []);\n        return stringValue($private['booking_id'] ?? null);\n    }\n    public function cancel(string $id, string $etag): void\n    {\n        $this->request('DELETE', '/'.rawurlencode($id), null, $etag);\n    }\n    /**\n     * @return array<string,mixed>\n     */\n    public function changes(?string $syncToken, ?string $pageToken): array\n    {\n        $query = ['showDeleted' => 'true','maxResults' => 100];\n        if ($syncToken !== null) {\n            $query['syncToken'] = $syncToken;\n        }\n        if ($pageToken !== null) {\n            $query['pageToken'] = $pageToken;\n        }\n        return $this->request('GET', '?'.http_build_query($query));\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ответ Google остаётся отдельным от локального состояния бронирования. ensure не перезаписывает существующее событие: он проверяет booking_id и возвращает найденное. Перенос выполняется только отдельным move с If-Match. DELETE с кодом 204 не пытается декодировать пустой ответ как JSON."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Идентификатор календаря URL-кодируется как один сегмент. Не используйте входной URL пользователя вместо базового адреса API: это превратит интеграцию в произвольный сетевой клиент. Сам calendar_id берётся из подтверждённой серверной настройки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · booking.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$action = $argv[1] ?? '';\n$id = $argv[2] ?? '';\nif (!in_array($action, ['create','move','cancel'], true) || !preg_match('/^[A-Z0-9-]{1,40}$/D', $id)) {\n    throw new RuntimeException('Usage: php booking.php create|move|cancel B-1042 [START END ZONE]');\n}\n$lock = fopen(envRequired('APP_DB').'.calendar.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    throw new RuntimeException('Calendar busy; retry later');\n}\n$db = database();\nif ($action === 'cancel') {\n    $db->prepare(\"UPDATE bookings SET state='cancelled',version=version+1,sync_state='pending' WHERE id=? AND state='active'\")->execute([$id]);\n} else {\n    $zone = new DateTimeZone($argv[5] ?? 'Europe/Moscow');\n    $dates = [];\n    foreach ([$argv[3] ?? '',$argv[4] ?? ''] as $raw) {\n        $date = DateTimeImmutable::createFromFormat(DateTimeInterface::ATOM, $raw);\n        if (!$date || $date->format(DateTimeInterface::ATOM) !== $raw || $date->getOffset() !== $zone->getOffset($date)) {\n            throw new RuntimeException('Use valid RFC3339 timestamps with the selected zone offset');\n        }\n        $dates[] = $date;\n    }\n    if ($dates[1] <= $dates[0]) {\n        throw new RuntimeException('End must follow start');\n    }\n    $start = $dates[0]->setTimezone(new DateTimeZone('UTC'))->format(DateTimeInterface::ATOM);\n    $end = $dates[1]->setTimezone(new DateTimeZone('UTC'))->format(DateTimeInterface::ATOM);\n    if ($action === 'create') {\n        $db->prepare('INSERT INTO bookings(id,event_id,starts_at,ends_at,zone) VALUES(?,?,?,?,?)')\n            ->execute([$id,bin2hex(random_bytes(16)),$start,$end,$zone->getName()]);\n    } else {\n        $query = $db->prepare(\"UPDATE bookings SET starts_at=?,ends_at=?,zone=?,version=version+1,sync_state='pending' WHERE id=? AND state='active'\");\n        $query->execute([$start,$end,$zone->getName(),$id]);\n        if ($query->rowCount() !== 1) {\n            throw new RuntimeException('Active booking not found');\n        }\n    }\n}\necho \"Saved locally; run sync-bookings.php\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · создать и перенести учебную запись",
+                  "code": "php booking.php create B-1042 \"2026-11-20T15:00:00+03:00\" \"2026-11-20T15:30:00+03:00\" Europe/Moscow\nphp sync-bookings.php\nphp booking.php move B-1042 \"2026-11-20T16:00:00+03:00\" \"2026-11-20T16:30:00+03:00\" Europe/Moscow\nphp sync-bookings.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "booking.php создаёт случайный ID один раз и сохраняет время в UTC. Команда move увеличивает версию, но сохраняет event_id. В приложении бронирования используйте такую же запись изменения вместе с бизнес-транзакцией. CLI здесь служит безопасной точкой проверки самого календаря и не проверяет занятость слота."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · sync.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/calendar.php';\n\n/**\n * @param array<string,mixed> $row\n * @return array<string,mixed>\n */\nfunction eventBody(array $row): array\n{\n    $zone = new DateTimeZone(stringValue($row['zone']));\n    return ['id' => $row['event_id'],'summary' => 'Консультация · '.stringValue($row['id']),\n        'start' => ['dateTime' => (new DateTimeImmutable(stringValue($row['starts_at'])))->setTimezone($zone)->format(DateTimeInterface::ATOM),'timeZone' => $row['zone']],\n        'end' => ['dateTime' => (new DateTimeImmutable(stringValue($row['ends_at'])))->setTimezone($zone)->format(DateTimeInterface::ATOM),'timeZone' => $row['zone']],\n        'extendedProperties' => ['private' => ['booking_id' => $row['id']]]];\n}\n\nfunction syncBookings(PDO $db, CalendarClient $calendar): void\n{\n    $pending = $db->query(\"SELECT * FROM bookings WHERE sync_state IN ('pending','unknown') ORDER BY id\");\n    if ($pending === false) {\n        throw new RuntimeException('Cannot read bookings');\n    }\n    $pending->setFetchMode(PDO::FETCH_ASSOC);\n    foreach ($pending as $data) {\n        $row = objectValue($data);\n        $id = stringValue($row['event_id']);\n        $state = 'unknown';\n        $etag = $row['etag'] === null ? null : stringValue($row['etag']);\n        try {\n            $expected = eventBody($row);\n            if ($row['state'] === 'cancelled') {\n                // Не вызываем ensure: отменённая запись не должна создавать событие.\n                $found = $calendar->get($id);\n                if (CalendarClient::bookingId($found) !== $row['id']) {\n                    throw new RuntimeException('Owner mismatch');\n                }\n                if ($etag !== null && $found['etag'] !== $etag) {\n                    throw new RuntimeException('Manual change');\n                }\n                $calendar->cancel($id, stringValue($found['etag']));\n            } else {\n                $found = $calendar->ensure($expected);\n                $matches = strtotime(stringValue(objectValue($found['start'] ?? [])['dateTime'] ?? '')) === strtotime(stringValue($row['starts_at']))\n                    && strtotime(stringValue(objectValue($found['end'] ?? [])['dateTime'] ?? '')) === strtotime(stringValue($row['ends_at']));\n                if (!$matches) {\n                    if ($etag === null || $found['etag'] !== $etag) {\n                        throw new RuntimeException('Manual change');\n                    }\n                    $found = $calendar->move($id, $expected, $etag);\n                }\n                $etag = stringValue($found['etag']);\n            }\n            $state = 'synced';\n        } catch (CalendarError $error) {\n            $state = match ($error->status) {\n                401 => 'reconnect_required', 403,404,410,412 => 'review', default => 'unknown',\n            };\n        } catch (RuntimeException $error) {\n            // Сетевой сбой и конфликт не смешиваем для автоматического повтора.\n            $state = $error->getMessage() === 'Transport result unknown' ? 'unknown' : 'review';\n        }\n        $q = $db->prepare('UPDATE bookings SET sync_state=?,etag=?,synced_version=CASE WHEN ?=? THEN version ELSE synced_version END WHERE id=? AND version=?');\n        $q->execute([$state,$etag,$state,'synced',$row['id'],$row['version']]);\n    }\n}\n\nfunction pullChanges(PDO $db, CalendarClient $calendar): void\n{\n    $cursor = $db->query('SELECT token FROM calendar_cursor WHERE id=1');\n    if ($cursor === false) {\n        throw new RuntimeException('Cannot read sync cursor');\n    }\n    $token = $cursor->fetchColumn();\n    $page = null;\n    $db->beginTransaction();\n    try {\n        do {\n            $result = $calendar->changes(is_string($token) ? $token : null, $page);\n            if (!is_array($result['items'] ?? null)) {\n                throw new RuntimeException('Invalid event list');\n            }\n            foreach ($result['items'] as $event) {\n                if (!is_array($event)) {\n                    throw new RuntimeException('Invalid event');\n                }\n                if (!is_string($event['id'] ?? null)) {\n                    continue;\n                }\n                $db->prepare('INSERT INTO calendar_snapshot(event_id,body) VALUES(?,?) ON CONFLICT(event_id) DO UPDATE SET body=excluded.body')\n                    ->execute([$event['id'],json_encode($event, JSON_THROW_ON_ERROR)]);\n                // Сверка помечает конфликт; не перезаписывает бизнес-запись.\n                $db->prepare(\"UPDATE bookings SET sync_state='review' WHERE event_id=? AND sync_state='synced' AND state='active' AND (etag<>? OR ?='cancelled')\")\n                    ->execute([$event['id'],$event['etag'] ?? '',$event['status'] ?? '']);\n            }\n            $page = isset($result['nextPageToken']) ? stringValue($result['nextPageToken']) : null;\n        } while ($page !== null);\n        if (!is_string($result['nextSyncToken'] ?? null)) {\n            throw new RuntimeException('Missing sync token');\n        }\n        $db->prepare('INSERT INTO calendar_cursor(id,token) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET token=excluded.token')->execute([$result['nextSyncToken']]);\n        $db->commit();\n    } catch (Throwable $error) {\n        $db->rollBack();\n        if ($error instanceof CalendarError && $error->status === 410) {\n            $db->beginTransaction();\n            $db->exec('DELETE FROM calendar_cursor; DELETE FROM calendar_snapshot');\n            $db->commit(); // Следующий проход начнёт полную синхронизацию.\n        }\n        throw $error;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · sync-bookings.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/google-token.php';\nrequire __DIR__.'/sync.php';\n$lock = fopen(envRequired('APP_DB').'.calendar.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    exit(0);\n}\n$calendar = new CalendarClient(accessToken(), envRequired('GOOGLE_CALENDAR_ID'), Closure::fromCallable('jsonHttp'));\n$db = database();\nif (($argv[1] ?? '') === 'pull') {\n    pullChanges($db, $calendar);\n} else {\n    syncBookings($db, $calendar);\n}\necho \"Synchronization finished; inspect sync_state\\n\";"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "syncBookings берёт pending/unknown и записывает synced только после подтверждённой операции. Потерянный ответ insert восстанавливается чтением того же ID. Потерянный ответ PATCH тоже можно распознать: если фактическое время уже совпало с желаемым, повторная правка не требуется. Если время отличается и etag изменился, нужна сверка, а не перезапись."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Все CLI-операции используют один lock-файл. В приложении с несколькими серверами замените его блокировкой общей БД или очередью по booking_id. Нельзя оставить файловую блокировку только на одном узле и считать, что она защищает обработчики на остальных. Ошибку получения OAuth-токена worker не превращает в успешную синхронизацию: локальные записи остаются для разбора."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "move-cancel",
+        "label": "Переносите и отменяйте существующее событие",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Переносите и отменяйте существующее событие"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При переносе сначала проверьте нового владельца операции и доступность слота, затем сохраните новую версию бронирования и задание. Worker читает актуальную версию и вызывает move с тем же event_id. Старая задача с прежней версией должна завершиться без отправки устаревшего времени."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-google-calendar/stable-event.jpg",
+                  "width": 1080,
+                  "height": 953,
+                  "alt": "Бронь B-1042 сохраняет один event_id при переносе с 10 на 12 часов; If-Match защищает чужие правки, конфликт требует сверки.",
+                  "caption": "Поясняющая схема, не снимок Google Calendar. ID, время и обозначения etag условные; в API используются полные значения etag без изменений.",
+                  "mobile_src": "/images/guides/telegram-bot-google-calendar/stable-event-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1190
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед изменением перечитайте событие. If-Match с его etag защищает от незаметной перезаписи ручной правки; HTTP 412 означает конфликт. Прочитайте новую версию и примените выбранное правило: в нашем примере спорные переносы передаются специалисту. Бесконечный повтор со старым etag не поможет. "
+                },
+                {
+                  "type": "text",
+                  "text": "Условное изменение ресурса",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/calendar/api/guides/version-resources"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для отмены пометьте бронирование отменённым, затем вызовите cancel с актуальным etag. Успешный DELETE не содержит JSON; модуль учитывает 204. После потерянного ответа проверьте именно связанное событие. 404 или 410 можно трактовать как уже отсутствующее событие только после проверки доступа к правильному календарю и его идентификатора, а не при любой ошибке Google."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните связь и статус отмены: удаление строки связи сразу после DELETE делает поздние задания опасными. Worker больше не должен воссоздавать отменённую запись через ensure. Уведомление клиенту привязывайте к версии операции, чтобы перенос и отмена не породили несколько одинаковых сообщений."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · отменить ту же запись",
+                  "code": "php booking.php cancel B-1042\nphp sync-bookings.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · результат операции",
+                  "code": "SELECT id,event_id,state,version,synced_version,sync_state,etag FROM bookings;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В коде отмена при 404/410 оставляет review: такой ответ может означать не только удалённое событие, но и проблему доступа. Убедитесь, что нужный календарь доступен и связанного события действительно нет, затем отметьте эту отмену синхронизированной вручную. Для автоматизации этого решения потребуется дополнительная проверка календаря, а не расширение списка «успешных» ошибок."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При 412 состояние также review. Покажите специалисту локальное и календарное время. Он должен выбрать, сохранить ручной перенос или применить бронь; после решения обновите etag и версию. В примере нет автоматической кнопки, которая стирает чужую правку, — конфликт остаётся заметным в БД."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sync",
+        "label": "Как учитывать изменения со стороны Google Calendar",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как учитывать изменения со стороны Google Calendar"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для первого запуска достаточно фонового чтения изменений; push можно добавить позже. Выполните events.list до конца пагинации, сохраните события и nextSyncToken последней страницы. Затем передавайте syncToken в следующие запросы. Не меняйте набор фильтров между страницами и проходами; совместимость параметров описана в "
+                },
+                {
+                  "type": "text",
+                  "text": "events.list",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/calendar/api/v3/reference/events/list"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обрабатывайте отменённые события и сохраняйте новый sync token только после надёжного применения всех страниц. При 410 токен устарел: пересоздайте локальный снимок календаря полной синхронизацией. Не удаляйте бронирования приложения вместе со снимком. "
+                },
+                {
+                  "type": "text",
+                  "text": "Порядок incremental sync",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/calendar/api/guides/sync"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сопоставляйте событие по calendar_id/event_id. extendedProperties.private.booking_id помогает диагностике, но не даёт внешнему событию права изменять чужую запись. Для событий без существующей связи максимум обновляйте занятость специалиста, не создавайте задним числом клиентскую бронь."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выберите правила владения полями. В нашем примере изменение описания не меняет бронь; ручное изменение активного связанного события переводит запись в review для сверки специалистом. Учебный вариант консервативен: он реагирует на смену etag, в том числе после правки описания. Собственная подтверждённая отмена не создаёт такой конфликт. Пока конфликт не разрешён, бот не должен подтверждать клиенту новое время. Автоматическое принятие ручного переноса возможно лишь после той же проверки слота, что выполняется при записи."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "events.watch отправляет уведомление об изменении без тела события: после него всё равно нужен sync. Проверяйте X-Goog-Channel-ID, X-Goog-Resource-ID и собственный непредсказуемый Channel-Token, сводите повторные уведомления в одну задачу. Канал наблюдения истекает и требует обновления; фоновая сверка полезна и при push. "
+                },
+                {
+                  "type": "text",
+                  "text": "Push-уведомления Google Calendar",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/calendar/api/guides/push"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · получить изменения календаря",
+                  "code": "php sync-bookings.php pull"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция pullChanges уже входит в sync.php. Она сохраняет каждую страницу в снимок и переносит курсор только после успешного полного прохода. При 410 очищается лишь снимок и курсор; таблица bookings остаётся. Повтор команды начинает полную синхронизацию. Для небольшого учебного календаря используется одна транзакция; для большого календаря загружайте страницы во временный снимок и атомарно переключайте готовую версию, чтобы не удерживать блокировку БД во время сети."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Изменение связанного события переводит synced в review. Чужие события остаются в снимке и не получают права создавать или менять брони. Запускайте pull после исходящей синхронизации и периодически по расписанию. В период ручного конфликта не отправляйте клиенту новое подтверждение времени автоматически."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Проверьте интеграцию на отдельном календаре",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте интеграцию на отдельном календаре"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Одна запись создаёт событие в правильном календаре; повтор задания возвращает тот же id."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Смоделируйте успешный insert с потерянным ответом. Повтор должен прочитать событие, а не создать новый ID."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Перенос меняет время существующего события. Старое задание после переноса не возвращает прежний слот."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ручная правка между GET и PATCH приводит к 412 и разбору конфликта, а не к молчаливой потере правки."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отмена выдерживает повтор, поздняя задача создания не воскрешает удалённую встречу."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте две зоны, переход летнего времени и отображение даты в Telegram."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте отзыв OAuth-доступа, несколько страниц sync, отменённое событие и восстановление после 410."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate в этой схеме используется для Telegram-уведомлений. Google OAuth, события и синхронизация выполняются вашим сервером непосредственно через Calendar API. Напоминания лучше вынести в отдельный процесс, привязанный к актуальной версии записи; пример есть в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по напоминаниям",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-telegram-appointment-reminders"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Первый полный проход: создайте B-1042, синхронизируйте, проверьте один event_id в Google, перенесите запись, повторите синхронизацию, затем отмените. В календаре не должно появляться второе событие при переносе. Отдельно вручную сдвиньте событие перед очередным move и проверьте переход в review."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Внешние приглашения участникам и Google Meet сюда не добавлены: в событии нет attendees и conferenceData. Это сохраняет тест без неожиданных email. Если добавляете гостей, сначала разберите sendUpdates и правила доступа календаря; Telegram-уведомление о записи и приглашение Google — разные каналы."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

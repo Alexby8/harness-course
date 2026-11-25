@@ -1,0 +1,1043 @@
+[
+  {
+    "slug": "telegram-mini-app-file-upload",
+    "title": "Как загружать фотографии и документы через Telegram Mini App",
+    "seo_title": "Как загружать фотографии и документы через Telegram Mini App",
+    "description": "Заявка на ремонт с файлами: форма Mini App, FormData и PHP, проверка вложений, закрытое хранение, скачивание владельцем и повтор после потери ответа.",
+    "card_description": "Заявка на ремонт с файлами: форма Mini App, FormData и PHP, проверка вложений, закрытое хранение, скачивание владельцем и повтор после потери ответа.",
+    "category": "Практика",
+    "topics": "Mini Apps · PHP · Файлы",
+    "reading_time": "32 минуты",
+    "published_at": "2026-11-19",
+    "is_published": true,
+    "sort_order": 70,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера клиент оставляет заявку на ремонт: описывает неисправность, прикладывает фотографию устройства и PDF с результатом диагностики. Соберём форму Mini App и PHP-сервер, который проверит пользователя и файлы, сохранит заявку и выдаст номер. Вложения останутся в закрытом каталоге, а повтор отправки с тем же ключом вернёт прежний результат."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "route",
+        "label": "Куда отправляются файлы",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Куда отправляются файлы"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Форма отправляет multipart-запрос непосредственно вашему HTTPS-серверу. Telegram открывает Mini App и передаёт initData, но не становится хранилищем загруженного файла. В таком сценарии нет входящего message.document, file_id и вызова getFile. Если пользователь должен прислать документ обычным сообщением боту, нужен "
+                },
+                {
+                  "type": "text",
+                  "text": "другой обработчик",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-receive-and-save-files"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "FormData умеет объединять текстовые поля и File в одном теле. Для fetch не задавайте Content-Type вручную: браузер добавит multipart boundary. Текст из textarea и выбранные файлы должны попасть в один снимок отправки. После нажатия блокируем поля, пока результат не подтверждён, чтобы повтор не содержал уже другие данные. "
+                },
+                {
+                  "type": "text",
+                  "text": "Использование FormData",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest_API/Using_FormData_Objects"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Учебное ограничение — от одного до трёх файлов, каждый до 5 МиБ, только JPEG, PNG и PDF. Документом здесь считается PDF; DOCX, ZIP, HEIC и SVG намеренно не принимаются. Если клиент выбрал фотографию в неподдерживаемом формате, предложите экспортировать JPEG или приложить PDF, а не переименовывать расширение."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовьте PHP и закрытое хранилище",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте PHP и закрытое хранилище"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нужны PHP 8.3+, PDO SQLite, mbstring и fileinfo; Composer не требуется. Веб-сервер открывает только public. База и каталог вложений находятся вне публичного корня, доступны процессу PHP и не попадают в Git. Предпросмотр ниже выполняется в браузере; авторизация, проверка типов и сохранение — на PHP."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "public/form.html\npublic/api.php\npublic/download.php\ncommon.php\nvalues.php\nauth.php\nuploads.php\nschema.sql\ninit.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · значения-примеры",
+                  "code": "APP_DB=/private/repair.sqlite\nUPLOAD_DIR=/private/repair-files\nBOT_TOKEN=TOKEN_FROM_BOTFATHER"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте каталог repair-files с правами только для пользователя приложения. На Linux код дополнительно задаёт сохранённым файлам режим 0600. Обычный PHP не загружает .env самостоятельно: значения должны быть доступны PHP-FPM и CLI. Для первого запуска достаточно отдельного тестового бота и небольшого приватного диска."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP INI · настройки учебного приложения",
+                  "code": "file_uploads = On\nupload_max_filesize = 6M\npost_max_size = 20M\nmax_file_uploads = 10\nmax_execution_time = 90\ndisplay_errors = Off"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Лимит приложения в 5 МиБ строже PHP-лимита в 6M, чтобы приложение могло вернуть понятную ошибку. post_max_size учитывает всё тело и служебные части multipart. На Nginx задайте подходящий client_max_body_size для этого виртуального хоста. Если запрос отсекается до PHP, ответом может быть HTML 413, а не JSON вашего API. "
+                },
+                {
+                  "type": "text",
+                  "text": "Параметры PHP",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/en/ini.core.php#ini.post-max-size"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · values.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n *\n * @return array<string,mixed>\n */\nfunction objectValue(mixed $value): array\n{\n    if (!is_array($value)) {\n        throw new InvalidArgumentException('Expected object');\n    }\n    $result = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected object keys');\n        }\n        $result[$key] = $item;\n    }\n    return $result;\n}\n\nfunction stringValue(mixed $value): string\n{\n    if (!is_string($value)) {\n        throw new InvalidArgumentException('Expected string');\n    }\n    return $value;\n}\n\nfunction intValue(mixed $value): int\n{\n    if (!is_int($value) && !is_string($value)) {\n        throw new InvalidArgumentException('Expected integer');\n    }\n    $integer = filter_var($value, FILTER_VALIDATE_INT);\n    if ($integer === false) {\n        throw new InvalidArgumentException('Invalid integer');\n    }\n    return $integer;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/values.php';\n\nfunction envRequired(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing environment: '.$name);\n    }\n    return $value;\n}\n\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.envRequired('APP_DB'), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA busy_timeout=5000');\n    return $db;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE requests (\n id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,\n operation_id TEXT NOT NULL, request_hash TEXT NOT NULL, description TEXT NOT NULL,\n created_at INTEGER NOT NULL, UNIQUE(user_id,operation_id)\n);\nCREATE TABLE attachments (\n id TEXT PRIMARY KEY, request_id INTEGER NOT NULL REFERENCES requests(id),\n storage_name TEXT NOT NULL UNIQUE, mime TEXT NOT NULL, bytes INTEGER NOT NULL,\n sha256 TEXT NOT NULL\n);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\ndatabase()->exec(stringValue(file_get_contents(__DIR__.'/schema.sql')));\necho \"Database ready\\n\";"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "identity",
+        "label": "Проверьте пользователя до доступа к заявке",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте пользователя до доступа к заявке"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сервер берёт user_id только из подписанного initData. Поле user_id из формы не принимается. Один и тот же идентификатор вложения не даёт права скачать его: запрос должен принадлежать владельцу связанной заявки. Поэтому даже случайный 32-символьный ID не заменяет проверку доступа."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · auth.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nfunction telegramUser(string $raw, string $botToken, int $now): int\n{\n    if ($raw === '' || strlen($raw) > 16384) {\n        throw new RuntimeException('Invalid initData');\n    }\n    $fields = [];\n    foreach (explode('&', $raw) as $pair) {\n        [$key,$value] = array_pad(explode('=', $pair, 2), 2, '');\n        $key = urldecode($key);\n        $value = urldecode($value);\n        if ($key === '' || array_key_exists($key, $fields)) {\n            throw new RuntimeException('Duplicate field');\n        }\n        $fields[$key] = $value;\n    }\n    $hash = $fields['hash'] ?? '';\n    unset($fields['hash']);\n    if (!preg_match('/^[a-f0-9]{64}$/D', $hash)) {\n        throw new RuntimeException('Invalid hash');\n    }\n    ksort($fields, SORT_STRING);\n    $lines = [];\n    foreach ($fields as $key => $value) {\n        $lines[] = $key.'='.$value;\n    }\n    $secret = hash_hmac('sha256', $botToken, 'WebAppData', true);\n    if (!hash_equals(hash_hmac('sha256', implode(\"\\n\", $lines), $secret), $hash)) {\n        throw new RuntimeException('Bad signature');\n    }\n    $date = filter_var($fields['auth_date'] ?? '', FILTER_VALIDATE_INT);\n    if ($date === false || $date > $now + 30 || $date < $now - 3600) {\n        throw new RuntimeException('Expired initData');\n    }\n    $user = json_decode($fields['user'] ?? '', true, 16, JSON_THROW_ON_ERROR);\n    if (!is_array($user) || !is_int($user['id'] ?? null) || $user['id'] <= 0) {\n        throw new RuntimeException('Missing user');\n    }\n    return $user['id'];\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Здесь принимается initData не старше часа и отклоняются дублирующиеся query-поля. Клиент передаёт исходную строку в X-Telegram-Init-Data. Не помещайте её в URL, логи и базу. При 401 интерфейс предлагает заново открыть Mini App. Для долгой сессии можно после проверки выдавать собственную сессию — этот вариант разобран в "
+                },
+                {
+                  "type": "text",
+                  "text": "статье об авторизации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-initdata-auth-php-laravel"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Алгоритм HMAC использует токен именно этого бота. Если одна форма работает с несколькими ботами, сначала выберите подтверждённую серверную конфигурацию и только затем проверяйте initData. Нельзя проверять подпись одним токеном, а сохранять владельца в пространстве другого бота. "
+                },
+                {
+                  "type": "text",
+                  "text": "Проверка данных Mini App",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "validation",
+        "label": "Проверьте содержимое, а не название файла",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте содержимое, а не название файла"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "accept и File.type помогают интерфейсу, но клиент может изменить запрос. Сервер сначала проверяет UPLOAD_ERR_OK и происхождение временного файла, затем фактический размер и MIME через fileinfo. Для JPEG и PNG дополнительно проверяются размеры изображения. Ограничение в 20 мегапикселей не зависит от сжатого размера на диске."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Имя пользователя не становится путём хранения. Сервер назначает случайное имя и расширение по проверенному MIME. Файл с названием «акт.php» и настоящим PDF-содержимым будет храниться как случайный .pdf; наоборот, переименование исполняемого текста в .jpg не поможет пройти проверку. Исходные имена не нужны рабочей логике и в БД этого примера не сохраняются."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · uploads.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nfinal class UploadConflict extends RuntimeException\n{\n}\n\n/**\n * @param array<string,mixed> $file\n *\n * @return array{tmp:string,mime:string,extension:string,bytes:int,sha256:string}\n */\nfunction inspectUpload(array $file): array\n{\n    if (($file['error'] ?? null) !== UPLOAD_ERR_OK) {\n        throw new InvalidArgumentException('Файл не загружен целиком');\n    }\n    $tmp = stringValue($file['tmp_name'] ?? null);\n    if (!is_uploaded_file($tmp)) {\n        throw new InvalidArgumentException('Ожидается HTTP-загрузка');\n    }\n    $bytes = filesize($tmp);\n    if ($bytes === false || $bytes < 1 || $bytes > 5 * 1024 * 1024) {\n        throw new InvalidArgumentException('Файл должен быть от 1 байта до 5 МиБ');\n    }\n    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($tmp);\n    $allowed = ['image/jpeg' => 'jpg','image/png' => 'png','application/pdf' => 'pdf'];\n    if (!is_string($mime) || !isset($allowed[$mime])) {\n        throw new InvalidArgumentException('Разрешены JPEG, PNG и PDF');\n    }\n    if (str_starts_with($mime, 'image/')) {\n        $size = getimagesize($tmp);\n        if ($size === false || $size[0] < 1 || $size[1] < 1 || $size[0] * $size[1] > 20000000) {\n            throw new InvalidArgumentException('Изображение повреждено или больше 20 мегапикселей');\n        }\n    }\n    return ['tmp' => $tmp,'mime' => $mime,'extension' => $allowed[$mime],'bytes' => $bytes,'sha256' => stringValue(hash_file('sha256', $tmp))];\n}\n\n/**\n * @return array{id:int,attachments:list<array{id:string,mime:string,bytes:int}>}|null\n */\nfunction requestStatus(PDO $db, int $userId, string $operation): ?array\n{\n    $q = $db->prepare('SELECT id FROM requests WHERE user_id=? AND operation_id=?');\n    $q->execute([$userId,$operation]);\n    $id = $q->fetchColumn();\n    if ($id === false) {\n        return null;\n    }\n    $q = $db->prepare('SELECT id,mime,bytes FROM attachments WHERE request_id=? ORDER BY id');\n    $q->execute([$id]);\n    $files = [];\n    while ($row = $q->fetch(PDO::FETCH_ASSOC)) {\n        $r = objectValue($row);\n        $files[] = ['id' => stringValue($r['id']),'mime' => stringValue($r['mime']),'bytes' => intValue($r['bytes'])];\n    }\n    return ['id' => intValue($id),'attachments' => $files];\n}\n\n/**\n * @param list<array{tmp:string,mime:string,extension:string,bytes:int,sha256:string}> $files\n *\n * @return array{id:int,attachments:list<array{id:string,mime:string,bytes:int}>}\n */\nfunction saveRequest(PDO $db, int $userId, string $operation, string $description, array $files): array\n{\n    if (!preg_match('/^[a-f0-9-]{36}$/D', $operation) || mb_strlen(trim($description)) < 10 || mb_strlen($description) > 2000\n        || count($files) < 1 || count($files) > 3) {\n        throw new InvalidArgumentException('Проверьте описание и число файлов');\n    }\n    $manifest = array_map(static fn (array $f): array => [$f['mime'],$f['bytes'],$f['sha256']], $files);\n    $hash = hash('sha256', json_encode([$description,$manifest], JSON_THROW_ON_ERROR));\n    $directory = realpath(envRequired('UPLOAD_DIR'));\n    if ($directory === false || !is_writable($directory)) {\n        throw new RuntimeException('Private storage unavailable');\n    }\n    $paths = [];\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $q = $db->prepare('SELECT request_hash FROM requests WHERE user_id=? AND operation_id=?');\n        $q->execute([$userId,$operation]);\n        $previous = $q->fetchColumn();\n        if ($previous !== false) {\n            if (!hash_equals(stringValue($previous), $hash)) {\n                throw new UploadConflict('Ключ использован с другим содержимым');\n            }\n            $result = requestStatus($db, $userId, $operation);\n            if ($result === null) {\n                throw new RuntimeException('Request missing');\n            }\n            $db->exec('COMMIT');\n            return $result;\n        }\n        $db->prepare('INSERT INTO requests(user_id,operation_id,request_hash,description,created_at) VALUES(?,?,?,?,?)')\n            ->execute([$userId,$operation,$hash,$description,time()]);\n        $requestId = intValue($db->lastInsertId());\n        foreach ($files as $file) {\n            $id = bin2hex(random_bytes(16));\n            $name = $id.'.'.$file['extension'];\n            $path = $directory.DIRECTORY_SEPARATOR.$name;\n            if (!move_uploaded_file($file['tmp'], $path)) {\n                throw new RuntimeException('Cannot store upload');\n            }\n            $paths[] = $path;\n            if (!chmod($path, 0600)) {\n                throw new RuntimeException('Cannot restrict file permissions');\n            }\n            $db->prepare('INSERT INTO attachments(id,request_id,storage_name,mime,bytes,sha256) VALUES(?,?,?,?,?,?)')\n                ->execute([$id,$requestId,$name,$file['mime'],$file['bytes'],$file['sha256']]);\n        }\n        $result = requestStatus($db, $userId, $operation);\n        if ($result === null) {\n            throw new RuntimeException('Request missing');\n        }\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $e) {\n        $db->exec('ROLLBACK');\n        foreach ($paths as $path) {\n            if (is_file($path)) {\n                unlink($path);\n            }\n        }\n        throw $e;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "inspectUpload использует is_uploaded_file, поэтому обычный путь к файлу на диске не подойдёт даже в локальной проверке: нужен настоящий multipart HTTP-запрос. Для переноса используется move_uploaded_file, а не произвольное копирование пути из JSON. "
+                },
+                {
+                  "type": "text",
+                  "text": "Загрузка в PHP",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/en/features.file-upload.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "move_uploaded_file",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/en/function.move-uploaded-file.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка MIME не доказывает безопасность любого PDF и не удаляет метаданные снимка. Для публичного сервиса добавьте карантин и проверку антивирусом до доступа сотрудников, а для изображений при необходимости — отдельное безопасное перекодирование и удаление EXIF. Не показывайте пользовательский PDF встроенным HTML и не выполняйте его обработку системной командой из имени файла."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "atomic",
+        "label": "Как заявка и вложения сохраняются вместе",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как заявка и вложения сохраняются вместе"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "saveRequest проверяет все выбранные файлы до записи. Затем создаёт заявку и метаданные вложений, перемещает файлы в закрытый каталог и фиксирует транзакцию. При обычном исключении транзакция откатывается, уже перемещённые файлы удаляются. Пользователь видит успех только после commit."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "operation_id относится к одной отправке одного пользователя. request_hash включает описание и упорядоченный список MIME, размеров и SHA-256 файлов. Повтор с тем же содержимым возвращает прежний номер; тот же ключ с другой фотографией получает 409. Хеш содержимого здесь проверяет неизменность повторной отправки, а не даёт право доступа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Файловая система и SQLite не имеют общей транзакции. При аварийном завершении процесса между move_uploaded_file и commit может остаться файл без строки attachments. Поэтому нужен периодический поиск сирот: под блокировкой, исключающей текущую загрузку, сравнивайте случайные имена со строками БД и удаляйте только достаточно старые неподтверждённые файлы. Не удаляйте весь каталог по времени изменения — там могут быть действующие заявки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В примере SQLite удерживает блокировку записи во время нескольких локальных перемещений. Это приемлемо для небольшого теста на одном сервере. Для потока больших файлов используйте отдельную стадию загрузки, статусы проверки и финализацию заявки. Переход на объектное хранилище требует серверной проверки владельца ключа и фактического размера после загрузки."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "endpoint",
+        "label": "Подключите API приёма и проверки результата",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключите API приёма и проверки результата"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/api.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/auth.php';\nrequire dirname(__DIR__).'/uploads.php';\nheader('Content-Type: application/json; charset=utf-8');\nheader('Cache-Control: no-store');\n/**\n * @param array<string,mixed> $body\n */\nfunction respond(int $status, array $body): never\n{\n    http_response_code($status);\n    echo json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n    exit;\n}\ntry {\n    $userId = telegramUser(stringValue($_SERVER['HTTP_X_TELEGRAM_INIT_DATA'] ?? ''), envRequired('BOT_TOKEN'), time());\n} catch (Throwable) {\n    respond(401, ['error' => 'Переоткройте Mini App в Telegram']);\n}\ntry {\n    $db = database();\n    $method = $_SERVER['REQUEST_METHOD'] ?? '';\n    if ($method === 'GET') {\n        $key = stringValue($_GET['operation_id'] ?? '');\n        if (!preg_match('/^[a-f0-9-]{36}$/D', $key)) {\n            respond(422, ['error' => 'Некорректный ключ']);\n        }\n        $result = requestStatus($db, $userId, $key);\n        respond($result === null ? 404 : 200, $result ?? ['error' => 'Заявка не найдена']);\n    }\n    if ($method !== 'POST') {\n        respond(405, ['error' => 'Метод не поддерживается']);\n    }\n    if (intValue($_SERVER['CONTENT_LENGTH'] ?? 0) > 20 * 1024 * 1024) {\n        respond(413, ['error' => 'Запрос слишком большой']);\n    }\n    $upload = objectValue($_FILES['files'] ?? []);\n    $errors = $upload['error'] ?? null;\n    if (!is_array($errors) || !array_is_list($errors) || count($errors) < 1 || count($errors) > 3) {\n        respond(422, ['error' => 'Выберите от 1 до 3 файлов']);\n    }\n    $tmp = $upload['tmp_name'] ?? null;\n    if (!is_array($tmp)) {\n        respond(422, ['error' => 'Некорректные файлы']);\n    }\n    $files = [];\n    foreach ($errors as $i => $error) {\n        $files[] = inspectUpload(['error' => $error,'tmp_name' => $tmp[$i] ?? null]);\n    }\n    respond(200, saveRequest($db, $userId, stringValue($_POST['operation_id'] ?? ''), stringValue($_POST['description'] ?? ''), $files));\n} catch (UploadConflict $e) {\n    respond(409, ['error' => $e->getMessage()]);\n} catch (InvalidArgumentException $e) {\n    respond(422, ['error' => $e->getMessage()]);\n} catch (Throwable) {\n    respond(503,['error' => 'Не удалось подтвердить сохранение. Проверьте статус заявки']);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "POST принимает files[], description и operation_id. GET по operation_id только проверяет результат текущего пользователя. В JSON не возвращаются путь хранения, initData или токен бота. Некорректные поля получают 422, слишком большое тело — 413, несовместимый повтор — 409."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ответ"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Действие интерфейса"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "200"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Показать номер заявки и ссылки на её вложения."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "401"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Переоткрыть Mini App; не менять user_id вручную."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "413 / 422"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Исправить объём или состав файлов и начать исправленную отправку."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "409"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Проверить результат прежней операции; не заменять содержимое под тем же ключом."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Таймаут / 503 / не-JSON"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сохранить ключ, проверить GET и при необходимости повторить тот же снимок."
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пустой GET-результат сразу после сетевого сбоя ещё не доказывает, что первый POST никогда не выполнится. Запрос мог находиться на другом процессе. Повтор с прежним ключом безопаснее создания новой операции: уникальность и хеш защищают запись заявки на сервере."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "form",
+        "label": "Сделайте выбор файлов и предпросмотр",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сделайте выбор файлов и предпросмотр"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ниже полная HTML-страница без сборщика. Фото показывается через локальный blob URL; PDF выводится названием и размером. Имена вставляются через textContent, поэтому HTML в имени файла не превращается в разметку. При смене выбора старые object URL освобождаются."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-mini-app-file-upload/repair-attachments.jpg",
+                  "width": 1080,
+                  "height": 1121,
+                  "alt": "Форма ремонта содержит описание, demo.png и diagnostics.pdf; после серверной проверки появляется номер заявки, файлы остаются в закрытом хранилище.",
+                  "caption": "Макет на основе HTML статьи с демонстрационными файлами и условным изображением устройства. Ответ №42 показан как пример состояния; это не снимок Telegram и не реальная клиентская заявка.",
+                  "mobile_src": "/images/guides/telegram-mini-app-file-upload/repair-attachments-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1490
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "HTML и JavaScript · public/form.html",
+                  "code": "<!doctype html><html lang=\"ru\"><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>Заявка на ремонт</title><script src=\"https://telegram.org/js/telegram-web-app.js\"></script>\n<style>*{box-sizing:border-box}body{margin:0;padding:22px;font:16px/1.5 system-ui;background:#f2f6fc;color:#17243a}main{max-width:560px;margin:auto}h1{font-size:26px}label{display:block;margin-top:18px}textarea,input,button{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid #aab8cc}textarea{min-height:110px}button{margin-top:12px;background:#2869b0;color:white;border:0}button:disabled{opacity:.5}#status{padding:12px;background:#e0eafa;border-radius:10px}.file{margin:12px 0;padding:12px;background:white;border-radius:10px;overflow-wrap:anywhere}.file img{display:block;max-width:100%;max-height:150px;margin-top:8px}small{display:block;color:#52647d;margin:10px 0}</style>\n<main><h1>Заявка на ремонт</h1><p id=\"status\" role=\"status\">Выберите файлы и опишите неисправность</p>\n<form id=\"form\"><label for=\"description\">Что случилось?</label><textarea id=\"description\" minlength=\"10\" maxlength=\"2000\" required></textarea>\n<label for=\"files\">Фотографии и документы</label><input id=\"files\" type=\"file\" accept=\"image/jpeg,image/png,application/pdf\" multiple required>\n<small>От 1 до 3 файлов, каждый до 5 МиБ. JPEG, PNG или PDF.</small><div id=\"preview\"></div><button id=\"send\">Отправить заявку</button></form>\n<button id=\"check\" hidden>Проверить результат отправки</button><button id=\"retry\" hidden>Повторить ту же отправку</button><div id=\"downloads\"></div></main>\n<script type=\"module\">\nconst tg=window.Telegram?.WebApp,el=id=>document.getElementById(id),status=t=>el('status').textContent=t;\nlet urls=[],pending=null,pendingBody=null,done=false,busy=false;\nconst storageKey='repair-upload-operation';\ntry{pending=sessionStorage.getItem(storageKey);}catch{}\nfunction controls(){for(const id of ['description','files','send'])el(id).disabled=busy||done||!!pending;el('check').hidden=!pending||done;el('check').disabled=busy;el('retry').hidden=!pending||!pendingBody||done;el('retry').disabled=busy;}\nasync function call(url,body){\n const r=await fetch(url,{method:body?'POST':'GET',headers:{'X-Telegram-Init-Data':tg.initData},body,signal:AbortSignal.timeout(60000)});\n let data;try{data=await r.json();}catch{throw new Error('Сервер не подтвердил результат');}\n if(!r.ok)throw Object.assign(new Error(data.error||'Ошибка запроса'),{status:r.status});return data;\n}\nfunction showResult(result){\n done=true;pending=null;try{sessionStorage.removeItem(storageKey);}catch{}\n status('Заявка №'+result.id+' принята. Вложения сохранены.');\n for(const file of result.attachments){const b=document.createElement('button');b.textContent='Скачать вложение '+file.id.slice(0,6);b.type='button';\n b.onclick=async()=>{try{const r=await fetch('./download.php?id='+file.id,{headers:{'X-Telegram-Init-Data':tg.initData}});if(!r.ok)throw new Error('Файл недоступен');const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download='attachment-'+file.id+(file.mime==='application/pdf'?'.pdf':file.mime==='image/png'?'.png':'.jpg');a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);}catch(e){status(e.message);}};\n el('downloads').append(b);}\n}\nel('files').onchange=()=>{\n for(const u of urls)URL.revokeObjectURL(u);urls=[];el('preview').replaceChildren();\n for(const f of el('files').files){const row=document.createElement('div');row.className='file';row.textContent=f.name+' · '+(f.size/1024/1024).toFixed(2)+' МиБ';\n if(['image/jpeg','image/png'].includes(f.type)){const img=document.createElement('img');const u=URL.createObjectURL(f);urls.push(u);img.src=u;img.alt='Предпросмотр выбранной фотографии';row.append(img);}el('preview').append(row);}\n};\nel('form').onsubmit=async event=>{\n event.preventDefault();if(busy||done||pending)return;\n const files=[...el('files').files];\n if(files.length<1||files.length>3||files.some(f=>f.size<1||f.size>5*1024*1024)){status('Выберите 1–3 файла размером до 5 МиБ');return;}\n pending=crypto.randomUUID();try{sessionStorage.setItem(storageKey,pending);}catch{}\n const body=new FormData();body.append('operation_id',pending);body.append('description',el('description').value);\n for(const file of files)body.append('files[]',file,file.name);pendingBody=body;\n busy=true;controls();status('Загружаем и сохраняем…');\n try{showResult(await call('./api.php',body));}\n catch(e){status(e.message);if([401,413,422].includes(e.status)){pending=null;try{sessionStorage.removeItem(storageKey);}catch{}}}\n finally{busy=false;controls();}\n};\nel('check').onclick=async()=>{\n if(!pending||busy)return;busy=true;controls();\n try{showResult(await call('./api.php?operation_id='+encodeURIComponent(pending)));}\n catch(e){status(e.status===404?'Запись пока не найдена. Повторите проверку через минуту; не создавайте новую заявку сразу.':e.message);}\n finally{busy=false;controls();}\n};\nel('retry').onclick=async()=>{if(!pendingBody||!pending||busy)return;busy=true;controls();try{showResult(await call('./api.php',pendingBody));}catch(e){status(e.message);}finally{busy=false;controls();}};\nif(tg?.initData){tg.ready();controls();if(pending){status('Проверим предыдущую отправку');el('check').click();}}\nelse{busy=true;controls();status('Откройте форму из меню Telegram-бота');}\n</script></html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После отправки описание и список файлов заблокированы. При неизвестном результате кнопка проверки делает GET, а повторная отправка использует сохранённый FormData с тем же ключом. Успех показывается после серверного ответа, а не после завершения чтения файла в браузере. Процент прогресса здесь не рисуется: обычный fetch в этом примере не сообщает загрузочный прогресс."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "sessionStorage хранит только ключ операции. После перезагрузки браузер не восстановит File и произвольный доступ к файлам устройства; повторная отправка станет недоступна, но проверка результата останется. Если запрос точно не дошёл, сотрудник может проверить отсутствие заявки, после чего пользователь начнёт новую форму. Для устойчивого продолжения больших загрузок нужен отдельный протокол возобновления. "
+                },
+                {
+                  "type": "text",
+                  "text": "Черновик формы",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-form-draft"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " решает сохранение полей, но сам по себе не сохраняет выбранные файлы."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "download",
+        "label": "Отдавайте файл только владельцу",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отдавайте файл только владельцу"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/download.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/auth.php';\nheader('Cache-Control: private, no-store');\nheader('X-Content-Type-Options: nosniff');\ntry {\n    $userId = telegramUser(stringValue($_SERVER['HTTP_X_TELEGRAM_INIT_DATA'] ?? ''), envRequired('BOT_TOKEN'), time());\n} catch (Throwable) {\n    http_response_code(401);\n    exit;\n}\n$id = $_GET['id'] ?? '';\nif (!is_string($id) || !preg_match('/^[a-f0-9]{32}$/D', $id)) {\n    http_response_code(404);\n    exit;\n}\n$q = database()->prepare('SELECT a.* FROM attachments a JOIN requests r ON r.id=a.request_id WHERE a.id=? AND r.user_id=?');\n$q->execute([$id,$userId]);\n$row = $q->fetch(PDO::FETCH_ASSOC);\nif (!is_array($row)) {\n    http_response_code(404);\n    exit;\n}\n$name = stringValue($row['storage_name']);\nif (!preg_match('/^[a-f0-9]{32}\\.(jpg|png|pdf)$/D', $name)) {\n    http_response_code(500);\n    exit;\n}\n$path = rtrim(envRequired('UPLOAD_DIR'), '/\\\\').DIRECTORY_SEPARATOR.$name;\n$file = fopen($path, 'rb');\nif ($file === false) {\n    http_response_code(503);\n    exit;\n}\nheader('Content-Type: '.stringValue($row['mime']));\nheader('Content-Disposition: attachment; filename=\"'.$name.'\"');\nheader('Content-Length: '.intValue($row['bytes']));\nfpassthru($file);\nfclose($file);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запрос соединяет attachments с requests и одновременно проверяет user_id. Чужой и отсутствующий ID получают одинаковый 404. Ответ запрещает MIME-sniffing и предлагает скачивание. Отправка бинарного тела идёт из файлового потока, без base64 внутри JSON."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В форме скачивание выполняется через fetch с initData, затем создаётся временный blob URL. Это не вечная публичная ссылка. Поведение сохранения файла проверьте в клиентах Telegram: Android, iOS и Desktop могут показывать разные диалоги. Не отключайте авторизацию ради удобства обычного тега a. Если понадобится передаваемая ссылка, проектируйте отдельный короткоживущий токен с проверяемой областью доступа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сотрудникам требуется отдельная авторизованная панель и разрешение на просмотр заявок. Этот download.php предназначен владельцу заявки, а не менеджеру с известным ID. Отдельно задайте сроки хранения, удаление после закрытия обращения и резервное копирование базы вместе с файлами."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "launch",
+        "label": "Первый запуск и проверка результата",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Первый запуск и проверка результата"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · создать таблицы",
+                  "code": "php init.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Откройте public на HTTPS-домене и укажите form.html в меню Mini App тестового бота. Обычная браузерная вкладка без Telegram должна показать просьбу открыть приложение из бота. В Telegram заполните описание, приложите небольшой PNG и PDF и отправьте форму. Ожидается номер заявки и две кнопки скачивания."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · сверка сохранения",
+                  "code": "SELECT id,user_id,operation_id,created_at FROM requests;\nSELECT request_id,id,mime,bytes FROM attachments;"
+                }
+              }
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повтор той же отправки оставляет одну заявку и прежние ID вложений."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Подмена MIME, обрыв загрузки, нулевой файл и размер выше 5 МиБ отклоняются."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Четыре файла не создают частичную заявку из трёх."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Другой пользователь не получает файл и статус чужой операции."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Потерянный HTTP-ответ не вызывает автоматического создания новой заявки."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выбранные файлы и их имена не попадают в публичный каталог, журнал запросов или аналитические события."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нагрузка, лимиты на пользователя и проверка содержимого требуют отдельной настройки до публичного запуска. BotGate здесь может доставить менеджеру уведомление о принятой заявке. Сама загрузка и закрытое хранение проходят через ваш сервер и не зависят от Telegram-транспорта."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,1346 @@
+[
+  {
+    "slug": "telegram-bot-mini-course",
+    "title": "Как сделать обучающий мини-курс через Telegram-бота",
+    "seo_title": "Как сделать обучающий мини-курс через Telegram-бота",
+    "description": "Курс из пяти занятий на Laravel: уроки и задания, условия открытия, сохранение прогресса, продолжение после перерыва и отключаемые напоминания.",
+    "card_description": "Курс из пяти занятий на Laravel: уроки и задания, условия открытия, сохранение прогресса, продолжение после перерыва и отключаемые напоминания.",
+    "category": "Практика",
+    "topics": "Laravel · Обучение · Прогресс",
+    "reading_time": "34 минуты",
+    "published_at": "2026-11-20",
+    "is_published": true,
+    "sort_order": 75,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера соберём небольшой курс об основах Telegram-ботов: пять коротких занятий и проверочный вопрос после каждого. Бот сохранит результат, откроет следующий урок после правильного ответа и паузы в 24 часа, поможет продолжить после перерыва и позволит отключить напоминания. Реализуем весь цикл на PHP и Laravel, включая обработку старых кнопок и повторов."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "course-rules",
+        "label": "Опишите, что считается прохождением урока",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Опишите, что считается прохождением урока"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Получить сообщение, прочитать материал и выполнить задание — разные события. Telegram не даёт этому учебному боту надёжного доказательства прочтения. Поэтому completed увеличивается только после правильного ответа на вопрос текущего урока. Отправка текста и нажатие «Продолжить» сами по себе не засчитывают занятие."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-mini-course/course-progress.jpg",
+                  "alt": "Пять уроков курса: первый пройден, второй открыт, остальные закрыты. Отключение напоминаний сохраняет прогресс.",
+                  "caption": "Поясняющая схема курса из примера: первый урок завершён, второй открыт. Переход требует правильного ответа и паузы в 24 часа.",
+                  "width": 1080,
+                  "height": 1070,
+                  "mobile_src": "/images/guides/telegram-bot-mini-course/course-progress-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1019
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "У каждого урока есть два варианта ответа. Это простая автоматическая проверка, а не оценка свободного текста: участник может ошибиться и попробовать снова. Для курса с эссе, фотографиями или проверкой наставником понадобятся отдельные состояния submitted и reviewed, очередь проверки и понятные сроки ответа. Не подменяйте такую проверку кнопкой «Я всё сделал», если обещаете оценку задания."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Условие"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Поведение"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Первый /start"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Открывается урок 1, напоминания выключены"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Неверный ответ"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Тот же урок и возможность повторить"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Верный ответ на урок 1–4"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Результат сохраняется; следующий урок доступен через 24 часа"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Возвращение спустя неделю"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/continue показывает актуальный этап без сброса"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/stop"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Выключает напоминания, сохраняя курс и ответы"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Верный ответ на урок 5"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Курс завершён, новые напоминания не планируются"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пауза отсчитывается от верного ответа, а не от регистрации и не от полуночи. Это ровно 86 400 секунд в UTC: смена часового пояса или переход на летнее время не меняют условие. Время отправки «каждый день в 10:00 по местному времени» — другая задача; её стоит строить с явным часовым поясом и "
+                },
+                {
+                  "type": "text",
+                  "text": "настройками уведомлений",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-notification-settings"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовьте отдельного бота и приложение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте отдельного бота и приложение"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример рассчитан на PHP 8.3+ в 64-битной среде и Laravel 13. Нужны Composer, HTTPS, база данных и постоянно работающий отправитель. Для тестового курса используем SQLite через pdo_sqlite; содержимое базы должно сохраняться между запусками. Статический массив в PHP хранит материалы, а не прогресс пользователей."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · новый учебный проект",
+                  "code": "composer create-project \"laravel/laravel:^13.0\" course-bot\ncd course-bot"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте отдельного бота в "
+                },
+                {
+                  "type": "text",
+                  "text": "BotFather",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-botfather"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и настройте .env. База SQLite и .env не должны находиться в public. BOT_WEBHOOK_SECRET сгенерируйте случайно, например из 32 случайных байтов в hex; обозначения ниже нужно заменить своими значениями."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "ENV · дополнение .env",
+                  "code": "APP_URL=https://course-bot.example.com\nAPP_DEBUG=false\nBOT_TOKEN=TOKEN_FROM_BOTFATHER\nBOT_WEBHOOK_SECRET=RANDOM_SECRET_GENERATED_FOR_THIS_BOT"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · config/guidebot.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nreturn ['token' => env('BOT_TOKEN'), 'secret' => env('BOT_WEBHOOK_SECRET')];"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте app/GuideBot для Event, Lessons, Dialogue, Outbox, Telegram и Webhook, а app/Console/Commands — для Deliver, Remind и SetupWebhook. Ниже даны все эти файлы. Пример самостоятельный: код языкового бота из соседней статьи устанавливать не требуется. У двух учебных приложений совпадают имена классов и таблиц, поэтому не копируйте оба набора в один проект без объединения схемы."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "storage",
+        "label": "Храните прогресс отдельно от доставки сообщений",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Храните прогресс отдельно от доставки сообщений"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · database/migrations/2026_11_20_000001_create_course_bot_tables.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nuse Illuminate\\Database\\Migrations\\Migration;\nuse Illuminate\\Database\\Schema\\Blueprint;\nuse Illuminate\\Support\\Facades\\Schema;\n\nreturn new class () extends Migration {\n    public function up(): void\n    {\n        Schema::create('demo_users', function (Blueprint $t): void {\n            $t->bigInteger('chat_id')->primary();\n            $t->unsignedInteger('course_version')->default(1);\n            $t->unsignedInteger('completed')->default(0);\n            $t->unsignedInteger('active_lesson')->default(0);\n            $t->bigInteger('available_at')->default(0);\n            $t->boolean('reminders')->default(false);\n            $t->bigInteger('reminder_due')->nullable();\n            $t->unsignedInteger('revision')->default(0);\n            $t->index(['reminders', 'reminder_due']);\n        });\n        Schema::create('demo_answers', function (Blueprint $t): void {\n            $t->id();\n            $t->bigInteger('chat_id');\n            $t->unsignedInteger('lesson');\n            $t->string('choice', 1);\n            $t->bigInteger('answered_at');\n            $t->unique(['chat_id', 'lesson']);\n        });\n        Schema::create('demo_updates', fn (Blueprint $t) => $t->bigInteger('update_id')->primary());\n        Schema::create('demo_outbox', function (Blueprint $t): void {\n            $t->id();\n            $t->bigInteger('chat_id');\n            $t->string('event_key')->unique();\n            $t->text('payload');\n            $t->string('kind');\n            $t->unsignedInteger('revision')->default(0);\n            $t->string('state');\n            $t->unsignedInteger('attempts');\n            $t->bigInteger('next_at');\n            $t->bigInteger('message_id')->nullable();\n            $t->integer('error_code')->nullable();\n            $t->index(['state', 'next_at']);\n        });\n    }\n    public function down(): void\n    {\n        Schema::dropIfExists('demo_outbox');\n        Schema::dropIfExists('demo_updates');\n        Schema::dropIfExists('demo_answers');\n        Schema::dropIfExists('demo_users');\n    }\n};"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "completed — число успешно выполненных занятий, active_lesson — открытый урок с незавершённым заданием, ноль означает ожидание следующего открытия. available_at хранит Unix-время разрешённого перехода. Например, completed=2 и active_lesson=3 означает, что первые два занятия пройдены, третье выдано, но ещё не засчитано."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "demo_answers хранит успешные ответы: уникальная пара chat_id + lesson дополнительно запрещает повторно засчитать урок. Неверные попытки здесь не сохраняются; если преподавателю нужна статистика ошибок, добавьте отдельную таблицу попыток, не меняя смысл completed. demo_updates защищает обработку повторно пришедшего Telegram Update."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "revision увеличивается при изменении этапа или предпочтения напоминаний. Напоминание запоминает эту версию, и отправитель перед запросом проверяет её снова. Поэтому сообщение о старом уроке, которое долго лежало в очереди, можно отменить. Это не мешает отправлять обычные ответы на команды."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "course_version=1 относится ко всему учебному сценарию. Не меняйте местами уроки и правильные ответы v1 после начала обучения: старая кнопка содержит тот же номер. Для содержательной переработки нужен v2, отдельное сопоставление прогресса и явное решение, что делать с уже зачисленными учениками. В этой статье у всех пользователей одна неизменяемая версия."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "lessons",
+        "label": "Задайте пять занятий с проверяемыми заданиями",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задайте пять занятий с проверяемыми заданиями"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Lessons.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nfinal class Lessons\n{\n    /** @return array<int, array{title:string, body:string, question:string, options:array<string,string>, correct:string}> */\n    public static function all(): array\n    {\n        return [\n            1 => [\n                'title' => 'Токен и первый запуск',\n                'body' => 'Токен выдаёт BotFather. Он разрешает обращаться к API от имени бота, поэтому его хранят в закрытом окружении сервера. Пользователь сам открывает личный чат и нажимает Start. Бот не получает право написать любому человеку по известному username.',\n                'question' => 'Задание: выберите место хранения токена.',\n                'options' => ['a' => 'JavaScript страницы', 'b' => 'Закрытое окружение сервера'], 'correct' => 'b',\n            ],\n            2 => [\n                'title' => 'Получение событий',\n                'body' => 'Webhook — HTTPS-адрес вашего приложения, куда Telegram отправляет Update. Проверяйте секретный заголовок до обработки. Успешный HTTP-ответ подтверждает приём события, поэтому важные данные надо сохранить до ответа. Сетевую отправку сообщений можно выполнить отдельно.',\n                'question' => 'Задание: что сделать до ответа HTTP 200?',\n                'options' => ['a' => 'Надёжно сохранить результат обработки', 'b' => 'Только записать сообщение в память'], 'correct' => 'a',\n            ],\n            3 => [\n                'title' => 'Повторная доставка',\n                'body' => 'Одно событие может поступить повторно. Уникальный update_id помогает не провести одну операцию дважды. Проверку события и изменение прогресса объединяют транзакцией. Случайный новый идентификатор при каждой попытке не позволяет распознать повтор.',\n                'question' => 'Задание: какой ключ нужен для повтора одного Update?',\n                'options' => ['a' => 'Новый UUID на каждый запрос', 'b' => 'Исходный update_id'], 'correct' => 'b',\n            ],\n            4 => [\n                'title' => 'Доступ к данным',\n                'body' => 'Кнопка может содержать номер заказа или урока, но этот номер не доказывает право доступа. Состояние выбирают для отправителя события и проверяют допустимость действия. В личном боте пользователь не должен менять чужой прогресс, подставив ID в callback_data.',\n                'question' => 'Задание: откуда брать владельца прогресса?',\n                'options' => ['a' => 'Из проверенного отправителя события', 'b' => 'Из user_id в тексте кнопки'], 'correct' => 'a',\n            ],\n            5 => [\n                'title' => 'Неизвестный результат отправки',\n                'body' => 'При подтверждённом ответе 429 повтор планируют после retry_after. При таймауте ответ мог потеряться уже после отправки сообщения. Такой исход требует отдельного состояния и проверки: слепой повтор способен создать дубль. Отправка сообщения и запись в вашу БД не являются одной транзакцией.',\n                'question' => 'Задание: что означает таймаут sendMessage?',\n                'options' => ['a' => 'Сообщение точно не отправлено', 'b' => 'Результат может быть неизвестен'], 'correct' => 'b',\n            ],\n        ];\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Материал специально короткий и помещается в одно текстовое сообщение. В рабочем курсе занятие можно разделить на блоки, приложить документ или видео, а после него отправить вопрос. Успешная загрузка файла в Telegram не должна автоматически закрывать задание. Для длинных текстов учитывайте ограничения и "
+                },
+                {
+                  "type": "text",
+                  "text": "разбиение сообщений",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-long-messages"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В callback_data будет версия курса, номер урока и буква ответа. Идентификатор пользователя туда не входит: владельца определяет проверенный отправитель события. Правильный ответ хранится на сервере. Сам формат кнопки не считается доверенным — обработчик сверяет номер с реально открытым уроком и текущим completed."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Такой вопрос проверяет понимание конкретного положения из материала. Если нужна более серьёзная проверка знаний, расширьте банк вопросов и критерии, а не усложняйте транспорт. Для учебного примера два варианта позволяют воспроизвести правильный, неправильный и повторный ответ без дополнительных интерфейсов."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "progress",
+        "label": "Реализуйте выдачу урока, ответ и продолжение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Реализуйте выдачу урока, ответ и продолжение"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Dialogue.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Dialogue\n{\n    public function handle(Event $event): void\n    {\n        DB::table('demo_users')->insertOrIgnore(['chat_id' => $event->chatId]);\n        $user = DB::table('demo_users')->where('chat_id', $event->chatId)->lockForUpdate()->first();\n        if (!$user || (int) $user->course_version !== 1) {\n            throw new \\RuntimeException('Unsupported course version');\n        }\n        $action = $event->action;\n        $text = 'Команды: /continue — урок, /progress — прогресс, /remind_on — включить напоминания, /stop — отключить их.';\n        $buttons = $this->menu();\n        if (in_array($action, ['/stop', '/remind_on'], true)) {\n            $enabled = $action === '/remind_on';\n            $this->change($user, ['reminders' => $enabled]);\n            $text = $enabled ? 'Напоминания включены. Не более одного на текущий этап, не раньше чем через 24 часа.'\n                : 'Напоминания отключены. Прогресс сохранён; /continue работает в любое время.';\n        } elseif ($action === '/progress') {\n            $text = 'Пройдено '.(int) $user->completed.' из 5. Напоминания: '.((bool) $user->reminders ? 'включены.' : 'отключены.');\n        } elseif (in_array($action, ['/start', '/continue', 'course:v1:continue'], true)) {\n            if ((int) $user->completed === 5) {\n                $text = 'Курс завершён: 5 из 5. Поздравляем! Прогресс сохранён.';\n            } elseif ((int) $user->active_lesson === 0 && now()->getTimestamp() < (int) $user->available_at) {\n                $hours = (int) ceil(((int) $user->available_at - now()->getTimestamp()) / 3600);\n                $text = 'Следующий урок ещё закрыт. Осталось не более '.$hours.' ч. Вернитесь через /continue.';\n            } else {\n                if ((int) $user->active_lesson === 0) {\n                    $this->change($user, ['active_lesson' => (int) $user->completed + 1]);\n                }\n                [$text, $buttons] = $this->lesson((int) $user->active_lesson);\n                if ($action === '/start') {\n                    $text = \"Курс из пяти занятий. Следующий урок — после верного ответа и паузы 24 часа. Напоминания включаются отдельно: /remind_on.\\n\\n\".$text;\n                }\n            }\n        } elseif ($event->callbackId !== null && preg_match('/^course:v1:answer:([1-5]):([ab])$/D', $action, $match)) {\n            $lesson = (int) $match[1];\n            $choice = $match[2];\n            if ($lesson !== (int) $user->active_lesson || $lesson !== (int) $user->completed + 1) {\n                $text = 'Этот ответ относится к другому или уже пройденному уроку. Нажмите «Продолжить».';\n            } elseif (Lessons::all()[$lesson]['correct'] !== $choice) {\n                [$text, $buttons] = $this->lesson($lesson);\n                $text = \"Пока неверно. Перечитайте объяснение и попробуйте снова.\\n\\n\".$text;\n            } else {\n                DB::table('demo_answers')->insert([\n                    'chat_id' => $event->chatId, 'lesson' => $lesson, 'choice' => $choice, 'answered_at' => now()->getTimestamp(),\n                ]);\n                $this->change($user, ['completed' => $lesson, 'active_lesson' => 0,\n                    'available_at' => $lesson < 5 ? now()->getTimestamp() + 86400 : 0]);\n                $text = $lesson === 5 ? 'Верно! Курс завершён: 5 из 5. Поздравляем!'\n                    : 'Верно! Урок '.$lesson.' пройден. Следующий откроется через 24 часа. Используйте /continue.';\n            }\n        } elseif ($event->callbackId !== null) {\n            $text = 'Эта кнопка не поддерживается. Откройте актуальный урок через /continue.';\n        }\n        Outbox::add($event->chatId, 'update:'.$event->updateId, ['text' => $text, 'reply_markup' => $buttons]);\n    }\n\n    /** @param array<string, int|bool> $fields */\n    private function change(\\stdClass $user, array $fields): void\n    {\n        foreach ($fields as $key => $value) {\n            $user->{$key} = $value;\n        }\n        $user->revision = (int) $user->revision + 1;\n        $user->reminder_due = (bool) $user->reminders && (int) $user->completed < 5\n            ? max(now()->getTimestamp() + 86400, (int) $user->available_at) : null;\n        DB::table('demo_users')->where('chat_id', $user->chat_id)->update($fields + [\n            'revision' => $user->revision, 'reminder_due' => $user->reminder_due,\n        ]);\n        // Pending reminder rows are invalidated by revision, without locking them here.\n    }\n\n    /** @return array{string, array<string, mixed>} */\n    private function lesson(int $number): array\n    {\n        $lesson = Lessons::all()[$number];\n        $rows = [];\n        foreach ($lesson['options'] as $choice => $label) {\n            $rows[] = [['text' => $label, 'callback_data' => 'course:v1:answer:'.$number.':'.$choice]];\n        }\n        return ['Урок '.$number.'/5. '.$lesson['title'].\"\\n\\n\".$lesson['body'].\"\\n\\n\".$lesson['question'], ['inline_keyboard' => $rows]];\n    }\n\n    /** @return array<string, mixed> */\n    private function menu(): array\n    {\n        return ['inline_keyboard' => [[['text' => 'Продолжить', 'callback_data' => 'course:v1:continue']]]];\n    }\n\n    public function remind(): void\n    {\n        $ids = DB::table('demo_users')->where('reminders', true)->where('completed', '<', 5)\n            ->where('reminder_due', '<=', now()->getTimestamp())->orderBy('chat_id')->limit(100)->pluck('chat_id');\n        foreach ($ids as $id) {\n            DB::transaction(function () use ($id): void {\n                $user = DB::table('demo_users')->where('chat_id', $id)->lockForUpdate()->first();\n                if (!$user || !(bool) $user->reminders || (int) $user->completed >= 5\n                    || $user->reminder_due === null || (int) $user->reminder_due > now()->getTimestamp()) {\n                    return;\n                }\n                $text = (int) $user->active_lesson > 0\n                    ? 'Вы остановились на уроке '.(int) $user->active_lesson.'. Продолжите, когда будет удобно. /stop отключит напоминания.'\n                    : 'Следующий урок уже доступен. Нажмите «Продолжить». /stop отключит напоминания.';\n                Outbox::add(\n                    (int) $user->chat_id,\n                    'reminder:'.$user->chat_id.':'.$user->revision,\n                    ['text' => $text, 'reply_markup' => $this->menu()],\n                    'reminder',\n                    (int) $user->revision\n                );\n                DB::table('demo_users')->where('chat_id', $id)->update(['reminder_due' => null]);\n            }, 3);\n        }\n    }\n\n    public function canSend(\\stdClass $row): bool\n    {\n        if ($row->kind !== 'reminder') {\n            return true;\n        }\n        return DB::table('demo_users')->where('chat_id', $row->chat_id)->where('reminders', true)\n            ->where('completed', '<', 5)->where('revision', $row->revision)->exists();\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Метод handle вызывается внутри транзакции webhook и блокирует строку ученика. Проверка допустимого шага, сохранение ответа, изменение completed и запись сообщения происходят вместе. Если операция откатится, повтор события не увидит наполовину пройденный урок. Код не делает внешних запросов, пока держит блокировку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После правильного ответа active_lesson становится нулём. До available_at команда /continue возвращает оставшееся время, округлённое вверх до часа. После срока она открывает completed+1. Уже открытый урок можно запросить повторно в любое время: состояние не сбрасывается, а неполученное или потерявшееся в истории сообщение легко восстановить."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Старая кнопка урока 1 после перехода к уроку 2 не засчитает второй урок. Даже если Telegram прислал новое update_id на повторное нажатие, проверка active_lesson остановит действие. Дедупликация событий и проверка бизнес-состояния решают разные задачи, поэтому нужны обе."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Команда /start тоже продолжает существующий курс. Это сознательное решение: привычное повторное открытие бота не должно стирать результаты. Сброс курса для повторного прохождения потребовал бы отдельной команды с подтверждением, новой попытки обучения и ключей ответов, учитывающих эту попытку. В примере такой команды нет."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если сообщение с уроком не доставилось, запись об открытии всё равно сохранится, но завершённым урок не станет. Пользователь запросит /continue и получит ту же карточку. Если потерялось подтверждение верного ответа, повтор не увеличит completed второй раз. /progress позволит проверить фактический результат."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Принимайте события только от нужного пользователя",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Принимайте события только от нужного пользователя"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Входящий webhook работает только с личными чатами. Идентификатор владельца берём из from.id и проверяем его совпадение с chat.id, а не читаем из callback_data. Сначала проверяем секретный заголовок, затем в одной транзакции отмечаем update_id, изменяем состояние и создаём ответ. При ошибке транзакция откатывается, успешного подтверждения нет: Telegram сможет повторить событие. Повтор уже сохранённого Update ничего не меняет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Event.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nfinal readonly class Event\n{\n    public function __construct(\n        public int $updateId,\n        public int $chatId,\n        public string $action,\n        public string $language,\n        public ?string $callbackId,\n    ) {\n    }\n\n    /** @param array<string, mixed> $update */\n    public static function from(array $update): ?self\n    {\n        $callback = $update['callback_query'] ?? null;\n        $message = is_array($callback) ? ($callback['message'] ?? null) : ($update['message'] ?? null);\n        $from = is_array($callback) ? ($callback['from'] ?? null) : (is_array($message) ? ($message['from'] ?? null) : null);\n        $chat = is_array($message) ? ($message['chat'] ?? null) : null;\n        if (!is_array($from) || !is_array($chat) || ($chat['type'] ?? '') !== 'private'\n            || !is_int($from['id'] ?? null) || $from['id'] <= 0 || ($chat['id'] ?? null) !== $from['id']\n            || !is_int($update['update_id'] ?? null)) {\n            return null;\n        }\n        $action = is_array($callback) ? ($callback['data'] ?? '') : ($message['text'] ?? '');\n        $callbackId = is_array($callback) ? ($callback['id'] ?? null) : null;\n        return new self(\n            $update['update_id'],\n            $from['id'],\n            is_string($action) ? trim($action) : '',\n            is_string($from['language_code'] ?? null) ? $from['language_code'] : '',\n            is_string($callbackId) ? $callbackId : null\n        );\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Http\\JsonResponse;\nuse Illuminate\\Http\\Request;\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Webhook\n{\n    public function __invoke(Request $request, Dialogue $dialogue): JsonResponse\n    {\n        $secret = config('guidebot.secret');\n        $provided = $request->header('X-Telegram-Bot-Api-Secret-Token');\n        abort_unless(is_string($secret) && $secret !== ''\n            && is_string($provided) && hash_equals($secret, $provided), 403);\n        abort_if(strlen($request->getContent()) > 131072, 413);\n        $update = $request->json()->all();\n        $event = Event::from($update);\n        if ($event === null) {\n            return response()->json(['ok' => true]);\n        }\n        DB::transaction(function () use ($event, $dialogue): void {\n            if (!DB::table('demo_updates')->insertOrIgnore(['update_id' => $event->updateId])) {\n                return;\n            }\n            $dialogue->handle($event);\n        }, 3);\n        // Telegram executes this method after receiving the webhook response.\n        // Its result is not available here; business replies use the outbox.\n        return response()->json($event->callbackId === null ? ['ok' => true] : [\n            'method' => 'answerCallbackQuery', 'callback_query_id' => $event->callbackId,\n        ]);\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · routes/api.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nuse App\\GuideBot\\Webhook;\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::post('/telegram', Webhook::class);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · добавьте api в существующий withRouting в bootstrap/app.php",
+                  "code": "->withRouting(\n    web: __DIR__.'/../routes/web.php',\n    api: __DIR__.'/../routes/api.php',\n    commands: __DIR__.'/../routes/console.php',\n    health: '/up',\n)"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для кнопок возвращаем answerCallbackQuery прямо в JSON-ответе webhook, чтобы убрать индикатор ожидания. Это поддержанный Telegram способ вызова метода, но результат такого вызова приложению недоступен. Поэтому в нём нет важных подтверждений: они отправляются отдельными сообщениями через outbox. Если обработчик надолго зависнет, индикатор может остаться; не помещайте в транзакцию запросы к CRM или другим API. "
+                },
+                {
+                  "type": "text",
+                  "text": "Ответ методом на webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#making-requests-when-getting-updates"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Webhook — отдельный API-маршрут без браузерной сессии; секретный заголовок заменяет здесь браузерный CSRF-токен, а не отменяет CSRF для сайта. Не отключайте защиту web-маршрутов целиком. Ограничение тела есть и в коде; на веб-сервере также нужен разумный лимит запроса. Не журналируйте BOT_TOKEN, весь URL Telegram или сырые заголовки. Для чтения таблиц используйте закрытый административный доступ."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Маршрут принимает только message и callback_query нужного формата. Группы и события без подходящего личного чата не участвуют в курсе. Для группового обучения понадобится другая модель: один чат уже не равен одному ученику, а сообщение с заданием может быть общим. Не переносите допущение chat_id=from.id в групповой бот."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "reminders",
+        "label": "Добавьте напоминания с явным включением и отменой",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавьте напоминания с явным включением и отменой"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Console/Commands/Remind.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Console\\Commands;\n\nuse App\\GuideBot\\Dialogue;\nuse Illuminate\\Console\\Command;\n\nfinal class Remind extends Command\n{\n    protected $signature = 'course:remind';\n    protected $description = 'Queue due course reminders';\n    public function handle(Dialogue $dialogue): int\n    {\n        $dialogue->remind();\n        return self::SUCCESS;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · добавьте в routes/console.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nuse Illuminate\\Support\\Facades\\Schedule;\n\nSchedule::command('course:remind')->everyMinute()->withoutOverlapping();"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подписка на напоминания начинается только после /remind_on. Создание ученика, /start и правильный ответ её не включают. Сразу после включения ничего не отправляется: reminder_due ставится не раньше чем через 24 часа. На текущем этапе создаётся максимум одно напоминание; ежедневного преследования до ответа в этом примере нет."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Метод remind повторно проверяет срок под блокировкой пользователя, создаёт outbox с уникальным ключом и обнуляет reminder_due в той же транзакции. Повторный запуск планировщика не создаст вторую строку. После нового этапа появится другой revision и, если напоминания разрешены, новый срок."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда ученик нажал /stop, напоминание уже может находиться в outbox. Поэтому одной проверки в планировщике недостаточно: canSend проверяет preference, revision и незавершённость курса перед сетевым запросом. Устаревшая строка получает cancelled. При правильном ответе или открытии следующего урока старое напоминание отменяется тем же способом."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Остаётся небольшое окно гонки: /stop может прийти после проверки, когда запрос к Telegram уже начался. Один такой запрос ещё может завершиться; отозвать его из сети нельзя. Не обещайте мгновенное удаление уже отправленного уведомления. После подтверждённой остановки новые напоминания не планируются, а ожидающие отсеиваются при отправке."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для этого курса напоминание только предлагает вернуться. Оно не открывает занятие и не меняет completed. Это сохраняет контроль за учеником: даже после месяца отсутствия бот не отправит пять уроков подряд и не покажет фиктивное завершение. Повторный /remind_on создаёт новую возможность напомнить через сутки, если человек сам попросил включить её снова. "
+                },
+                {
+                  "type": "text",
+                  "text": "Планировщик Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/framework/docs/13.x/scheduling"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "delivery",
+        "label": "Отправляйте сообщения с контролем повторов",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправляйте сообщения с контролем повторов"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Исходящие сообщения сохраняются в demo_outbox вместе с изменением состояния. Отдельная Artisan-команда читает эту таблицу и отправляет их. В примере это небольшая очередь в БД: Laravel queue:work её не обслуживает. Для учебной нагрузки запустите один bot:deliver --watch; при росте нагрузки понадобятся ограничения частоты и распределение работы между процессами. Здесь важнее увидеть границу между сохранением ответа и его доставкой."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Outbox.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Outbox\n{\n    /** @param array<string, mixed> $payload */\n    public static function add(int $chatId, string $key, array $payload, string $kind = 'reply', int $revision = 0): void\n    {\n        DB::table('demo_outbox')->insertOrIgnore([\n            'chat_id' => $chatId, 'event_key' => $key,\n            'payload' => json_encode(['chat_id' => $chatId] + $payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),\n            'kind' => $kind, 'revision' => $revision, 'state' => 'pending',\n            'attempts' => 0, 'next_at' => now()->getTimestamp(),\n        ]);\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/GuideBot/Telegram.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\GuideBot;\n\nuse Illuminate\\Support\\Facades\\Http;\n\nfinal class Telegram\n{\n    /** @param array<string, mixed> $payload\n     *  @return array{state:string, delay:int, message_id:?int, code:?int} */\n    public function call(string $method, array $payload): array\n    {\n        $unknown = ['state' => 'unknown', 'delay' => 0, 'message_id' => null, 'code' => null];\n        $token = config('guidebot.token');\n        if (!is_string($token) || $token === '') {\n            throw new \\LogicException('BOT_TOKEN is missing');\n        }\n        try {\n            $response = Http::connectTimeout(5)->timeout(20)\n                ->post('https://api.telegram.org/bot'.$token.'/'.$method, $payload);\n            $body = $response->json();\n        } catch (\\Throwable) {\n            return $unknown;\n        }\n        if (!is_array($body) || $response->serverError()) {\n            return $unknown;\n        }\n        $result = $body['result'] ?? null;\n        $messageId = is_array($result) && is_int($result['message_id'] ?? null) ? $result['message_id'] : null;\n        if ($response->successful() && ($body['ok'] ?? null) === true\n            && ($method !== 'sendMessage' || $messageId !== null)) {\n            return ['state' => 'sent', 'delay' => 0, 'message_id' => $messageId, 'code' => null];\n        }\n        $code = $body['error_code'] ?? null;\n        $parameters = $body['parameters'] ?? null;\n        $delay = is_array($parameters) ? ($parameters['retry_after'] ?? null) : null;\n        if (($body['ok'] ?? null) === false && $code === 429 && is_int($delay) && $delay > 0) {\n            return ['state' => 'retry', 'delay' => $delay, 'message_id' => null, 'code' => 429];\n        }\n        if (($body['ok'] ?? null) === false && is_int($code) && $code >= 400 && $code < 500) {\n            return ['state' => 'failed', 'delay' => 0, 'message_id' => null, 'code' => $code];\n        }\n        return $unknown;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Console/Commands/Deliver.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Console\\Commands;\n\nuse App\\GuideBot\\{Dialogue, Telegram};\nuse Illuminate\\Console\\Command;\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class Deliver extends Command\n{\n    protected $signature = 'bot:deliver {--watch}';\n    protected $description = 'Deliver persisted demo messages';\n\n    public function handle(Telegram $telegram, Dialogue $dialogue): int\n    {\n        do {\n            $ids = DB::table('demo_outbox')->whereIn('state', ['pending', 'retry'])\n                ->where('next_at', '<=', now()->getTimestamp())->orderBy('id')->limit(50)->pluck('id');\n            foreach ($ids as $id) {\n                $row = DB::transaction(function () use ($id, $dialogue): ?\\stdClass {\n                    $row = DB::table('demo_outbox')->where('id', $id)->lockForUpdate()->first();\n                    if (!$row || !in_array($row->state, ['pending', 'retry'], true)\n                        || (int) $row->next_at > now()->getTimestamp()) {\n                        return null;\n                    }\n                    if (!$dialogue->canSend($row)) {\n                        DB::table('demo_outbox')->where('id', $id)->update(['state' => 'cancelled']);\n                        return null;\n                    }\n                    DB::table('demo_outbox')->where('id', $id)->update([\n                        'state' => 'sending', 'attempts' => (int) $row->attempts + 1,\n                    ]);\n                    return $row;\n                });\n                if (!$row instanceof \\stdClass) {\n                    continue;\n                }\n                try {\n                    /** @var array<string, mixed> $payload */\n                    $payload = json_decode((string) $row->payload, true, 512, JSON_THROW_ON_ERROR);\n                    $result = $telegram->call('sendMessage', $payload);\n                } catch (\\Throwable) {\n                    $result = ['state' => 'unknown', 'delay' => 0, 'message_id' => null, 'code' => null];\n                }\n                if ($result['state'] === 'retry' && (int) $row->attempts + 1 >= 5) {\n                    $result['state'] = 'failed';\n                }\n                DB::table('demo_outbox')->where('id', $id)->update([\n                    'state' => $result['state'], 'next_at' => now()->getTimestamp() + $result['delay'],\n                    'message_id' => $result['message_id'], 'error_code' => $result['code'],\n                ]);\n            }\n            if ($this->option('watch')) {\n                usleep(500000);\n            }\n        } while ($this->option('watch'));\n        return self::SUCCESS;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "HTTP-клиент не вызывает retry(). Подтверждённый Telegram 429 переносит попытку на retry_after, максимум — пять попыток. Таймаут, 5xx или непонятное тело дают unknown: ответ мог потеряться после отправки. Статус sending после аварии процесса тоже требует проверки. Уникальный event_key предотвращает повторное создание строки, но не превращает Telegram и вашу БД в одну транзакцию. "
+                },
+                {
+                  "type": "text",
+                  "text": "HTTP-клиент Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://laravel.com/framework/docs/13.x/http-client"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ответы и напоминания используют одну таблицу, но только kind=reminder зависит от пользовательского разрешения. После /stop бот продолжает отвечать на /progress и /continue: отключение инициативных сообщений не делает курс недоступным. Для полного удаления аккаунта или блокировки общения нужна отдельная продуктовая операция."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Один исходящий процесс помогает сохранять порядок учебного диалога, однако отложенный retry может прийти позже более нового ответа. Поэтому каждая карточка содержит номер урока, а обработчик проверяет актуальное состояние. Не пытайтесь получить строгий порядок сообщений лишь сортировкой SELECT: для этого пришлось бы блокировать очередь конкретного чата до разрешения предыдущей операции."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "run",
+        "label": "Запустите webhook, отправитель и расписание",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запустите webhook, отправитель и расписание"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Console/Commands/SetupWebhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nnamespace App\\Console\\Commands;\n\nuse App\\GuideBot\\Telegram;\nuse Illuminate\\Console\\Command;\n\nfinal class SetupWebhook extends Command\n{\n    protected $signature = 'bot:webhook';\n    protected $description = 'Register this demo webhook';\n    public function handle(Telegram $telegram): int\n    {\n        $url = config('app.url');\n        $secret = config('guidebot.secret');\n        if (!is_string($url) || !str_starts_with($url, 'https://') || !is_string($secret)\n            || !preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $secret)) {\n            $this->error('Set HTTPS APP_URL and a random BOT_WEBHOOK_SECRET first.');\n            return self::FAILURE;\n        }\n        $result = $telegram->call('setWebhook', [\n            'url' => rtrim($url, '/').'/api/telegram', 'secret_token' => $secret,\n            'allowed_updates' => ['message', 'callback_query'], 'max_connections' => 1,\n        ]);\n        $this->line($result['state']);\n        return $result['state'] === 'sent' ? self::SUCCESS : self::FAILURE;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · первичный запуск в каталоге course-bot",
+                  "code": "php artisan migrate\nphp artisan route:list --path=api/telegram\nphp artisan bot:webhook\nphp artisan bot:deliver --watch"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Первые команды создают таблицы и проверяют маршрут, bot:webhook регистрирует публичный HTTPS-адрес. sent означает подтверждённую регистрацию. Не используйте этот токен одновременно в другом приложении: у бота один текущий webhook. Отправитель оставьте работающим в отдельном терминале."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · второй терминал для локальной проверки расписания",
+                  "code": "php artisan schedule:work"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для постоянной работы запускают отправитель через менеджер процессов и вызывают schedule:run каждую минуту. Ниже образец crontab именно учебного приложения; замените каталог своим. schedule:work и cron не нужно держать одновременно. withoutOverlapping требует исправного хранилища cache для блокировки, а защита от повторного напоминания дополнительно находится в БД."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Cron · пример пути, замените своим",
+                  "code": "* * * * * cd /var/www/course-bot && php artisan schedule:run >> /var/log/course-bot-schedule.log 2>&1"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это команды инфраструктуры отдельного курса, а не команды импорта статьи на сайт BotGate. В планировщике нет sendMessage: он только создаёт задания. Если cron работает, а bot:deliver остановлен, уроки и напоминания будут ждать в outbox. После возобновления устаревшие напоминания пройдут повторную проверку и отменятся."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "check",
+        "label": "Пройдите курс и проверьте прерванный сценарий",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пройдите курс и проверьте прерванный сценарий"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отправьте /start: должен прийти урок 1. /progress покажет 0 из 5 и выключенные напоминания."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выберите неверный ответ: получите объяснение и тот же вопрос. Прогресс останется нулевым."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выберите верный ответ два раза. Урок засчитывается один раз, а повторное нажатие предлагает продолжить."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сразу отправьте /continue: урок 2 закрыт. Через 24 часа эта команда открывает его."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Перезапустите приложение и запросите /continue: откроется прежний незавершённый урок, а не первый."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Включите напоминания, дождитесь формирования строки, остановите отправитель и отправьте /stop. После запуска отправителя напоминание должно стать cancelled."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Завершите пятый урок: completed=5, reminder_due=NULL, /start не сбрасывает результат."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В автоматической проверке подменяйте время через Carbon::setTestNow и HTTP через Http::fake, запрещая реальные сетевые запросы. Это позволяет проверить 24-часовую границу за секунды. В ручной тестовой копии также можно осторожно приблизить available_at и reminder_due для своего ученика; не ослабляйте проверки времени в рабочем коде ради ускорения опыта."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · проверка своего учебного прогресса",
+                  "code": "SELECT chat_id, course_version, completed, active_lesson,\n       available_at, reminders, reminder_due, revision\nFROM demo_users\nWHERE chat_id = 123456789;\n\nSELECT lesson, choice, answered_at\nFROM demo_answers\nWHERE chat_id = 123456789\nORDER BY lesson;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "123456789 здесь — вымышленный ID, замените его собственным тестовым chat_id. Набор ответов должен соответствовать completed: после второго урока ровно две успешные записи. Проверяйте также другого ученика: одинаковая кнопка у двух людей должна менять две независимые строки, а не общий счётчик курса."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · состояние исходящих сообщений",
+                  "code": "SELECT id, chat_id, event_key, state, attempts, next_at, message_id, error_code\nFROM demo_outbox\nORDER BY id DESC\nLIMIT 20;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если строки остаются pending, сначала проверьте процесс bot:deliver, его окружение и доступ к той же БД. retry с будущим next_at означает ожидание разрешённой попытки. failed с 403 обычно требует проверки доступности чата и отношений пользователя с ботом; повтор по таймеру здесь не поможет. В failed сохраняется код ошибки, но не сырое описание с возможными данными запроса. unknown и зависшее sending разбирайте отдельно по конкретной операции и чату."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После выяснения причины можно повторить конкретную строку: остановите отправитель, проверьте ID, payload и отсутствие уже полученного сообщения, затем верните только её в pending с attempts=0 и next_at=текущему Unix-времени. Если Telegram мог принять первый запрос, повтор способен создать дубль — это осознанное решение оператора. Не возвращайте массово все sending/unknown в очередь. Для уже доставленного сообщения сохраните подтверждённый message_id и состояние sent, затем возобновите отправитель."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если нужно исправить прогресс ученика вручную, сначала разберите ответы и активную версию курса. Простое изменение completed без согласования active_lesson, available_at, demo_answers и revision оставит противоречивое состояние. Исправление следует выполнять отдельной административной операцией в транзакции с журналом причины; обычное продолжение обучения такой операции не требует."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "extend",
+        "label": "Как расширить курс и где здесь BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как расширить курс и где здесь BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для нескольких курсов добавьте course_id к зачислению, ответам, событиям и callback_data. Для повторного прохождения понадобится enrollment_id или номер попытки. Материалы можно перенести в таблицы и редактор, но опубликованные версии нужно сохранять: правка вопроса не должна задним числом менять смысл уже принятого ответа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Вложения и проверка наставником расширяют модель задания. Платный доступ проверяют перед выдачей каждого урока, а не только перед первым /start. Сертификат создают после подтверждённого завершения с уникальным номером выдачи. Эти функции не реализованы в текущем примере; его результат — последовательный курс с автоматическим вопросом и сохраняемым прогрессом."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если Telegram вызывается через BotGate, курс, время открытия и разрешения на напоминания остаются в вашем приложении. Меняется транспорт и проверка входящих событий по "
+                },
+                {
+                  "type": "text",
+                  "text": "контракту BotGate",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#webhook"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Прямой X-Telegram-Bot-Api-Secret-Token из этой статьи не является проверкой подписи webhook сервиса. Не подключайте тот же токен к двум конкурирующим получателям событий."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для отправки через Laravel-пакет используйте "
+                },
+                {
+                  "type": "text",
+                  "text": "руководство по интеграции",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-telegram-notifications"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и согласуйте один уровень повторов. BotGate не определяет, выполнил ли ученик задание, и не восстанавливает прогресс из истории чата: источником этих решений остаётся ваша БД."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

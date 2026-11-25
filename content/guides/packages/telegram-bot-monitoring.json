@@ -1,0 +1,794 @@
+[
+  {
+    "slug": "telegram-bot-monitoring",
+    "title": "Как настроить мониторинг Telegram-бота и узнавать о сбоях раньше пользователей",
+    "seo_title": "Как настроить мониторинг Telegram-бота и узнавать о сбоях раньше пользователей",
+    "description": "Контролируем доставку webhook, возраст очереди и результат отправки. Выбираем пороги по нагрузке, отличаем тихий период от сбоя и проверяем доставку тревог.",
+    "card_description": "Контролируем доставку webhook, возраст очереди и результат отправки. Выбираем пороги по нагрузке, отличаем тихий период от сбоя и проверяем доставку тревог.",
+    "category": "Практика",
+    "topics": "Telegram · Мониторинг · Очереди",
+    "reading_time": "14 минут",
+    "published_at": "2026-11-06",
+    "is_published": true,
+    "sort_order": 43,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера бот принимает заявки и отправляет ответы после обработки в очереди. Процесс запущен, сервер отвечает 200, но сообщения могут задерживаться внутри worker. Построим наблюдение за всем путём события и определим, когда действительно требуется вмешательство."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "path",
+        "label": "Отмечаем этапы, которые проходит событие",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отмечаем этапы, которые проходит событие"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нарисуйте для своего приложения последовательность: Telegram → приёмник webhook → постоянная запись → очередь → бизнес-обработка → исходящий API-запрос → подтверждение Telegram. Если есть шлюз или внешняя CRM, добавьте их отдельными этапами."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для каждого этапа нужны время последнего успеха, число ошибок и способ связать событие со следующим шагом. Используйте внутренний correlation ID, ID бота и update_id в закрытом журнале. Метрики агрегируйте по ограниченному набору признаков: окружение, тип операции, класс исхода. Не делайте chat_id, update_id или текст сообщения метками временных рядов: это создаёт огромное число рядов и раскрывает данные."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разделите «принято», «сохранено», «обработано» и «отправлено». HTTP 200 вашего webhook подтверждает только тот этап, до которого действительно дошёл обработчик. Если он возвращает успех до надёжного сохранения, зелёный график может скрывать потерю событий."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Наблюдаем входящий webhook",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Наблюдаем входящий webhook"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Собирайте число запросов, долю 4xx/5xx, время ответа и ошибки проверки подлинности отдельно. При прямом webhook Telegram проверяется заголовок X-Telegram-Bot-Api-Secret-Token, если задан secret_token; при доставке через BotGate — его HMAC-подпись. Отказ этой проверки может означать посторонние запросы, а не недоставленные события Telegram. Для принятых событий считайте успешные записи в БД и ошибки постановки в очередь."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Периодически читайте getWebhookInfo: pending_update_count, last_error_date, last_error_message и соответствие URL ожидаемой настройке. Не публикуйте полный URL, если он содержит секрет. Ошибка с давней last_error_date может оставаться историческим свидетельством после восстановления: оценивайте её дату вместе со свежими успешными событиями."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Рост pending_update_count указывает на накопление обновлений на стороне Telegram, но нулевой показатель не доказывает, что ваша очередь обработана. Если webhook быстро сохраняет всё локально, задержка переезжает внутрь приложения. Разбор самого подключения есть в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-webhook-not-working"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При polling вместо webhook наблюдайте успешность циклов получения, фиксацию прогресса и отсутствие конкурирующих получателей. Не включайте getUpdates для диагностики бота с действующим webhook. Через BotGate применяется webhook, а getUpdates недоступен."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "queue",
+        "label": "Измеряем возраст работы, а не только длину очереди",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Измеряем возраст работы, а не только длину очереди"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Собирайте число готовых к выполнению задач, возраст самой старой готовой задачи, время обработки, количество повторов и окончательных ошибок. Длинная очередь быстрых задач может быть допустима; одна зависшая важная задача — нет. Отложенные напоминания на завтра не должны считаться просроченной работой сегодня."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Heartbeat worker полезен, но не заменяет успешное выполнение задания. Процесс может отправлять heartbeat и постоянно падать на одной и той же операции. Для контрольной задачи храните planned_at, started_at и completed_at, чтобы отличить отсутствие запуска от ошибки выполнения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример для приложения с собственной таблицей tasks показывает, как исключить задачи, время которых ещё не наступило. Это SQL для SQLite, не универсальный запрос к таблицам Laravel, Redis или брокера. :now передаётся как Unix-время, ready_at и created_at хранятся в тех же единицах."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · Возраст просроченной готовой работы",
+                  "code": "SELECT\n    COUNT(*) AS ready_count,\n    MAX(:now - ready_at) AS oldest_ready_seconds\nFROM tasks\nWHERE state = 'pending' AND ready_at <= :now;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При отсутствии готовых задач MAX вернёт NULL. Отображайте это как «готовой работы нет», а не «метрики не поступают». Отдельно следите за свежестью самого сборщика: отсутствие новых значений нельзя автоматически интерпретировать как нулевую очередь."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "outbound",
+        "label": "Разделяем исходы отправки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разделяем исходы отправки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для исходящих запросов измеряйте время ответа, число попыток, подтверждённые успехи, ошибки API и неизвестные исходы. При HTTP 200 дополнительно проверяйте ok=true. Таймаут после отправки запроса не доказывает недоставку: первое сообщение уже могло появиться в чате."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разделяйте категории: нет доступа к чату, ошибка параметров, лимит Telegram, лимит шлюза, сетевой сбой, ошибка сервера. Нельзя объединять все HTTP 400 в одну бизнес-причину. Например, через BotGate Telegram error_code=429 может приходить внутри HTTP 400; собственный 429 сервиса относится к другому ограничению."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для задержки смотрите распределение и высокий процентиль вместе с числом запросов. p95 из трёх отправок мало говорит о стабильности; доля ошибок 100% при единственной попытке и при тысяче попыток требует разной оценки. Также полезно время от сохранения заявки до подтверждённого ответа, а не только скорость одного HTTP-вызова."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "thresholds",
+        "label": "Выбираем пороги под обещание пользователю",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выбираем пороги под обещание пользователю"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала определите допустимую задержку сценария. Для примера договоримся, что обычная заявка должна попасть менеджеру за минуту. Следующие числа — стартовая гипотеза для такого сервиса, а не нормы Telegram:"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Предупреждение: возраст готовой задачи выше 30 секунд держится две минуты."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Срочная тревога: возраст превышает 60 секунд и подтверждённой обработки нет."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Предупреждение по отправке: за пять минут более 5% ошибок при не менее 20 попытках."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отдельная тревога по свежести: сборщик не передавал метрики три ожидаемых интервала подряд."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте пороги на реальном графике нагрузки и согласуйте допустимое время реакции. Кратковременные всплески можно сглаживать окном или требованием устойчивости условия; длительность такого ожидания тоже входит в задержку обнаружения. При малом трафике используйте абсолютные ошибки и контрольные операции вместо одного процента."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для планового обслуживания задавайте ограниченное по времени подавление тревог. Не отключайте правило навсегда после первого шумного срабатывания. Изменяйте причину шума: порог, окно, область группировки или неверное определение готовой задачи."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "quiet",
+        "label": "Отличаем тихий период от остановки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отличаем тихий период от остановки"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отсутствие пользовательских сообщений ночью может быть нормальным. Сравнивайте входящий поток с ожидаемым расписанием, но не считайте одно лишь падение трафика доказательством поломки. Проверяйте независимые признаки: свежий heartbeat, доступность приёмника, обработку контрольной задачи и успешный read-only API-запрос."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка getMe подтверждает доступ к API и действительность токена, но не путь входящего webhook и не право отправки в конкретный чат. Внутренняя контрольная задача проверяет очередь, но не Telegram. Полный контрольный обмен требует тестового аккаунта/бота и выделенного чата; его следует явно отделить от клиентских событий и бизнес-метрик."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не отправляйте контрольные сообщения клиентам. Для начала достаточно сочетания HTTP health-check с конечным таймаутом, свежести worker и безопасной задачи без бизнес-последствий. Набор проверок должен покрывать нужные участки, а не изображать полную проверку одним зелёным индикатором."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "alerts",
+        "label": "Доставляем тревогу по независимому пути",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Доставляем тревогу по независимому пути"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не отправляйте единственную тревогу тем же ботом через тот же worker, отказ которого отслеживаете. Выберите независимый канал: email, сервис дежурств или отдельный транспорт. Telegram может быть дополнительным каналом, но при общей проблеме доступа он тоже окажется недоступен."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В тревоге укажите окружение, затронутый бот без секретов, условие, текущее значение, время начала и ссылку на краткий порядок диагностики. Назначьте ответственного, правила повторного уведомления и сообщение о восстановлении. Объединяйте повторяющиеся тревоги об одной причине, чтобы десять зависимых симптомов не скрыли основную проблему."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте также сам канал тревог: контрольное уведомление должно реально дойти адресату. Успешная запись в журнал мониторинга не равна доставке человеку."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "collector-example",
+        "label": "Подключаем минимальный сборщик и два правила тревоги",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключаем минимальный сборщик и два правила тревоги"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для приложения с SQLite-таблицей tasks из примера выше можно начать с готового PHP-сборщика. Он читает число готовых задач и их возраст, затем публикует файл для textfile collector в node_exporter. Время сбора записывается отдельным значением. Пустая очередь даёт нулевой возраст; ошибка чтения БД оставляет старый снимок, который станет просроченным."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Предпосылки: Linux, PHP CLI с pdo_sqlite, установленный node_exporter и Prometheus. У задач "
+                },
+                {
+                  "type": "text",
+                  "text": "state",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " — текст, "
+                },
+                {
+                  "type": "text",
+                  "text": "ready_at",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " — Unix timestamp в секундах. Для Redis и стандартной очереди Laravel замените только запрос сбора на соответствующий источник. Каталог метрик находится вне сайта; пользователь сборщика может писать в него, а node_exporter — читать. Выделите им общую группу для файла с правами 0640."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · collect-bot-metrics.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nif (PHP_SAPI !== 'cli') exit(1);\n$database = getenv('TASKS_SQLITE_PATH');\n$directory = getenv('TEXTFILE_DIRECTORY');\nif (!$database || !is_file($database) || !$directory || !is_dir($directory)) {\n    fwrite(STDERR, \"Настройте пути к существующей БД и каталогу метрик\\n\");\n    exit(1);\n}\n$temporary = null;\n$failed = false;\ntry {\n    $db = new PDO('sqlite:'.$database, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA query_only = ON');\n    $db->exec('PRAGMA busy_timeout = 3000');\n    $now = time();\n    $q = $db->prepare(\"SELECT COUNT(*) AS ready_count,\n        COALESCE(MAX(? - ready_at), 0) AS oldest\n        FROM tasks WHERE state = 'pending' AND ready_at <= ?\");\n    $q->execute([$now, $now]);\n    $row = $q->fetch(PDO::FETCH_ASSOC);\n    $metrics = \"# TYPE bot_tasks_ready gauge\\n\"\n        .'bot_tasks_ready '.(int) $row['ready_count'].\"\\n\"\n        .\"# TYPE bot_tasks_oldest_ready_seconds gauge\\n\"\n        .'bot_tasks_oldest_ready_seconds '.(int) $row['oldest'].\"\\n\"\n        .\"# TYPE bot_metrics_collected_at_seconds gauge\\n\"\n        .'bot_metrics_collected_at_seconds '.$now.\"\\n\";\n    $temporary = tempnam($directory, '.bot-');\n    if ($temporary === false || file_put_contents($temporary, $metrics) !== strlen($metrics)) {\n        throw new RuntimeException('write');\n    }\n    // На Linux файл заменяется атомарно в пределах одного каталога.\n    if (!chmod($temporary, 0640) || !rename($temporary, $directory.'/bot.prom')) {\n        throw new RuntimeException('publish');\n    }\n    $temporary = null;\n} catch (Throwable) {\n    // Старый снимок остаётся: правило свежести обнаружит остановку сборщика.\n    fwrite(STDERR, \"Не удалось обновить метрики очереди\\n\");\n    $failed = true;\n} finally {\n    if (is_string($temporary) && is_file($temporary)) unlink($temporary);\n}\nexit($failed ? 1 : 0);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавьте к параметрам node_exporter "
+                },
+                {
+                  "type": "text",
+                  "text": "--collector.textfile.directory=/var/lib/node_exporter/textfile_collector",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Пути ниже — пример для вашего приложения. Запустите сборщик вручную от его системного пользователя, затем добавьте тот же вызов в crontab этого пользователя. Он работает отдельно от очереди, которую наблюдает."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · один запуск и строка crontab",
+                  "code": "TASKS_SQLITE_PATH=/srv/example/private/tasks.sqlite TEXTFILE_DIRECTORY=/var/lib/node_exporter/textfile_collector php /srv/example/collect-bot-metrics.php\n\n# crontab: раз в минуту; каталог и права подготовлены заранее\n* * * * * TASKS_SQLITE_PATH=/srv/example/private/tasks.sqlite TEXTFILE_DIRECTORY=/var/lib/node_exporter/textfile_collector /usr/bin/php /srv/example/collect-bot-metrics.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для одного сервера задайте Prometheus job с именем bot-host и интервалом опроса 15 секунд. Адрес 127.0.0.1:9100 подходит, если Prometheus и exporter работают на одном сервере. При раздельной установке используйте закрытый сетевой адрес; не открывайте exporter всему интернету. В конфигурации Prometheus подключите файл правил и target:"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "YAML · фрагменты prometheus.yml",
+                  "code": "rule_files:\n  - bot-alerts.yml\nscrape_configs:\n  - job_name: bot-host\n    scrape_interval: 15s\n    static_configs:\n      - targets: ['127.0.0.1:9100']"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "YAML · bot-alerts.yml",
+                  "code": "groups:\n  - name: bot-queue\n    rules:\n      - alert: BotQueueWaiting\n        expr: bot_tasks_oldest_ready_seconds{job=\"bot-host\"} > 30\n        for: 2m\n        labels:\n          severity: warning\n        annotations:\n          summary: 'Готовая задача слишком долго ждёт worker'\n      - alert: BotMetricsStale\n        expr: (time() - bot_metrics_collected_at_seconds{job=\"bot-host\"} > 180) or absent(bot_metrics_collected_at_seconds{job=\"bot-host\"}) or (up{job=\"bot-host\"} == 0)\n        for: 30s\n        labels:\n          severity: critical\n        annotations:\n          summary: 'Нет свежего снимка очереди или недоступен exporter'"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте конфигурацию через "
+                },
+                {
+                  "type": "text",
+                  "text": "promtool check config prometheus.yml",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "promtool check rules bot-alerts.yml",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". В /metrics exporter должны появиться три bot_-метрики. В интерфейсе Prometheus выполните выражения из правил и убедитесь, что target имеет состояние UP. Эти правила рассчитаны на один target; для нескольких серверов контролируйте отсутствие метрик по каждому ожидаемому instance."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка без клиентских сообщений: в тестовой таблице добавьте pending-задачу с ready_at на минуту в прошлом. Сначала правило BotQueueWaiting станет pending, затем firing. Переведите задачу в done и дождитесь нового снимка — тревога снимется. Остановите только cron сборщика: через три минуты снимок устареет при всё ещё доступном exporter. Эта проверка отличает остановку обработки от остановки наблюдения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "С интервалом сбора в минуту и for: 2m предупреждение приходит с дополнительной задержкой. Если обещание клиенту составляет минуту, нужен более частый сбор и отдельное срочное правило. Доставку тревог на email или в сервис дежурств настройте в Alertmanager; появление firing в Prometheus само по себе ещё не отправляет письмо. Проверяйте её отдельной тестовой тревогой."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Textfile collector node_exporter",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/prometheus/node_exporter#textfile-collector"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Проверяем мониторинг управляемым сбоем",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем мониторинг управляемым сбоем"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "На изолированной среде остановите тестовый worker и убедитесь, что возраст задачи растёт, срабатывает нужное правило и приходит тревога. Затем восстановите worker и проверьте сообщение о восстановлении. Отдельно смоделируйте ошибку API и прекращение метрик: эти случаи должны различаться."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если используете BotGate, его журналы запросов и webhook помогают разбирать участок обмена с Telegram. Они не заменяют контроль вашей очереди, CRM и результата бизнес-операции. Начните с "
+                },
+                {
+                  "type": "text",
+                  "text": "документации сервиса",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и связывайте журналы по безопасному внутреннему ID."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "getWebhookInfo и WebhookInfo",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#getwebhookinfo"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Практика построения тревог Prometheus",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://prometheus.io/docs/practices/alerting/"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

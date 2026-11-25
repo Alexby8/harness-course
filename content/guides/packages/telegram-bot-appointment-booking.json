@@ -1,0 +1,1126 @@
+[
+  {
+    "slug": "telegram-bot-appointment-booking",
+    "title": "Как сделать запись на свободное время через Telegram-бота",
+    "seo_title": "Как сделать запись на свободное время через Telegram-бота",
+    "description": "Показываем свободные интервалы, резервируем время на несколько минут, подтверждаем и отменяем запись. Защищаем один интервал от двух одновременных записей.",
+    "card_description": "Показываем свободные интервалы, резервируем время на несколько минут, подтверждаем и отменяем запись. Защищаем один интервал от двух одновременных записей.",
+    "category": "Практика",
+    "topics": "Telegram Bot API · Запись на услуги · База данных",
+    "reading_time": "16 минут",
+    "published_at": "2026-11-09",
+    "is_published": true,
+    "sort_order": 49,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера возьмём запись на 30-минутную консультацию. Клиент выбирает день и время в личном чате с ботом. Интервал удерживается до пяти минут, пока клиент подтверждает выбор. Если два человека нажмут на одно время, подтвердить его сможет только тот, кто получил действующий резерв."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "slots",
+        "label": "Создаём интервалы и показываем свободное время",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создаём интервалы и показываем свободное время"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Заранее создайте по одной строке на каждый 30-минутный интервал консультанта. В "
+                },
+                {
+                  "type": "text",
+                  "text": "booking_slots",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " храните "
+                },
+                {
+                  "type": "text",
+                  "text": "id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "resource_id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "starts_at",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "ends_at",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "state",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "telegram_user_id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "reservation_id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "hold_until",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Держите уникальный ключ "
+                },
+                {
+                  "type": "text",
+                  "text": "(resource_id, starts_at)",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и формируйте интервалы из одной сетки без пересечений для каждого консультанта."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "free",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — интервал свободен. Поля владельца, резерва и срока пустые."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "held",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — интервал удерживается до "
+                        },
+                        {
+                          "type": "text",
+                          "text": "hold_until",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ". Идентификатор резерва отличает текущую попытку от предыдущих."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "booked",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — клиент подтвердил запись. Владелец и идентификатор резерва сохраняются, срок удержания очищается."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Рабочие часы и выбор дня считайте в часовом поясе услуги, например "
+                },
+                {
+                  "type": "text",
+                  "text": "Europe/Moscow",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". В PostgreSQL храните моменты начала, конца и срока резерва как "
+                },
+                {
+                  "type": "text",
+                  "text": "timestamptz",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Рядом с кнопками указывайте пояс. Для выбранной даты считайте полуоткрытый интервал от местной полуночи до следующей местной полуночи и переводите обе границы в моменты времени. Такой расчёт учитывает и пояса с переходом на летнее время."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Показывайте будущие строки со статусом "
+                },
+                {
+                  "type": "text",
+                  "text": "free",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и строки "
+                },
+                {
+                  "type": "text",
+                  "text": "held",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", у которых срок уже истёк. К моменту нажатия доступность может измениться, поэтому бот проверяет её повторно при резервировании."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Эта модель подходит для услуг одинаковой длительности на фиксированной сетке. Если можно записаться с произвольного времени или на разные по длине услуги, соседние старты могут пересекаться. Тогда проверяйте пересечение диапазонов на уровне БД. Например, в PostgreSQL можно использовать ограничение исключения для активных интервалов одного ресурса."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "buttons",
+        "label": "Связываем кнопки Telegram с действиями",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Связываем кнопки Telegram с действиями"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После команды "
+                },
+                {
+                  "type": "text",
+                  "text": "/book",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " покажите кнопки с датами, затем список доступных интервалов. При выборе времени создайте резерв и отобразите его срок, кнопку «Подтвердить» и кнопку «Отменить». Для кнопок используйте короткие значения "
+                },
+                {
+                  "type": "text",
+                  "text": "callback_data",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " длиной от 1 до 64 байт."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-appointment-booking/booking-states.jpg",
+                  "alt": "Выбор даты, кнопки 10:30 и 11:00, временный резерв до 10:05 с подтверждением или отменой и подтверждённая запись.",
+                  "caption": "Схема кнопок и состояний из статьи, не снимок Telegram. Даты и срок учебные; кнопки времени взяты из JSON-примера.",
+                  "width": 1080,
+                  "height": 896,
+                  "mobile_src": "/images/guides/telegram-bot-appointment-booking/booking-states-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1125
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · inline-кнопки",
+                  "code": "{\n  \"inline_keyboard\": [\n    [{ \"text\": \"10:30\", \"callback_data\": \"hold:183\" }],\n    [{ \"text\": \"11:00\", \"callback_data\": \"hold:184\" }]\n  ]\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После успешного резерва используйте "
+                },
+                {
+                  "type": "text",
+                  "text": "confirm:<reservation_id>",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "cancel:<reservation_id>",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Например, UUID длиной 36 символов вместе с префиксом помещается в лимит. Получателя действий определяйте по "
+                },
+                {
+                  "type": "text",
+                  "text": "callback_query.from.id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " из проверенного обновления. Сервер проверяет формат ID, владельца и текущее состояние записи. Кнопки могут остаться в старых сообщениях."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Вызывайте "
+                },
+                {
+                  "type": "text",
+                  "text": "answerCallbackQuery",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " для каждого нажатия, включая устаревшие кнопки. Если операция занимает время, быстро подтвердите получение нажатия и покажите результат отдельным редактированием сообщения после фиксации БД. Настройка приёма нажатий разобрана в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по inline-кнопкам",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-inline-buttons-not-working"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "atomic-hold",
+        "label": "Резервируем время атомарно",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Резервируем время атомарно"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ниже фрагменты для PostgreSQL с именованными параметрами драйвера приложения. Для каждого изменения начните транзакцию и заблокируйте целевую строку через "
+                },
+                {
+                  "type": "text",
+                  "text": "SELECT … FOR UPDATE",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". При выборе ищите по "
+                },
+                {
+                  "type": "text",
+                  "text": "id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", при подтверждении и отмене — по уникальному "
+                },
+                {
+                  "type": "text",
+                  "text": "reservation_id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". После получения блокировки выполните следующий условный запрос. В PostgreSQL "
+                },
+                {
+                  "type": "text",
+                  "text": "statement_timestamp()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " в этом запросе отражает время его начала, уже после ожидания блокировки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · резерв свободного или просроченного интервала",
+                  "code": "UPDATE booking_slots\nSET state = 'held',\n    telegram_user_id = :user_id,\n    reservation_id = :new_reservation_id,\n    hold_until = LEAST(\n      statement_timestamp() + interval '5 minutes',\n      starts_at\n    )\nWHERE id = :slot_id\n  AND starts_at > statement_timestamp()\n  AND (state = 'free'\n       OR (state = 'held' AND hold_until <= statement_timestamp()))\nRETURNING reservation_id, hold_until;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для нового резерва сгенерируйте UUID на сервере. Если заблокированная строка уже удерживается тем же клиентом и срок не истёк, верните текущие ID и время окончания без продления. Если запрос обновил строку, зафиксируйте транзакцию и покажите клиенту срок. Если строка не обновилась, перечитайте расписание и предложите другое время."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При одновременных нажатиях вторая транзакция дождётся освобождения строки. Когда первая сохранит резерв, условие для второй уже не выполнится. Отдельный фоновый процесс для снятия просроченных резервов не нужен: просроченную строку можно занять этим же запросом. Планировщик можно использовать для напоминаний о подтверждённых записях."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "confirmation",
+        "label": "Подтверждаем и отменяем запись",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подтверждаем и отменяем запись"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подтверждение проверяет ID текущего резерва, владельца и срок. Старое сообщение не сможет подтвердить чужой или заменённый резерв."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · подтверждение действующего резерва",
+                  "code": "UPDATE booking_slots\nSET state = 'booked', hold_until = NULL\nWHERE reservation_id = :reservation_id\n  AND telegram_user_id = :user_id\n  AND state = 'held'\n  AND hold_until > statement_timestamp()\n  AND starts_at > statement_timestamp()\nRETURNING id, starts_at;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если строка уже "
+                },
+                {
+                  "type": "text",
+                  "text": "booked",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " с тем же ID и владельцем, повтор подтверждения возвращает сведения о той же записи. Иначе отсутствие обновлённой строки означает, что подтвердить выбор больше нельзя. Предложите выбрать время снова. Если ведёте историю записей, сохраните запись о подтверждении в той же транзакции и добавьте уникальность по ID резерва."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для отмены снова проверьте владельца и ID. В примере до начала консультации клиент может освободить удерживаемый или подтверждённый интервал. После начала состояние остаётся в расписании. Для платной услуги здесь же примените своё правило отмены."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · отмена резерва или записи",
+                  "code": "UPDATE booking_slots\nSET state = 'free',\n    telegram_user_id = NULL,\n    reservation_id = NULL,\n    hold_until = NULL\nWHERE reservation_id = :reservation_id\n  AND telegram_user_id = :user_id\n  AND state IN ('held', 'booked')\n  AND starts_at > statement_timestamp()\nRETURNING id;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При повторной отмене с тем же ID запрос больше не меняет строку. Если между нажатиями время занял другой клиент, у него будет новый ID резерва. Бот может показать нейтральный ответ «Эта запись уже недоступна». После подтверждения отдельный планировщик может отправить "
+                },
+                {
+                  "type": "text",
+                  "text": "напоминание о визите",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-telegram-appointment-reminders"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Перед отправкой проверьте, что запись всё ещё действует и её ID совпадает с заданием."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "php-example",
+        "label": "Подключаем резервирование к обработчику PHP",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключаем резервирование к обработчику PHP"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера используем PHP 8.3+ с "
+                },
+                {
+                  "type": "text",
+                  "text": "pdo_pgsql",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и PostgreSQL. Приёмник webhook уже проверяет подлинность события. Функция ниже отвечает за расписание и вызывается после этой проверки; внешние API-запросы выполняются после её завершения. В отдельной тестовой БД создайте таблицу:"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · схема фиксированных интервалов",
+                  "code": "CREATE TABLE booking_slots (\n  id bigserial PRIMARY KEY, resource_id bigint NOT NULL,\n  starts_at timestamptz NOT NULL, ends_at timestamptz NOT NULL,\n  state text NOT NULL DEFAULT 'free' CHECK (state IN ('free', 'held', 'booked')),\n  telegram_user_id bigint, reservation_id uuid UNIQUE, hold_until timestamptz,\n  UNIQUE (resource_id, starts_at), CHECK (ends_at > starts_at),\n  CHECK (\n    (state = 'free' AND telegram_user_id IS NULL AND reservation_id IS NULL AND hold_until IS NULL)\n    OR (state = 'held' AND telegram_user_id IS NOT NULL AND reservation_id IS NOT NULL AND hold_until IS NOT NULL)\n    OR (state = 'booked' AND telegram_user_id IS NOT NULL AND reservation_id IS NOT NULL AND hold_until IS NULL)\n  )\n);\nINSERT INTO booking_slots (resource_id, starts_at, ends_at)\nVALUES (1, '2026-12-01 10:00:00+03', '2026-12-01 10:30:00+03');"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Замените дату на будущую. Этот пример использует фиксированные интервалы по 30 минут и одного консультанта. Уникальность начала не запрещает произвольные пересекающиеся интервалы: создание расписания должно сохранять выбранную сетку. Для подтверждений и отмены сохраняется случайный ID резерва; числовой ID интервала используется только при выборе времени."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · booking.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction bookingAction(PDO $db, int $userId, string $action, string $key): ?array\n{\n    if (!in_array($action, ['hold', 'confirm', 'cancel'], true) || $userId <= 0) {\n        throw new InvalidArgumentException('Некорректное действие');\n    }\n    if ($action === 'hold' ? !preg_match('/\\A[1-9][0-9]{0,17}\\z/', $key)\n        : !preg_match('/\\A[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}\\z/', $key)) {\n        return null;\n    }\n    $db->beginTransaction();\n    try {\n        $column = $action === 'hold' ? 'id' : 'reservation_id';\n        $q = $db->prepare(\"SELECT id FROM booking_slots WHERE $column = ? FOR UPDATE\");\n        $q->execute([$key]);\n        $id = $q->fetchColumn();\n        if ($id === false) {\n            $db->commit();\n            return null;\n        }\n        // Новый statement начинается после получения блокировки.\n        $q = $db->prepare('SELECT *,\n            (starts_at > statement_timestamp())::int AS future,\n            (hold_until > statement_timestamp())::int AS alive\n            FROM booking_slots WHERE id = ?');\n        $q->execute([$id]);\n        $slot = $q->fetch(PDO::FETCH_ASSOC);\n        $mine = (string) $slot['telegram_user_id'] === (string) $userId;\n        $held = $slot['state'] === 'held' && (int) $slot['alive'] === 1;\n        $result = null;\n        if ($action === 'hold') {\n            if ($mine && $held && (int) $slot['future'] === 1) {\n                $result = $slot; // Повтор не продлевает срок удержания.\n            } elseif ((int) $slot['future'] === 1 &&\n                ($slot['state'] === 'free' || ($slot['state'] === 'held' && !$held))) {\n                $hex = bin2hex(random_bytes(16));\n                $uuid = substr($hex, 0, 8).'-'.substr($hex, 8, 4).'-'.substr($hex, 12, 4)\n                    .'-'.substr($hex, 16, 4).'-'.substr($hex, 20);\n                $q = $db->prepare(\"UPDATE booking_slots SET state = 'held',\n                    telegram_user_id = ?, reservation_id = ?,\n                    hold_until = LEAST(statement_timestamp() + interval '5 minutes', starts_at)\n                    WHERE id = ? AND starts_at > statement_timestamp() RETURNING *\");\n                $q->execute([$userId, $uuid, $id]);\n                $result = $q->fetch(PDO::FETCH_ASSOC) ?: null;\n            }\n        } elseif ($mine && $slot['reservation_id'] === $key) {\n            if ($action === 'confirm' && $slot['state'] === 'booked') {\n                $result = $slot; // Уже подтверждённая запись имеет тот же ID.\n            } elseif ($action === 'confirm' && $held) {\n                $q = $db->prepare(\"UPDATE booking_slots SET state = 'booked', hold_until = NULL\n                    WHERE id = ? AND starts_at > statement_timestamp()\n                    AND hold_until > statement_timestamp() RETURNING *\");\n                $q->execute([$id]);\n                $result = $q->fetch(PDO::FETCH_ASSOC) ?: null;\n            } elseif ($action === 'cancel') {\n                $q = $db->prepare(\"UPDATE booking_slots SET state = 'free',\n                    telegram_user_id = NULL, reservation_id = NULL, hold_until = NULL\n                    WHERE id = ? AND starts_at > statement_timestamp() RETURNING *\");\n                $q->execute([$id]);\n                $result = $q->fetch(PDO::FETCH_ASSOC) ?: null;\n            }\n        }\n        $db->commit();\n        return $result;\n    } catch (Throwable $error) {\n        if ($db->inTransaction()) $db->rollBack();\n        throw $error;\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключение создавайте один раз на обработчик: "
+                },
+                {
+                  "type": "text",
+                  "text": "new PDO(getenv('BOOKING_DSN'), getenv('BOOKING_DB_USER'), getenv('BOOKING_DB_PASSWORD'), [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_EMULATE_PREPARES => false])",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". DSN имеет вид "
+                },
+                {
+                  "type": "text",
+                  "text": "pgsql:host=127.0.0.1;port=5432;dbname=booking_demo",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "; пароль хранится в окружении. Функция сама открывает транзакцию, поэтому не оборачивайте её ещё одной."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · вызов из проверенного callback_query",
+                  "code": "// $db — PDO; $callback — callback_query из проверенного webhook.\n$actor = $callback['from']['id'] ?? null;\n$payload = $callback['data'] ?? null;\nif (!is_int($actor) || !is_string($payload)) return;\n$parts = explode(':', $payload, 2);\nif (count($parts) !== 2 || !in_array($parts[0], ['hold', 'confirm', 'cancel'], true)) return;\n$slot = bookingAction($db, $actor, $parts[0], $parts[1]);\nif ($slot === null) {\n    $text = 'Это время уже недоступно. Откройте расписание заново.';\n    $buttons = [];\n} elseif ($slot['state'] === 'held') {\n    $until = (new DateTimeImmutable($slot['hold_until']))->setTimezone(new DateTimeZone('Europe/Moscow'));\n    $text = 'Время удерживается до '.$until->format('H:i').' (Москва).';\n    $buttons = [[\n        ['text' => 'Подтвердить', 'callback_data' => 'confirm:'.$slot['reservation_id']],\n        ['text' => 'Отменить', 'callback_data' => 'cancel:'.$slot['reservation_id']],\n    ]];\n} else {\n    $text = $slot['state'] === 'booked' ? 'Запись подтверждена.' : 'Запись отменена.';\n    $buttons = $slot['state'] === 'booked' ? [[\n        ['text' => 'Отменить', 'callback_data' => 'cancel:'.$slot['reservation_id']],\n    ]] : [];\n}\n// Передайте $text и ['inline_keyboard' => $buttons] в sendMessage\n// для личного чата $actor. answerCallbackQuery подтверждает само нажатие."
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для показа свободного времени выбирайте строки по "
+                },
+                {
+                  "type": "text",
+                  "text": "resource_id",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и границам выбранного дня: "
+                },
+                {
+                  "type": "text",
+                  "text": "starts_at >= :from AND starts_at < :to AND starts_at > statement_timestamp() AND (state = 'free' OR (state = 'held' AND hold_until <= statement_timestamp())) ORDER BY starts_at",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Границы передавайте с часовым поясом. Подпись кнопки получается из "
+                },
+                {
+                  "type": "text",
+                  "text": "starts_at",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", а её значение — "
+                },
+                {
+                  "type": "text",
+                  "text": "hold:",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " плюс ID строки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Начните проверку без Telegram: вызовите "
+                },
+                {
+                  "type": "text",
+                  "text": "bookingAction($db, 101, 'hold', '1')",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", затем ту же функцию с пользователем 202. Первый получит резерв, второй — null. Повтор от 101 должен вернуть прежний reservation_id. Для проверки реальной конкуренции запустите два процесса с отдельными соединениями. Если уведомление не отправилось, состояние записи остаётся сохранённым: при следующем входе покажите пользователю его "
+                },
+                {
+                  "type": "text",
+                  "text": "held",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "booked",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " интервалы. Историю отмен храните отдельно до очистки полей слота, если она нужна для отчётности."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверяем запись с двух аккаунтов",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем запись с двух аккаунтов"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выберите одинаковое время с двух аккаунтов почти одновременно. Один получит резерв, второй увидит обновлённый список. В БД останется один владелец интервала."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Дождитесь окончания резерва, выберите тот же интервал со второго аккаунта и нажмите «Подтвердить» в старом сообщении первого. Состояние нового резерва не изменится."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Дважды подтвердите действующий резерв. Бот покажет ту же запись. Затем отмените её и убедитесь, что время снова доступно."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте список на границе двух дат и проверьте подпись часового пояса. Если обслуживаете регионы с переводом часов, отдельно проверьте день такого перехода."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "CallbackQuery",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#callbackquery",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " · "
+                },
+                {
+                  "type": "text",
+                  "text": "answerCallbackQuery",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#answercallbackquery",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " · "
+                },
+                {
+                  "type": "text",
+                  "text": "Блокировки строк PostgreSQL",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " · "
+                },
+                {
+                  "type": "text",
+                  "text": "Ограничения для диапазонов PostgreSQL",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.postgresql.org/docs/current/rangetypes.html#RANGETYPES-CONSTRAINT",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

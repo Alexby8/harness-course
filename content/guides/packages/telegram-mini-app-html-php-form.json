@@ -1,0 +1,816 @@
+[
+  {
+    "slug": "telegram-mini-app-html-php-form",
+    "title": "Как создать первое Telegram Mini App: форма заявки на HTML и PHP",
+    "seo_title": "Как создать первое Telegram Mini App: форма заявки на HTML и PHP",
+    "description": "Готовый учебный пример Mini App: HTML-форма, запуск из меню бота, проверка initData на PHP, запись в SQLite и подтверждение без повторного создания заявки.",
+    "card_description": "Готовый учебный пример Mini App: HTML-форма, запуск из меню бота, проверка initData на PHP, запись в SQLite и подтверждение без повторного создания заявки.",
+    "category": "Практика",
+    "topics": "Mini Apps · PHP · Формы",
+    "reading_time": "18 минут",
+    "published_at": "2026-11-04",
+    "is_published": true,
+    "sort_order": 37,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера сервисный центр принимает заявки на консультацию. Пользователь открывает форму из личного чата с ботом, вводит имя и вопрос, а PHP проверяет данные Telegram и сохраняет заявку в SQLite. После сохранения форма показывает номер; сервер также пробует отправить подтверждение в чат. Разберём все файлы и повторную отправку после сетевого сбоя."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "customBlock",
+          "attrs": {
+            "id": "guide-image",
+            "config": {
+              "src": "/images/guides/telegram-mini-app-html-php-form/form-result.jpg",
+              "alt": "Заполненная форма заявки и подтверждение сохранения с кнопкой «Новая заявка».",
+              "caption": "Форма из HTML-примера статьи. Данные и ответы сервера демонстрационные; это макет, а не снимок клиента Telegram.",
+              "width": 1080,
+              "height": 1120,
+              "mobile_src": "/images/guides/telegram-mini-app-html-php-form/form-result-mobile.jpg",
+              "mobile_width": 390,
+              "mobile_height": 1850
+            }
+          }
+        }
+      ]
+    },
+    "sections": [
+      {
+        "id": "prepare",
+        "label": "Что подготовить и какой способ запуска используем",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что подготовить и какой способ запуска используем"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Понадобятся тестовый бот, PHP 8.3+ на 64-битной системе с cURL, mbstring и PDO SQLite, а также доступный по HTTPS адрес приложения с действительным сертификатом. Если бота ещё нет, начните с "
+                },
+                {
+                  "type": "text",
+                  "text": "BotFather",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-botfather"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Сначала откройте его личный чат и нажмите «Старт»: в этом примере подтверждение отправляется в уже начатый диалог."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Mini Apps также называют Web Apps в именах объектов API. Мы используем кнопку меню личного чата с типом web_app и обычный fetch к собственному PHP endpoint. sendData здесь не нужен: он предназначен для другого способа запуска — кнопки обычной клавиатуры. Сначала сервер сохраняет заявку, затем возвращает результат форме. Никакой Telegram-токен в браузер не передаётся."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте такую структуру. Корнем сайта должен быть только public. app.php, установочный скрипт и var с базой не должны быть доступны по HTTP."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Text · Структура проекта",
+                  "code": "mini-app/\n  app.php\n  install.php\n  setup-menu.php\n  var/\n  public/\n    index.html\n    submit.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В окружении PHP-процесса задайте BOT_TOKEN — токен именно этого бота. CLI и PHP-FPM могут иметь разные окружения: проверьте значение в обоих без вывода самого секрета. Простое создание .env в таком проекте его не загрузит. Пользователю PHP нужен доступ на запись к var и файлам SQLite. Не размещайте там чужие файлы и резервные копии публично."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "server",
+        "label": "Общий PHP-код: проверка Telegram и сохранение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Общий PHP-код: проверка Telegram и сохранение"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте app.php. Функция validateInitData получает исходную строку Telegram.WebApp.initData. Мы декодируем каждое значение один раз, запрещаем повторяющиеся ключи, исключаем hash, сортируем остальные поля и вычисляем HMAC. Если присутствует поле signature, при этом способе с токеном оно остаётся в проверяемой строке; алгоритм проверки Ed25519 без токена устроен иначе."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Срок в 10 минут и допуск 30 секунд в будущее — политика нашего примера. После истечения срока пользователь переоткрывает приложение. Внутренние часы сервера должны быть синхронизированы. Подпись проверяем до JSON-декодирования user, а ID берём только из подписанных данных. initDataUnsafe на сервер не отправляем."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction botToken(): string\n{\n    $token = getenv('BOT_TOKEN');\n    if (!is_string($token) || $token === '') {\n        throw new RuntimeException('Set BOT_TOKEN in the PHP process');\n    }\n    return $token;\n}\n\nfunction validateInitData(string $raw, string $token, int $now): int\n{\n    if ($raw === '' || strlen($raw) > 12000) {\n        throw new DomainException('Invalid Telegram data');\n    }\n    $fields = [];\n    foreach (explode('&', $raw) as $pair) {\n        $parts = explode('=', $pair, 2);\n        if (count($parts) !== 2) {\n            throw new DomainException('Invalid Telegram data');\n        }\n        $key = urldecode($parts[0]);\n        if (!preg_match('/^[a-zA-Z0-9_]+$/D', $key)\n            || array_key_exists($key, $fields)) {\n            throw new DomainException('Invalid Telegram fields');\n        }\n        $fields[$key] = urldecode($parts[1]);\n    }\n    $hash = $fields['hash'] ?? '';\n    unset($fields['hash']);\n    if (!preg_match('/^[a-f0-9]{64}$/D', $hash)) {\n        throw new DomainException('Invalid Telegram hash');\n    }\n    ksort($fields, SORT_STRING);\n    $lines = [];\n    foreach ($fields as $key => $value) {\n        $lines[] = $key.'='.$value;\n    }\n    $secret = hash_hmac('sha256', $token, 'WebAppData', true);\n    $expected = hash_hmac('sha256', implode(\"\\n\", $lines), $secret);\n    if (!hash_equals($expected, $hash)) {\n        throw new DomainException('Invalid Telegram signature');\n    }\n    $date = $fields['auth_date'] ?? '';\n    if (!ctype_digit($date) || (int) $date < $now - 600 || (int) $date > $now + 30) {\n        throw new DomainException('Reopen the Mini App');\n    }\n    try {\n        $user = json_decode($fields['user'] ?? '', true, 32, JSON_THROW_ON_ERROR);\n    } catch (JsonException) {\n        throw new DomainException('Invalid Telegram user');\n    }\n    if (!is_array($user) || !is_int($user['id'] ?? null) || $user['id'] <= 0) {\n        throw new DomainException('Invalid Telegram user');\n    }\n    return $user['id'];\n}\n\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.__DIR__.'/var/leads.sqlite', null, null, [\n        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,\n        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,\n    ]);\n    $db->exec('PRAGMA busy_timeout = 5000');\n    return $db;\n}\n\nfunction saveLead(PDO $db, int $userId, string $requestId, string $name, string $question): array\n{\n    $insert = $db->prepare('INSERT INTO leads\n        (user_id, request_id, name, question, created_at, notification)\n        VALUES (?, ?, ?, ?, ?, ?)\n        ON CONFLICT(user_id, request_id) DO NOTHING');\n    $insert->execute([$userId, $requestId, $name, $question, time(), 'pending']);\n    $created = $insert->rowCount() === 1;\n    $select = $db->prepare('SELECT * FROM leads WHERE user_id = ? AND request_id = ?');\n    $select->execute([$userId, $requestId]);\n    $lead = $select->fetch();\n    if ($lead === false) {\n        throw new RuntimeException('Lead not found');\n    }\n    if ($lead['name'] !== $name || $lead['question'] !== $question) {\n        throw new LogicException('Request ID already used with different fields');\n    }\n    return ['lead' => $lead, 'created' => $created];\n}\n\nfunction telegram(string $method, array $params): mixed\n{\n    $curl = curl_init('https://api.telegram.org/bot'.botToken().'/'.$method);\n    curl_setopt_array($curl, [\n        CURLOPT_POST => true,\n        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],\n        CURLOPT_POSTFIELDS => json_encode($params, JSON_THROW_ON_ERROR),\n        CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 3,\n        CURLOPT_TIMEOUT => 8,\n    ]);\n    try {\n        $raw = curl_exec($curl);\n        if ($raw === false) {\n            throw new RuntimeException('Telegram result unknown');\n        }\n        $body = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);\n        if (!is_array($body) || !is_bool($body['ok'] ?? null)) {\n            throw new RuntimeException('Invalid Telegram response');\n        }\n        if ($body['ok'] === false) {\n            throw new UnexpectedValueException('Telegram rejected request');\n        }\n        if (curl_getinfo($curl, CURLINFO_HTTP_CODE) !== 200) {\n            throw new RuntimeException('Unexpected HTTP status');\n        }\n        return $body['result'];\n    } finally {\n        unset($curl);\n    }\n}\n\nfunction notifyLead(int $userId, int $leadId): string\n{\n    try {\n        telegram('sendMessage', [\n            'chat_id' => $userId,\n            'text' => 'Заявка №'.$leadId.' сохранена. Спасибо за обращение!',\n        ]);\n        return 'sent';\n    } catch (UnexpectedValueException) {\n        return 'rejected';\n    } catch (Throwable) {\n        return 'unknown';\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохранение использует составной ключ user_id/request_id. При повторе с теми же полями возвращается прежняя заявка; другой пользователь не получает её по чужому request_id. При изменённых полях сервер отклоняет повтор, а не незаметно перезаписывает запись. В этом небольшом проекте один бот и одна база; для нескольких ботов добавьте bot_id в ключ и запросы."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовленные PDO-запросы отделяют значения формы от SQL. Подпись Telegram подтверждает личность, но поля name и question всё равно остаются пользовательским вводом. При отображении этих значений в кабинете экранируйте их под HTML; при пересылке с parse_mode — под разметку Telegram."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "install",
+        "label": "Создаём таблицу один раз",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создаём таблицу один раз"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Установочный скрипт запускается из корня проекта в CLI. Он не выполняется при открытии формы и не должен лежать в public."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · install.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nif (PHP_SAPI !== 'cli') {\n    http_response_code(404);\n    exit;\n}\nrequire __DIR__.'/app.php';\nif (!is_dir(__DIR__.'/var') && !mkdir(__DIR__.'/var', 0700)) {\n    throw new RuntimeException('Cannot create private storage');\n}\ndatabase()->exec('CREATE TABLE IF NOT EXISTS leads (\n    id INTEGER PRIMARY KEY AUTOINCREMENT,\n    user_id INTEGER NOT NULL,\n    request_id TEXT NOT NULL,\n    name TEXT NOT NULL,\n    question TEXT NOT NULL,\n    created_at INTEGER NOT NULL,\n    notification TEXT NOT NULL,\n    UNIQUE (user_id, request_id)\n)');\necho \"Storage ready\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · Подготовка хранилища",
+                  "code": "php install.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ожидаемый результат — Storage ready и файл var/leads.sqlite. Ошибка драйвера означает, что в PHP отсутствует PDO SQLite; ошибка доступа требует исправить права на частный каталог. Не переключайте приложение на публичный JSON-файл ради обхода настройки базы."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "endpoint",
+        "label": "Принимаем форму в submit.php",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Принимаем форму в submit.php"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Endpoint работает на том же origin, что и страница, и принимает только POST с JSON. Мы не используем cookie-сессию и не включаем CORS для чужих сайтов. Авторизация каждого запроса основана на подписанном initData. Это bearer-данные на ограниченное время: не пишите их в логи и не передавайте в URL."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/submit.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/app.php';\n\nfunction respond(int $status, array $body): never\n{\n    http_response_code($status);\n    header('Content-Type: application/json; charset=utf-8');\n    header('Cache-Control: no-store');\n    echo json_encode($body, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n    exit;\n}\n\nif (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {\n    header('Allow: POST');\n    respond(405, ['error' => 'Используйте POST']);\n}\nif (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/json') {\n    respond(415, ['error' => 'Ожидается JSON']);\n}\n$raw = file_get_contents('php://input', false, null, 0, 16385);\nif ($raw === false || strlen($raw) > 16384) {\n    respond(413, ['error' => 'Запрос слишком большой']);\n}\ntry {\n    $data = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);\n    if (!is_array($data)) {\n        throw new InvalidArgumentException('Некорректная форма');\n    }\n    foreach (['initData', 'requestId', 'name', 'question'] as $key) {\n        if (!is_string($data[$key] ?? null)) {\n            throw new InvalidArgumentException('Заполните поля формы');\n        }\n    }\n    $userId = validateInitData($data['initData'], botToken(), time());\n    $name = trim($data['name']);\n    $question = trim($data['question']);\n    if (!preg_match('/^[a-f0-9-]{36}$/D', $data['requestId'])\n        || mb_strlen($name) < 1 || mb_strlen($name) > 80\n        || mb_strlen($question) < 1 || mb_strlen($question) > 1000) {\n        throw new InvalidArgumentException('Имя: 1–80 знаков; вопрос: 1–1000');\n    }\n    $db = database();\n    $saved = saveLead($db, $userId, $data['requestId'], $name, $question);\n    $lead = $saved['lead'];\n    $notification = $lead['notification'];\n    if ($saved['created']) {\n        $notification = notifyLead($userId, (int) $lead['id']);\n        $query = $db->prepare('UPDATE leads SET notification = ? WHERE id = ?');\n        $query->execute([$notification, $lead['id']]);\n    }\n    respond(200, ['saved' => true, 'id' => (int) $lead['id'], 'notification' => $notification]);\n} catch (DomainException) {\n    respond(401, ['error' => 'Переоткройте приложение из Telegram']);\n} catch (JsonException|InvalidArgumentException $error) {\n    respond(422, ['error' => 'Проверьте поля и формат запроса']);\n} catch (LogicException) {\n    respond(409, ['error' => 'Эта отправка уже сохранена с другими полями. Начните новую заявку']);\n} catch (Throwable) {\n    // Do not log the token, initData or the user's form here.\n    error_log('Mini App submit failed; inspect private application monitoring');\n    respond(500, ['error' => 'Не удалось подтвердить результат. Повторите те же данные']);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При повторе отправка сообщения не выполняется: используется сохранённый notification. Статус sent означает успешный ответ Bot API; rejected — явный отказ Telegram; unknown — исход не удалось надёжно определить. pending может остаться, если процесс завершился между сохранением и обновлением статуса."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сам факт заявки уже сохранён перед вызовом sendMessage. Потеря ответа Telegram не откатывает её. В учебном примере нет автоматической повторной отправки уведомлений: иначе неизвестный результат мог бы породить дубль в чате. Для рабочего сервиса перенесите уведомления в outbox и worker с отдельным учётом исхода; граница между БД и Telegram всё равно не даёт exactly-once."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "html",
+        "label": "Создаём страницу и отправляем данные через fetch",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создаём страницу и отправляем данные через fetch"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните страницу как public/index.html. Скрипт Telegram подключается перед нашим кодом. Форма остаётся открытой до серверного ответа; сообщения выводятся через textContent. Если страницу открыли напрямую в браузере без initData, отправка недоступна: подставлять фиктивный Telegram ID нельзя."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "HTML · public/index.html",
+                  "code": "<!doctype html>\n<html lang=\"ru\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>Заявка на консультацию</title>\n  <script src=\"https://telegram.org/js/telegram-web-app.js?64\"></script>\n  <style>\n    * { box-sizing: border-box; }\n    body { margin: 0; padding: 20px; font: 16px/1.5 system-ui;\n      color: var(--tg-theme-text-color, #17212b);\n      background: var(--tg-theme-bg-color, #fff); }\n    main { max-width: 520px; margin: auto; }\n    label { display: block; margin: 16px 0; }\n    input, textarea, button { font: inherit; width: 100%; padding: 12px; }\n    input, textarea { color: inherit; background: inherit;\n      border: 1px solid #888; border-radius: 8px; }\n    button { border: 0; border-radius: 8px; margin-top: 12px;\n      color: var(--tg-theme-button-text-color, #fff);\n      background: var(--tg-theme-button-color, #246bce); }\n    button:disabled { opacity: .55; }\n    #status { overflow-wrap: anywhere; }\n  </style>\n</head>\n<body>\n<main>\n  <h1>Заявка на консультацию</h1>\n  <form id=\"lead\">\n    <label>Как к вам обращаться\n      <input name=\"name\" required maxlength=\"80\" autocomplete=\"name\">\n    </label>\n    <label>Ваш вопрос\n      <textarea name=\"question\" required maxlength=\"1000\" rows=\"5\"></textarea>\n    </label>\n    <p>Имя и вопрос будут сохранены для обработки обращения сервисным центром.\n      Не указывайте пароли и платёжные данные.</p>\n    <button id=\"send\" type=\"submit\" disabled>Отправить заявку</button>\n  </form>\n  <p id=\"status\" role=\"status\" aria-live=\"polite\"></p>\n  <button id=\"new\" type=\"button\" hidden>Новая заявка</button>\n</main>\n<script>\nconst app = window.Telegram && window.Telegram.WebApp;\nconst form = document.getElementById('lead');\nconst send = document.getElementById('send');\nconst status = document.getElementById('status');\nconst next = document.getElementById('new');\nlet requestId;\ntry {\n  requestId = sessionStorage.getItem('leadRequestId') || crypto.randomUUID();\n  sessionStorage.setItem('leadRequestId', requestId);\n  if (!app || !app.initData) throw new Error('Open from Telegram');\n  app.ready();\n  app.expand();\n  send.disabled = false;\n} catch (error) {\n  status.textContent = 'Откройте форму из меню бота в актуальном Telegram.';\n}\nform.addEventListener('submit', async (event) => {\n  event.preventDefault();\n  if (!app || !app.initData || !requestId || send.disabled) return;\n  send.disabled = true;\n  next.hidden = true;\n  status.textContent = 'Сохраняем заявку…';\n  let saved = false;\n  try {\n    const fields = new FormData(form);\n    const response = await fetch('submit.php', {\n      method: 'POST', credentials: 'omit',\n      headers: {'Content-Type': 'application/json'},\n      body: JSON.stringify({initData: app.initData, requestId,\n        name: fields.get('name'), question: fields.get('question')})\n    });\n    const result = await response.json();\n    if (!response.ok || result.saved !== true) {\n      if (response.status === 409) next.hidden = false;\n      throw new Error(result.error || 'Не удалось подтвердить сохранение');\n    }\n    saved = true;\n    status.textContent = 'Заявка №' + result.id + ' сохранена.' +\n      (result.notification === 'sent' ? ' Подтверждение отправлено в чат.' :\n        ' Отправка подтверждения в чат не подтверждена; заявка уже в базе.');\n    next.hidden = false;\n  } catch (error) {\n    status.textContent = error instanceof Error ? error.message : 'Ошибка связи';\n    status.textContent += ' При повторе сохраните те же значения полей.';\n  } finally {\n    send.disabled = saved;\n  }\n});\nnext.addEventListener('click', () => {\n  requestId = crypto.randomUUID();\n  sessionStorage.setItem('leadRequestId', requestId);\n  form.reset();\n  status.textContent = '';\n  next.hidden = true;\n  send.disabled = false;\n});\n</script>\n</body>\n</html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "requestId сохраняется в sessionStorage этого окна, чтобы повторить операцию после потери ответа, в том числе после перезагрузки страницы. Сами поля в браузерном хранилище не сохраняются: после перезагрузки их нужно заполнить теми же значениями, если отправка уже могла дойти. Новую операцию начинайте кнопкой «Новая заявка» после подтверждения предыдущей либо при конфликте полей. Новое открытие приложения может получить другой requestId — это не пожизненная защита от всех одинаковых обращений."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отключение кнопки защищает только от случайного двойного клика. Настоящая защита от повтора находится в уникальном ключе БД. Ограничьте размер тела и частоту запросов также на веб-сервере; для рабочего проекта добавьте лимит по проверенному user_id. Подписанный пользователь всё ещё может создавать много новых requestId."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "launch",
+        "label": "Подключаем кнопку меню к боту",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключаем кнопку меню к боту"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разместите public на своём HTTPS-домене, например https://mini.example.com/. Проверка адреса должна открывать форму без ошибок сертификата. Затем создайте setup-menu.php и задайте APP_URL в окружении CLI. Скрипт меняет кнопку меню по умолчанию для личных чатов тестового бота, не отправляя сообщения пользователям."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-menu.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nif (PHP_SAPI !== 'cli') {\n    http_response_code(404);\n    exit;\n}\nrequire __DIR__.'/app.php';\n$url = getenv('APP_URL');\nif (!is_string($url) || !filter_var($url, FILTER_VALIDATE_URL)\n    || parse_url($url, PHP_URL_SCHEME) !== 'https') {\n    throw new RuntimeException('Set an HTTPS APP_URL');\n}\ntelegram('setChatMenuButton', ['menu_button' => [\n    'type' => 'web_app', 'text' => 'Оставить заявку',\n    'web_app' => ['url' => $url],\n]]);\necho \"Menu button configured\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · Настройка после размещения приложения",
+                  "code": "php setup-menu.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для запуска через эту кнопку достаточно setChatMenuButton; настройка Main Mini App и ссылок startapp — отдельные способы открытия. Если для конкретного личного чата уже назначена собственная кнопка меню, она может перекрыть общую: проверьте getChatMenuButton для этого чата и при необходимости верните type=default либо настройте его отдельно. Не заменяйте рабочее меню чужого бота ради эксперимента."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Проверяем форму и сбои по шагам",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем форму и сбои по шагам"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте приложение из личного чата бота и отправьте тестовый вопрос. Должны появиться номер заявки, строка в SQLite и, если отправка доступна, подтверждение в чате."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте тот же URL вне Telegram. Кнопка отправки останется недоступной; серверный запрос без подписи также должен быть отклонён."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "В изолированной проверке измените user.id внутри initData, не пересчитывая hash. Сервер должен вернуть 401, не создавая строку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте старый auth_date: потребуется переоткрыть приложение. Не убирайте проверку срока ради прохождения теста."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторите POST с теми же initData, requestId и полями. Должен вернуться прежний номер без второго sendMessage."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторите requestId с изменённым вопросом. Ожидается 409 без изменения первой записи."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Смоделируйте недоступность Telegram после записи. Форма должна подтвердить сохранение и отдельно показать, что отправка сообщения не подтверждена."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте форму на телефоне и компьютере, проверьте тёмную тему, экранную клавиатуру и длинный вопрос."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это законченный учебный путь одной формы, а не CRM: списка заявок для менеджера, резервного копирования, автоматической повторной доставки и удаления данных по сроку здесь нет. Перед приёмом реальных обращений добавьте эти возможности по своим требованиям, разместите сведения о получателе данных и политику обработки. Не собирайте дополнительные поля «на будущее»."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Где в этой схеме применяется BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Где в этой схеме применяется BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример выше вызывает Telegram напрямую. Если в проекте уже используется BotGate, исходящие setChatMenuButton и sendMessage можно выполнять настроенным серверным клиентом по "
+                },
+                {
+                  "type": "text",
+                  "text": "документации API",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#proxy"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Обновите также разбор ошибок под выбранный клиент, не меняя сохранение формы."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка подписи initData выполняется именно с Telegram-токеном этого бота, а не с API-ключом BotGate и не с webhook_secret. Поэтому серверу формы нужен защищённый доступ к токену даже при отправке сообщений через шлюз. В браузере его быть не должно. BotGate не размещает HTML-страницу и не проверяет поля формы вместо вашего PHP endpoint."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Официальная документация",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Официальная документация"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Telegram Mini Apps",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/webapps"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — подключение JavaScript и способы запуска."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверка initData",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — подпись и auth_date."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "setChatMenuButton",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#setchatmenubutton"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " и "
+                        },
+                        {
+                          "type": "text",
+                          "text": "sendMessage",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#sendmessage"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — меню и подтверждение."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "hash_hmac",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://www.php.net/manual/en/function.hash-hmac.php"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ", "
+                        },
+                        {
+                          "type": "text",
+                          "text": "hash_equals",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://www.php.net/manual/en/function.hash-equals.php"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " и "
+                        },
+                        {
+                          "type": "text",
+                          "text": "подготовленные запросы PDO",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://www.php.net/manual/en/pdo.prepared-statements.php"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — функции PHP из примера."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,847 @@
+[
+  {
+    "slug": "telegram-bot-botfather",
+    "title": "Как создать Telegram-бота через BotFather: пошаговая инструкция для новичка",
+    "seo_title": null,
+    "description": "Создание Telegram-бота через BotFather без кода: имя, username, токен и оформление профиля. Что проверить после регистрации и как перейти к первому запуску.",
+    "card_description": null,
+    "category": "Для начинающих",
+    "topics": "Telegram Bot API",
+    "reading_time": "5 минут",
+    "published_at": "2026-10-05",
+    "is_published": true,
+    "sort_order": 1,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "attrs": {
+            "textAlign": "start"
+          },
+          "content": [
+            {
+              "type": "text",
+              "text": "Создадим Telegram-бота через официальный BotFather, выберем имя и оформим профиль. Для регистрации код не нужен. В конце разберём, что уже готово и какой следующий шаг нужен, чтобы бот начал отвечать пользователям."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "prepare",
+        "label": "Что подготовить",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2,
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что подготовить перед созданием бота"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Вам нужен аккаунт Telegram, доступ к нему и понимание задачи будущего бота. Отдельный номер телефона для самого бота не требуется: он создаётся через ваш аккаунт. Основные принципы описаны во "
+                },
+                {
+                  "type": "text",
+                  "text": "введении Telegram о ботах",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots#how-do-bots-work",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера создадим бота небольшой мастерской: в будущем он будет принимать заявки на ремонт. Сейчас подготовим его профиль; вопросы клиенту и передачу заявки настроим на следующем этапе."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Заранее придумайте понятное название и несколько вариантов username. Если пока неясно, какую задачу поручить боту, начните с "
+                },
+                {
+                  "type": "text",
+                  "text": "руководства по сценариям бота для бизнеса",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-business"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ": оно поможет выбрать одну функцию для первого запуска."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "create",
+        "label": "Создание через BotFather",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2,
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "1. Создайте бота через BotFather"
+                }
+              ]
+            },
+            {
+              "type": "orderedList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте официальный "
+                        },
+                        {
+                          "type": "text",
+                          "text": "@BotFather",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://t.me/BotFather",
+                                "target": "_blank",
+                                "rel": "noopener noreferrer"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " по ссылке. Проверьте username: не передавайте данные аккаунтам с похожим названием."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Начните диалог и отправьте команду "
+                        },
+                        {
+                          "type": "text",
+                          "text": "/newbot",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введите отображаемое имя, например «Мастерская — заявки на ремонт». Это название увидят пользователи."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введите username — короткий адрес бота. Для нового бота используйте от 5 до 32 латинских букв, цифр и знаков подчёркивания; адрес должен заканчиваться на "
+                        },
+                        {
+                          "type": "text",
+                          "text": "bot",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ". Пример формата: "
+                        },
+                        {
+                          "type": "text",
+                          "text": "workshop_requests_bot",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Дождитесь сообщения BotFather с адресом созданного бота и токеном доступа."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример username вымышленный, его доступность не проверена. Если выбранный адрес занят, предложите другой. Если BotFather сообщает о неверном формате, проверьте символы, длину и окончание. "
+                },
+                {
+                  "type": "text",
+                  "text": "Правила создания и username",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/features#creating-a-new-bot",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " есть в документации Telegram."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-botfather/botfather-steps.jpg",
+                  "alt": "Проверить @BotFather, отправить /newbot, задать имя мастерской и username; затем сохранить ссылку и секретный токен.",
+                  "caption": "Памятка по шагам из статьи, не снимок BotFather. Имя и username — примеры; доступность адреса не проверена. Токен не изображён.",
+                  "width": 1080,
+                  "height": 938,
+                  "mobile_src": "/images/guides/telegram-bot-botfather/botfather-steps-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1049
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Результат этого шага — отдельный аккаунт бота с адресом в Telegram. Сохраните ссылку из сообщения BotFather: по ней вы и будущие пользователи сможете открыть чат."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "token",
+        "label": "Как сохранить токен",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2,
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "2. Сохраните токен доступа"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Токен — секрет для подключения программы к боту. Это не ссылка на чат и не пароль вашего личного аккаунта. Храните его в менеджере паролей или другом защищённом месте; не публикуйте в статье, переписке с клиентами и скриншотах."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда будете подключать конструктор или передавать работу разработчику, токен понадобится для настройки. Передавайте его только тому сервису или человеку, которому доверяете управление ботом. Рекомендации по хранению и замене токена приведены в "
+                },
+                {
+                  "type": "text",
+                  "text": "официальном учебном руководстве",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/tutorial#obtain-your-bot-token",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если токен оказался в открытом доступе, замените его через BotFather и обновите в подключённом приложении. Удаление скриншота или сообщения само по себе не отменяет доступ по старому токену."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "profile",
+        "label": "Оформление профиля",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2,
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "3. Оформите профиль"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправьте BotFather "
+                },
+                {
+                  "type": "text",
+                  "text": "/mybots",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и выберите созданного бота. Через настройки можно добавить описание, краткую информацию и изображение профиля. Названия пунктов интерфейса могут меняться; актуальные команды показывает сам BotFather."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Описание:",
+                          "marks": [
+                            {
+                              "type": "bold"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " какую задачу решает бот и что пользователь сможет сделать."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Краткая информация:",
+                          "marks": [
+                            {
+                              "type": "bold"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " одно предложение, помогающее узнать бота в профиле."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Изображение:",
+                          "marks": [
+                            {
+                              "type": "bold"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " узнаваемый знак мастерской, магазина или проекта."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для нашей мастерской описание можно сформулировать так: «Помогаю оставить заявку на ремонт и узнать, как связаться с мастерской». Добавляйте только те возможности, которые собираетесь реализовать к запуску. Подробнее об этих полях — в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации профиля бота",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/features#about-text-description-and-profile-media",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "check",
+        "label": "Проверка созданного бота",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2,
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "4. Проверьте созданного бота"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Откройте ссылку из сообщения BotFather. Убедитесь, что видны нужное имя, описание и изображение. Нажмите «Старт» или отправьте "
+                },
+                {
+                  "type": "text",
+                  "text": "/start",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если вы ещё не подключили программу или конструктор, ответа может не быть. BotFather регистрирует бота и управляет его настройками, а ответы формирует подключённое приложение. Этот следующий этап показан в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве Telegram по первому запуску",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/tutorial#first-run",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка регистрации закончена, когда чат открывается по правильной ссылке, профиль соответствует вашей задаче, а токен сохранён. Работу диалога проверяют после настройки сценария."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "next",
+        "label": "Что делать дальше",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2,
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Бот создан — что делать дальше"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Чтобы подключить ответы, выбрать конструктор или разработку и проверить первый диалог, перейдите к статье "
+                },
+                {
+                  "type": "text",
+                  "text": "«Что нужно для запуска Telegram-бота: от идеи до первого ответа»",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-launch"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "attrs": {
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если бот нужен для бизнеса, но вы ещё выбираете команды, меню и вопросы клиенту, прочитайте "
+                },
+                {
+                  "type": "text",
+                  "text": "«Как продумать Telegram-бота для бизнеса»",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-business"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Подготовленный сценарий пригодится и для конструктора, и для задания разработчику."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Источники",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2,
+                "textAlign": "start"
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Источники"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Telegram: BotFather",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/features#botfather",
+                                "target": "_blank",
+                                "rel": "noopener noreferrer"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — создание бота и настройка профиля."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Telegram: от BotFather до первого ответа",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/tutorial",
+                                "target": "_blank",
+                                "rel": "noopener noreferrer"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — токен и подключение программы."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Введение в Telegram-ботов",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots",
+                                "target": "_blank",
+                                "rel": "noopener noreferrer"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — устройство бота и отличие от аккаунта пользователя."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

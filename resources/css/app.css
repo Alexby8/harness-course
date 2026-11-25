@@ -1,0 +1,114 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+@layer components {
+    .journal-input {
+        @apply h-10 w-full min-w-0 rounded-lg border border-gray-700 bg-gray-950 px-3 text-sm text-gray-200 outline-none focus:border-indigo-500;
+        color-scheme: dark;
+    }
+    .journal-table { @apply w-full min-w-[960px] text-left text-sm; }
+    .journal-table th { @apply whitespace-nowrap bg-gray-900 px-4 py-3 text-xs font-medium text-gray-400; }
+    .journal-table td { @apply border-t border-gray-800 px-4 py-3 align-top; }
+    .journal-table tbody tr { @apply transition-colors hover:bg-gray-900/80; }
+    .account-menu summary::-webkit-details-marker { display: none; }
+    .journal-detail summary::-webkit-details-marker { display: none; }
+    .journal-detail[open] summary svg { transform: rotate(90deg); }
+
+    .guide-intro p { @apply my-0; }
+    .guide-intro code { @apply text-base text-indigo-300; }
+    .guide-example, .guide-prose .guide-example {
+        @apply mt-7 grid grid-cols-[2.5rem_minmax(0,1fr)] gap-4 rounded-xl border border-gray-700/70 bg-gray-900/70 p-5 text-left text-sm leading-6 text-gray-300 no-underline transition-colors sm:p-6;
+        overflow-wrap: anywhere;
+    }
+    .guide-example:hover { @apply border-indigo-400/50 bg-gray-900; }
+    .guide-example:focus-visible { @apply outline-2 outline-offset-4 outline-indigo-400; }
+    .guide-example-icon { @apply flex h-10 w-10 items-center justify-center rounded-lg border border-gray-700 bg-gray-800/60; }
+    .guide-example-content { @apply block min-w-0; }
+    .guide-example-meta { @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-gray-400; }
+    .guide-example-language { @apply rounded-md border border-gray-700 px-2 py-0.5 text-xs leading-4 text-gray-300; }
+    .guide-example-title { @apply mt-2 block text-base font-semibold leading-6 text-gray-100; }
+    .guide-example-description { @apply mt-1 block text-sm leading-6 text-gray-400; }
+    .guide-example-action { @apply mt-3 block text-sm font-medium text-indigo-300; }
+    .guide-example:hover .guide-example-action { @apply text-indigo-200 underline underline-offset-4; }
+    .guide-code { @apply my-6 rounded-lg overflow-hidden border border-gray-800; }
+    .guide-code-label { @apply bg-gray-800/60 px-4 py-1.5 text-xs text-gray-500 font-mono border-b border-gray-800; }
+    .guide-code pre, .guide-prose pre {
+        @apply bg-gray-900 px-4 py-4 text-sm text-gray-300 font-mono overflow-x-auto leading-relaxed whitespace-pre;
+    }
+    .guide-code pre { margin: 0; }
+    .guide-callout { @apply mb-10 rounded-xl border border-indigo-500/25 bg-indigo-500/5 p-5 sm:p-6; }
+    .guide-callout p:first-child { @apply mt-0 font-semibold text-indigo-200; }
+    .guide-callout p:last-child { @apply mb-0; }
+    .guide-prose {
+        @apply text-base leading-8 text-gray-300;
+        overflow-wrap: anywhere;
+    }
+
+    .guide-prose section {
+        @apply mb-12;
+        scroll-margin-top: 8rem;
+    }
+
+    .guide-prose h2 {
+        @apply mb-5 text-2xl font-semibold leading-snug tracking-tight text-white;
+    }
+
+    .guide-prose h3 {
+        @apply mt-7 mb-3 text-lg font-semibold leading-snug text-gray-100;
+    }
+
+    .guide-prose p {
+        @apply my-4;
+    }
+
+    .guide-prose strong {
+        @apply font-semibold text-gray-100;
+    }
+
+    .guide-prose a {
+        @apply text-indigo-300 underline decoration-indigo-400/30 underline-offset-4 transition hover:text-indigo-200;
+    }
+
+    .guide-prose :not(pre) > code {
+        @apply rounded bg-gray-800/70 px-1 py-0.5 text-sm text-indigo-200;
+    }
+
+    .guide-prose ul, .guide-prose ol {
+        @apply my-5 space-y-3 pl-5;
+    }
+
+    .guide-prose ul { @apply list-disc; }
+    .guide-prose ol { @apply list-decimal; }
+    .guide-prose li { @apply pl-1 marker:text-indigo-400; }
+    .guide-prose li > p { margin: 0; }
+    .guide-prose pre { overflow-wrap: normal; }
+
+    .guide-table-wrapper {
+        @apply my-6 overflow-x-auto rounded-xl border border-gray-800;
+    }
+
+    .guide-prose table { @apply block w-full overflow-x-auto my-6 rounded-xl border border-gray-800 text-left text-sm leading-6; }
+    /* RichEditor emits one tbody; the outer table remains the scroll container. */
+    .guide-prose table > tbody { display: table; width: 100%; }
+    .guide-prose th, .guide-prose td { min-width: 12rem; }
+    .guide-prose td p, .guide-prose th p { margin: 0; }
+    .guide-prose th { @apply bg-gray-900 px-4 py-3 font-medium text-gray-200; }
+    .guide-prose td { @apply border-t border-gray-800 px-4 py-4 align-top text-gray-400; }
+    .guide-prose th:first-child { @apply w-1/3; }
+    .guide-prose .guide-note { @apply text-sm leading-6 text-gray-500; }
+    .guide-illustration { @apply my-8; }
+    .guide-illustration img { @apply block w-full rounded-xl border border-gray-800; }
+    .guide-illustration figcaption { @apply mt-3 text-sm leading-6 text-gray-400; }
+    .guide-illustration-mobile { display: none; }
+    @media (max-width: 640px) {
+        .guide-illustration-desktop { display: none; }
+        .guide-illustration-mobile { display: block; }
+    }
+}

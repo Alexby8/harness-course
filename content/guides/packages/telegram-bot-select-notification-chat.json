@@ -1,0 +1,968 @@
+[
+  {
+    "slug": "telegram-bot-select-notification-chat",
+    "title": "Как дать пользователю выбрать группу или канал для уведомлений",
+    "seo_title": "Как дать пользователю выбрать группу или канал для уведомлений",
+    "description": "Подключение чата через request_chat: выбор группы или канала, проверка владельца и прав бота, пробная отправка, сохранение интеграции и отключение.",
+    "card_description": "Подключение чата через request_chat: выбор группы или канала, проверка владельца и прав бота, пробная отправка, сохранение интеграции и отключение.",
+    "category": "Практика",
+    "topics": "Telegram Bot API · request_chat · Интеграции · PHP",
+    "reading_time": "30 минут",
+    "published_at": "2026-11-16",
+    "is_published": true,
+    "sort_order": 62,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера подключим рабочий чат к уведомлениям сервиса. Пользователь нажмёт кнопку выбора группы или канала в личном диалоге с ботом. Сервер проверит, что пользователь вправе подключать этот чат, а бот может туда писать. Интеграция включится только после успешной пробной отправки; позже её можно будет отключить командой."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "flow",
+        "label": "Что даёт выбор чата и чего он не подтверждает",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что даёт выбор чата и чего он не подтверждает"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Кнопка request_chat открывает нативный список подходящих чатов. После выбора бот получает служебное message.chat_shared с request_id и chat_id. Это удобнее, чем просить скопировать отрицательный ID или добавить случайного бота для определения номера группы."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-select-notification-chat/connect-notification-chat.jpg",
+                  "alt": "Команда /group, кнопка Выбрать группу, выбор своего чата, проверки прав и пробная отправка; только затем сообщение Чат подключён.",
+                  "caption": "Схема сценария /group из статьи. «Выбрать группу» — кнопка reply-клавиатуры с request_chat. Название группы условное; нативное окно Telegram не воспроизведено.",
+                  "width": 1080,
+                  "height": 1002,
+                  "mobile_src": "/images/guides/telegram-bot-select-notification-chat/connect-notification-chat-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1260
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Полученный идентификатор ещё не является рабочей интеграцией. Пользователь мог нажать старую кнопку; бот мог потерять права между выбором и отправкой; очередь могла обрабатывать уже отменённый запрос. Поэтому связываем request_id с пользователем и сроком действия, затем отдельно проверяем чат и делаем пробную отправку."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Кнопка находится в обычной reply-клавиатуре, не в inline_keyboard, и используется в личном чате с ботом."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выбор группы и канала — два разных запроса с chat_is_channel=false/true."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Доступ к уведомлениям не подтверждается названием или username чата. Храним числовой chat_id в 64-битном поле."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "В примере у каждого пользователя одна активная интеграция. Успешный новый выбор заменяет предыдущий адресат; неуспешный оставляет прежний."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для компактного безопасного сценария подключение разрешено только владельцу чата. Бот должен быть заранее добавлен администратором. Это сознательное ограничение примера, а не общее требование Telegram: ниже объясним, как расширить сценарий для администраторов, не ослабляя серверную проверку."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовим бота, базу и идентификатор",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовим бота, базу и идентификатор"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера нужны PHP 8.3+ на 64-битной системе, cURL, PDO SQLite и mbstring. Один бот использует одну SQLite-базу на локальном диске. Публичный корень сайта — только public/; common.php, telegram.php, runtime.php, bot.php, worker.php, init.php и schema.sql находятся уровнем выше. Создайте закрытую папку private с правом записи для приложения. Обычный PHP не читает .env автоматически: задайте переменные окружения и для PHP-FPM, и для CLI."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · пример",
+                  "code": "BOT_TOKEN=TOKEN_FROM_BOTFATHER\nBOT_DB_PATH=/srv/demo/private/bot.sqlite\nWEBHOOK_SECRET=RANDOM_SECRET_FROM_PASSWORD_MANAGER\nWEBHOOK_URL=https://example.com/webhook.php\nBOT_ID=NUMERIC_ID_FROM_GETME"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE inbox (\n    seq INTEGER PRIMARY KEY, update_id INTEGER NOT NULL UNIQUE,\n    payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', received_at INTEGER NOT NULL\n);\nCREATE TABLE actions (\n    action_key TEXT PRIMARY KEY, method TEXT NOT NULL,\n    state TEXT NOT NULL, result TEXT, created_at INTEGER NOT NULL\n);\n\nCREATE TABLE chat_requests (\n    id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, kind TEXT NOT NULL,\n    expires_at INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'pending', selected_chat INTEGER\n);\nCREATE TABLE integrations (\n    user_id INTEGER PRIMARY KEY, chat_id INTEGER NOT NULL, kind TEXT NOT NULL,\n    active INTEGER NOT NULL, confirmed_at INTEGER NOT NULL\n);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction setting(string $name): string\n{\n    $value = getenv($name);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing setting: '.$name);\n    }\n    return $value;\n}\n\nfunction database(): PDO\n{\n    $path = setting('BOT_DB_PATH');\n    if (!is_file($path)) {\n        throw new RuntimeException('Run init.php first');\n    }\n    $db = new PDO('sqlite:'.$path, options: [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA foreign_keys=ON');\n    $db->exec('PRAGMA busy_timeout=3000');\n    return $db;\n}\n\n/** @param list<int|string|null> $values */\nfunction sql(PDO $db, string $query, array $values = []): PDOStatement\n{\n    $statement = $db->prepare($query);\n    $statement->execute($values);\n    return $statement;\n}\n\n/** @return array<string, int|string|null>|null */\nfunction row(PDOStatement $statement): ?array\n{\n    $result = $statement->fetch(PDO::FETCH_ASSOC);\n    if ($result === false) {\n        return null;\n    }\n    if (!is_array($result)) {\n        throw new RuntimeException('Invalid database row');\n    }\n    foreach ($result as $key => $value) {\n        if (!is_string($key) || !(is_int($value) || is_string($value) || $value === null)) {\n            throw new RuntimeException('Invalid database field');\n        }\n    }\n    return $result;\n}\n\n/**\n * @template T\n * @param callable(): T $action\n * @return T\n */\nfunction atomic(PDO $db, callable $action): mixed\n{\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $result = $action();\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $e) {\n        $db->exec('ROLLBACK');\n        throw $e;\n    }\n}\n\n/** @return array<string, mixed> */\nfunction jsonBody(): array\n{\n    $raw = file_get_contents('php://input', length: 65537);\n    if ($raw === false || strlen($raw) > 65536) {\n        throw new InvalidArgumentException('Request too large');\n    }\n    $data = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);\n    if (!is_array($data) || array_is_list($data)) {\n        throw new InvalidArgumentException('Expected JSON object');\n    }\n    $result = [];\n    foreach ($data as $key => $value) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Invalid JSON key');\n        }\n        $result[$key] = $value;\n    }\n    return $result;\n}\n\n/** @param array<string, mixed> $data */\nfunction reply(array $data, int $status = 200): never\n{\n    http_response_code($status);\n    header('Content-Type: application/json; charset=utf-8');\n    header('Cache-Control: no-store');\n    echo json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n    exit;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nif (PHP_SAPI !== 'cli') {\n    exit(1);\n}\n$path = setting('BOT_DB_PATH');\nif (file_exists($path)) {\n    throw new RuntimeException('Database already exists');\n}\n$schema = file_get_contents(__DIR__.'/schema.sql');\nif ($schema === false) {\n    throw new RuntimeException('Missing schema.sql');\n}\n$db = new PDO('sqlite:'.$path, options: [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n$db->exec('PRAGMA foreign_keys=ON');\n$db->exec($schema);\necho \"Database created\\n\";"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BOT_ID получите через getMe тем же токеном, которым отправляете сообщения; это числовой ID самого бота. Не используйте username или ID владельца. В канале дайте боту право публикации, в группе — минимальные административные права, достаточные для отправки и надёжной проверки участников."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавление администратором здесь нужно не только для отправки: getChatMember гарантирован для проверки других пользователей, когда сам бот — администратор. Если сервису принципиально нельзя выдавать административные права, потребуется другой сценарий подтверждения доступа; один chat_shared проблему не решает."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "chat_requests хранит одноразовый запрос выбора, а integrations — только подтверждённое подключение. В большом сервисе добавьте к обеим таблицам ID организации или проекта из авторизованной серверной сессии. Telegram ID сам по себе не доказывает право управлять чужим проектом сайта. Для связи аккаунтов используйте "
+                },
+                {
+                  "type": "text",
+                  "text": "привязку сайта и Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-link-website-account"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "handler",
+        "label": "Покажем кнопку и проверим выбранный чат",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Покажем кнопку и проверим выбранный чат"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · bot.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction checkDestination(int $owner, int $chat, string $kind): void\n{\n    $details = apiObject('getChat', ['chat_id' => $chat]);\n    $type = $details['type'] ?? '';\n    if ($kind === 'channel' ? $type !== 'channel' : !in_array($type, ['group', 'supergroup'], true)) {\n        throw new DomainException('Тип чата изменился');\n    }\n    if (($details['is_forum'] ?? false) === true) {\n        throw new DomainException('Для форума выберите также тему в отдельном сценарии');\n    }\n    // Requiring the bot to be admin makes getChatMember checks reliable for other users.\n    $bot = apiObject('getChatMember', ['chat_id' => $chat, 'user_id' => (int) setting('BOT_ID')]);\n    if (!isAdmin($bot) || ($kind === 'channel' && ($bot['can_post_messages'] ?? false) !== true)) {\n        throw new DomainException('Добавьте бота администратором с правом отправки');\n    }\n    $member = apiObject('getChatMember', ['chat_id' => $chat, 'user_id' => $owner]);\n    if (($member['status'] ?? '') !== 'creator') {\n        throw new DomainException('Подключать чат в этом примере может только его владелец');\n    }\n}\n\nfunction requestDestination(PDO $db, int $user, string $kind, int $update): void\n{\n    $id = random_int(1, 2147483647);\n    sql($db, \"UPDATE chat_requests SET state='cancelled' WHERE user_id=? AND state='pending'\", [$user]);\n    sql($db, 'INSERT INTO chat_requests(id,user_id,kind,expires_at) VALUES(?,?,?,?)', [$id, $user, $kind, time()+600]);\n    telegramOnce($db, 'choose:'.$update, 'sendMessage', [\n        'chat_id' => $user, 'text' => 'Выберите свой чат. Бот должен быть добавлен администратором. Запрос действует 10 минут.',\n        'reply_markup' => ['keyboard' => [[['text' => 'Выбрать '.($kind === 'channel' ? 'канал' : 'группу'),\n            'request_chat' => ['request_id' => $id, 'chat_is_channel' => $kind === 'channel',\n                'chat_is_created' => true, 'bot_is_member' => true, 'chat_is_forum' => false, 'request_title' => true]]]],\n            'resize_keyboard' => true, 'one_time_keyboard' => true],\n    ]);\n}\n\nfunction connectDestination(PDO $db, int $user, int $request, int $chat, int $update): void\n{\n    $pending = row(sql($db, \"SELECT * FROM chat_requests WHERE id=? AND user_id=? AND state='pending' AND expires_at>?\",\n        [$request, $user, time()]));\n    if ($pending === null) {\n        telegramOnce($db, 'stale:'.$update, 'sendMessage', ['chat_id' => $user, 'text' => 'Запрос устарел. Используйте /group или /channel.']);\n        return;\n    }\n    sql($db, \"UPDATE chat_requests SET state='checking',selected_chat=? WHERE id=?\", [$chat, $request]);\n    try {\n        checkDestination($user, $chat, (string) $pending['kind']);\n        $test = telegramOnce($db, 'test:'.$request, 'sendMessage', ['chat_id' => $chat,\n            'text' => 'Проверка подключения уведомлений. Этот чат выбран его владельцем.']);\n        $ok = $test['state'] === 'ok';\n        atomic($db, function () use ($db, $ok, $user, $chat, $pending, $request): void {\n            if ($ok) {\n                sql($db, 'INSERT INTO integrations VALUES(?,?,?,1,?) ON CONFLICT(user_id) DO UPDATE SET\n                    chat_id=excluded.chat_id,kind=excluded.kind,active=1,confirmed_at=excluded.confirmed_at',\n                    [$user, $chat, (string) $pending['kind'], time()]);\n            }\n            sql($db, 'UPDATE chat_requests SET state=? WHERE id=?', [$ok ? 'confirmed' : 'unconfirmed', $request]);\n        });\n        $text = $ok ? 'Чат подключён. Отключить: /disconnect' : 'Пробная отправка не подтверждена. Интеграция не включена.';\n    } catch (Throwable) {\n        sql($db, \"UPDATE chat_requests SET state='failed' WHERE id=?\", [$request]);\n        $text = 'Не удалось проверить доступ. Проверьте владельца чата и права бота, затем начните выбор заново.';\n    }\n    telegramOnce($db, 'connection-result:'.$request, 'sendMessage', ['chat_id' => $user, 'text' => $text,\n        'reply_markup' => ['remove_keyboard' => true]]);\n}\n\n/** @param array<string,mixed> $update */\nfunction handleUpdate(PDO $db, array $update): void\n{\n    $m = $update['message'] ?? null;\n    if (!is_array($m) || !is_array($m['chat'] ?? null) || !is_array($m['from'] ?? null)\n        || ($m['chat']['type'] ?? '') !== 'private' || !is_int($m['from']['id'] ?? null)\n        || ($m['chat']['id'] ?? null) !== $m['from']['id'] || !is_int($update['update_id'] ?? null)) {\n        return;\n    }\n    $user = $m['from']['id']; $id = $update['update_id']; $text = $m['text'] ?? '';\n    if ($text === '/disconnect') {\n        atomic($db, function () use ($db, $user): void {\n            sql($db, 'UPDATE integrations SET active=0 WHERE user_id=?', [$user]);\n            sql($db, \"UPDATE chat_requests SET state='cancelled' WHERE user_id=? AND state='pending'\", [$user]);\n        });\n        telegramOnce($db, 'disconnect:'.$id, 'sendMessage', ['chat_id' => $user, 'text' => 'Уведомления отключены.',\n            'reply_markup' => ['remove_keyboard' => true]]);\n    } elseif ($text === '/group' || $text === '/channel') {\n        requestDestination($db, $user, $text === '/channel' ? 'channel' : 'group', $id);\n    } elseif (is_array($m['chat_shared'] ?? null) && is_int($m['chat_shared']['request_id'] ?? null)\n        && is_int($m['chat_shared']['chat_id'] ?? null)) {\n        connectDestination($db, $user, $m['chat_shared']['request_id'], $m['chat_shared']['chat_id'], $id);\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пользователь пишет /group или /channel. Сервер генерирует request_id в диапазоне знакового 32-битного числа, связывает его с текущим пользователем и даёт десять минут на выбор. Предыдущий незавершённый запрос этого пользователя отменяется. Поэтому старая клавиатура не сможет незаметно заменить новое подключение."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "chat_is_created=true фильтрует чаты владельца, bot_is_member=true — чаты, где бот уже присутствует. Эти условия улучшают список в Telegram, но не заменяют checkDestination. На сервере повторно проверяются реальный тип чата, статус бота и статус пользователя creator. Ошибка или недоступность проверки не трактуется как разрешение."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Forum-группы исключены: для уведомления в конкретную тему нужен ещё message_thread_id. Произвольная отправка в общий раздел такого чата может быть неудобной или невозможной из-за настроек темы. Для форумов добавьте отдельный шаг выбора темы по "
+                },
+                {
+                  "type": "text",
+                  "text": "руководству об отправке в топики",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-send-message-to-topic"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После проверок sendMessage отправляет нейтральное сообщение без персональных данных. Только подтверждённый ok включает интеграцию. Если ответ потерян, пробное сообщение могло появиться, но интеграция остаётся unconfirmed. Пользователь повторяет подключение осознанно; приложение не объявляет успех по одному факту выбора чата."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "transport",
+        "label": "Подключим API и надёжно примем обновление",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подключим API и надёжно примем обновление"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · telegram.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/**\n * @param array<string, mixed> $params\n * @return array{state: string, result?: mixed, code?: int, retry_after?: int}\n */\nfunction telegram(string $method, array $params, bool $multipart = false): array\n{\n    $curl = curl_init('https://api.telegram.org/bot'.setting('BOT_TOKEN').'/'.$method);\n    curl_setopt_array($curl, [\n        CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_TIMEOUT => 8,\n        CURLOPT_POSTFIELDS => $multipart ? $params : json_encode($params, JSON_THROW_ON_ERROR),\n        CURLOPT_HTTPHEADER => $multipart ? [] : ['Content-Type: application/json'],\n    ]);\n    $raw = curl_exec($curl);\n    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    if (!is_string($raw) || $status >= 500) {\n        return ['state' => 'unknown'];\n    }\n    $data = json_decode($raw, true);\n    if (!is_array($data)) {\n        return ['state' => 'unknown'];\n    }\n    if (($data['ok'] ?? null) === true) {\n        return ['state' => 'ok', 'result' => $data['result'] ?? null];\n    }\n    if (($data['ok'] ?? null) !== false || !is_int($data['error_code'] ?? null)) {\n        return ['state' => 'unknown'];\n    }\n    $parameters = $data['parameters'] ?? null;\n    $delay = is_array($parameters) ? ($parameters['retry_after'] ?? null) : null;\n    return ['state' => 'rejected', 'code' => $data['error_code'],\n        'retry_after' => is_int($delay) && $delay > 0 ? $delay : 60];\n}\n\n/** @return array<string, mixed> */\nfunction incomingUpdate(): array\n{\n    $secret = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';\n    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !is_string($secret)\n        || !hash_equals(setting('WEBHOOK_SECRET'), $secret)) {\n        reply(['error' => 'Forbidden'], 403);\n    }\n    return jsonBody();\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · runtime.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/**\n * @param array<string,mixed> $params\n * @return array<string,mixed>\n */\nfunction apiObject(string $method, array $params): array\n{\n    $answer = telegram($method, $params);\n    $object = $answer['result'] ?? null;\n    if ($answer['state'] !== 'ok' || !is_array($object)) {\n        throw new RuntimeException('Telegram check failed: '.$method);\n    }\n    $result = [];\n    foreach ($object as $key => $value) {\n        if (!is_string($key)) {\n            throw new RuntimeException('Invalid API object');\n        }\n        $result[$key] = $value;\n    }\n    return $result;\n}\n\n/**\n * @param array<string,mixed> $params\n * @return array{state:string,result?:mixed}\n */\nfunction telegramOnce(PDO $db, string $key, string $method, array $params): array\n{\n    $inserted = sql($db, \"INSERT INTO actions(action_key,method,state,created_at) VALUES(?,?,'sending',?)\n        ON CONFLICT(action_key) DO NOTHING\", [$key, $method, time()])->rowCount();\n    if ($inserted === 0) {\n        $old = row(sql($db, 'SELECT state,result FROM actions WHERE action_key=?', [$key]));\n        return ['state' => (string) ($old['state'] ?? 'unknown'),\n            'result' => json_decode((string) ($old['result'] ?? 'null'), true)];\n    }\n    $answer = telegram($method, $params);\n    sql($db, 'UPDATE actions SET state=?,result=? WHERE action_key=?',\n        [$answer['state'], json_encode($answer['result'] ?? null, JSON_THROW_ON_ERROR), $key]);\n    return $answer;\n}\n\n/** @param array<string,mixed> $member */\nfunction isAdmin(array $member): bool\n{\n    return in_array($member['status'] ?? '', ['creator', 'administrator'], true);\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/telegram.php';\n$update = incomingUpdate();\nif (!is_int($update['update_id'] ?? null)) {\n    reply(['error' => 'Invalid update'], 422);\n}\nsql(database(), 'INSERT INTO inbox(update_id,payload,received_at) VALUES(?,?,?)\n    ON CONFLICT(update_id) DO NOTHING',\n    [$update['update_id'], json_encode($update, JSON_THROW_ON_ERROR), time()]);\nreply(['ok' => true]);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Webhook сначала проверяет секретный заголовок Telegram и сохраняет update_id с исходными данными в inbox. Только после записи возвращается 200. Повтор update_id не создаёт вторую задачу. Это прямой webhook Telegram; проверка входящих сообщений BotGate имеет другой контракт."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "telegramOnce фиксирует отдельную исходящую операцию по ключу. При повторном вызове возвращается записанный результат. Между внешним API и SQLite нет общей транзакции: при таймауте получается unknown, а при аварии процесса может остаться sending. Такие операции автоматически не повторяем. Эта небольшая реализация выбирает защиту от повторного действия ценой ручного восстановления неподтверждённых операций."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ответ rejected также не повторяется автоматически, включая 429. В рабочей очереди можно добавить ограниченные повторы только подтверждённого отказа с учётом retry_after; не возвращайте все sending и unknown в pending. Подробности — в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве о дублях",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-duplicate-messages"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "run",
+        "label": "Запустим обработчик и проверим журнал",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запустим обработчик и проверим журнал"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · worker.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/telegram.php';\nrequire __DIR__.'/runtime.php';\nrequire __DIR__.'/bot.php';\nif (PHP_SAPI !== 'cli') {\n    exit(1);\n}\n$lock = fopen(setting('BOT_DB_PATH').'.worker.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    exit(0);\n}\n$db = database();\nfor ($i = 0; $i < 100; ++$i) {\n    $entry = row(sql($db, \"SELECT * FROM inbox WHERE state='pending' ORDER BY seq LIMIT 1\"));\n    if ($entry === null) {\n        break;\n    }\n    sql($db, \"UPDATE inbox SET state='processing' WHERE seq=?\", [(int) $entry['seq']]);\n    try {\n        $update = json_decode((string) $entry['payload'], true, 32, JSON_THROW_ON_ERROR);\n        if (!is_array($update)) {\n            throw new RuntimeException('Invalid stored update');\n        }\n        handleUpdate($db, $update);\n        sql($db, \"UPDATE inbox SET state='done',payload='{}' WHERE seq=?\", [(int) $entry['seq']]);\n    } catch (Throwable) {\n        sql($db, \"UPDATE inbox SET state='failed' WHERE seq=?\", [(int) $entry['seq']]);\n        error_log('Update failed: '.(int) $entry['update_id']);\n    }\n}\nflock($lock, LOCK_UN);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-webhook.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/telegram.php';\nif (PHP_SAPI !== 'cli') exit(1);\n$url = setting('WEBHOOK_URL');\nif (!str_starts_with($url, 'https://')) throw new RuntimeException('HTTPS required');\n$result = telegram('setWebhook', [\n    'url' => $url, 'secret_token' => setting('WEBHOOK_SECRET'),\n    'allowed_updates' => ['message'],\n]);\nif ($result['state'] !== 'ok') throw new RuntimeException('Webhook not confirmed');\necho \"Webhook configured\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · запуск",
+                  "code": "php init.php\nphp setup-webhook.php\nphp worker.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Во время разработки запускайте worker.php после тестового сообщения. На сервере настройте его регулярный запуск, например раз в минуту; для ответов без минутной задержки используйте управляемый постоянно работающий процесс. Один проход ограничен 100 обновлениями. Файловая блокировка не даёт двум worker обрабатывать события параллельно; все процессы должны видеть один локальный файл базы и блокировки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · состояние обработки",
+                  "code": "SELECT update_id,state,received_at FROM inbox WHERE state <> 'done';\nSELECT action_key,method,state,created_at FROM actions ORDER BY created_at DESC LIMIT 20;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После успешной обработки тело update удаляется из inbox, идентификатор остаётся для защиты от повтора. failed и processing требуют разбора; в них ещё могут быть данные переписки. Ограничьте доступ, установите срок хранения и очистку после расследования. Ответ 200 webhook подтверждает приём, а не успешную отправку или изменение прав. Не запускайте эти примеры на клиентском боте до проверки в отдельном тестовом окружении."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "notifications",
+        "label": "Используем подтверждённый чат для уведомления",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Используем подтверждённый чат для уведомления"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · notify.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/telegram.php';\nrequire __DIR__.'/runtime.php';\nrequire __DIR__.'/bot.php';\nif (PHP_SAPI !== 'cli' || !ctype_digit($argv[1] ?? '') || !preg_match('/^[a-zA-Z0-9_-]{1,64}$/D', $argv[2] ?? '')) {\n    exit(\"Usage: php notify.php OWNER_TELEGRAM_ID EVENT_ID\\n\");\n}\n// Share the same lock with worker.php: disconnect and sending must not run in parallel.\n$lock = fopen(setting('BOT_DB_PATH').'.worker.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX)) {\n    exit(1);\n}\n$db = database(); $user = (int) $argv[1];\n$target = row(sql($db, 'SELECT * FROM integrations WHERE user_id=? AND active=1', [$user]));\nif ($target === null) {\n    exit(\"No active integration\\n\");\n}\ntry {\n    checkDestination($user, (int) $target['chat_id'], (string) $target['kind']);\n} catch (Throwable) {\n    sql($db, 'UPDATE integrations SET active=0 WHERE user_id=?', [$user]);\n    exit(\"Integration suspended; check access and reconnect\\n\");\n}\n$result = telegramOnce($db, 'notice:'.$user.':'.$argv[2], 'sendMessage', [\n    'chat_id' => (int) $target['chat_id'], 'text' => 'Тестовое уведомление: новая заявка в вашем сервисе.',\n]);\necho $result['state'].\"\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Shell · пробное бизнес-событие",
+                  "code": "php notify.php 123456789 demo-event-001"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Замените число на Telegram ID владельца, который завершил подключение. Скрипт предназначен для доверенного CLI или внутреннего обработчика сервиса, а не для публичного URL с произвольным user_id. В реальной заявке адресат определяется принадлежностью проекта, а ключ события — стабильным ID заявки и типа уведомления."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед отправкой права проверяются снова. Если проверка не проходит, подключение приостанавливается; даже временная недоступность Telegram в этом учебном варианте потребует повторного подключения. В большой системе можно отделить временный сбой от подтверждённого отзыва прав, сохранив правило «не отправлять до успешной проверки»."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ключ notice содержит владельца и ID события. Повтор команды с тем же ключом не отправит уведомление снова, даже если пользователь успел сменить чат. Если нужно сознательно повторить отправку в другое место, это отдельное действие с собственным ключом и понятным журналом, а не автоматический повтор старого события."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "disconnect",
+        "label": "Отключение и изменение прав",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отключение и изменение прав"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Команда /disconnect принимается только в личном диалоге текущего пользователя. Она выключает его интеграцию и отменяет незавершённые запросы выбора. Бот не выходит из группы и не удаляет уже опубликованные сообщения: пользователь может продолжать использовать его для других функций."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "notify.php и worker.php используют одну блокировку. Пока выполняется отправка, команда отключения ждёт обработки очередью; уже начатый HTTP-запрос отменить нельзя. Для интерфейса сервиса показывайте подтверждение после фактического обновления active, а не сразу после нажатия кнопки пользователем."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Удаление бота из чата, снятие права публикации или смена владельца обнаруживаются при следующей проверке. При миграции обычной группы в супергруппу появляется новый chat_id. Наш пример при ошибке приостанавливает подключение и требует выбрать чат заново; для автоматического переноса нужно отдельно обработать migrate_to_chat_id и повторно проверить доступ."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если пользователь выбирает новый чат, а проверка не удалась, старая активная интеграция остаётся. Сообщите это рядом с формой или предложите сначала /disconnect, если требуется немедленно прекратить отправку в прежнее место. Такой порядок предотвращает случайную потерю рабочего канала из-за ошибочного выбора."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "admins",
+        "label": "Как разрешить подключение администраторам",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как разрешить подключение администраторам"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для более гибкого продукта вместо chat_is_created можно задать user_administrator_rights и bot_administrator_rights. Набор прав бота должен быть подмножеством требуемых прав пользователя; Telegram может выдать запрошенные права, если это допустимо. Передавайте полный объект ChatAdministratorRights по текущему API, а не случайный набор флагов из старого примера."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Одновременно измените checkDestination: определите, каким администраторам разрешено подключать сервис. Например, право публикации в канале ещё не обязательно означает право привязать корпоративную CRM. В многопользовательском сервисе нужны и права в Telegram, и роль в вашей организации."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не удаляйте проверку creator в коде, оставив только успешный sendMessage: бот может писать в чат, которым подключающий человек вообще не вправе управлять. Пробная отправка подтверждает возможность доставки, а не полномочия пользователя."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверим подключение от начала до конца",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверим подключение от начала до конца"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Добавьте тестового бота администратором в свою тестовую группу и канал. Для канала включите публикацию."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отправьте /group, выберите группу и убедитесь, что тестовое сообщение пришло, а integrations.active стал 1."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Передайте chat_shared с request_id другого пользователя: подключения не должно быть."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Нажмите старую кнопку после нового /group или по истечении десяти минут: получите сообщение об устаревшем запросе."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Уберите бота из администраторов перед пробной отправкой: интеграция не включается."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отправьте одно событие notify.php дважды: в чате должно быть одно уведомление."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выполните /disconnect, затем notify.php с новым событием: отправки не будет."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Смените владельца или снимите права бота после подключения: следующая отправка должна приостановить интеграцию."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Название чата и фото в chat_shared используются только для интерфейса. Не выполняйте HTML/Markdown-разметку из названия без экранирования. В этом примере название вообще не копируется в исходящее сообщение, чтобы сосредоточиться на проверке подключения."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "BotGate и источники",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "BotGate и источники"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При работе через BotGate параметры reply_markup и служебное chat_shared должны проходить без изменения структуры. Получение идентификатора, владение интеграцией, проверки getChatMember и активность подключения остаются вашей бизнес-логикой. Настройки транспорта и webhook — в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Источники: "
+                },
+                {
+                  "type": "text",
+                  "text": "интерфейс выбора чатов",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/features#chat-and-user-selection"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "KeyboardButtonRequestChat",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#keyboardbuttonrequestchat"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "ChatShared",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#chatshared"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "getChatMember",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#getchatmember"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

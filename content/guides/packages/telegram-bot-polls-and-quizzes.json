@@ -1,0 +1,568 @@
+[
+  {
+    "slug": "telegram-bot-polls-and-quizzes",
+    "title": "Как создать опрос или викторину в Telegram-боте и обработать ответы",
+    "seo_title": "Как создать опрос или викторину в Telegram-боте и обработать ответы",
+    "description": "Создаём опрос и викторину через sendPoll: варианты, анонимность, poll_answer, изменение и отзыв голоса. Сохраняем результаты и закрываем опрос через stopPoll.",
+    "card_description": "Создаём опрос и викторину через sendPoll: варианты, анонимность, poll_answer, изменение и отзыв голоса. Сохраняем результаты и закрываем опрос через stopPoll.",
+    "category": "Практика",
+    "topics": "PHP · Опросы · Викторины",
+    "reading_time": "10 минут",
+    "published_at": "2026-11-03",
+    "is_published": true,
+    "sort_order": 33,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера учебный центр предложит выбрать время занятия, а затем проведёт короткую викторину. Разберём создание нативного опроса Telegram, связь ответа с участником, изменение голоса и закрытие. Для внутренней статистики будем хранить текущее состояние ответа, а не прибавлять единицу на каждое входящее событие."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "mode",
+        "label": "Выбираем анонимность и правила голосования",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выбираем анонимность и правила голосования"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обычный опрос regular подходит для выбора времени. Quiz добавляет правильные ответы и пояснение. Заранее решите, нужны ли результаты конкретного ученика: анонимный опрос даёт общую статистику, но не позволяет составить список ответов по Telegram user_id."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для персонального учёта бот должен сам отправить неанонимный опрос. Чужой опрос, просто присланный пользователем в чат с ботом, не становится вашим источником индивидуальных голосов. В allowed_updates обработчика включите poll и poll_answer, сохранив другие нужные типы обновлений."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Примеры ниже используют текущий Telegram Bot API и PHP 8.3+ для локальной обработки. Параметры JSON отправляйте вашим настроенным API-клиентом. Перед реальным запуском проведите тест в отдельном личном чате или группе: доступность конкретного режима может зависеть от типа чата."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В нашем сценарии варианты после создания не добавляются, их порядок не перемешивается. Это позволяет сопоставлять option_ids с неизменным массивом вариантов. Для редактируемых опросов потребуется учитывать persistent_id вариантов вместо предположения, что индекс всегда обозначает один ответ."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "create",
+        "label": "Создаём опрос для выбора времени",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создаём опрос для выбора времени"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · параметры sendPoll",
+                  "code": "{\n  \"chat_id\": 123456789,\n  \"question\": \"Когда удобно провести занятие?\",\n  \"options\": [{\"text\": \"Вторник, 18:00\"}, {\"text\": \"Среда, 19:00\"}, {\"text\": \"Суббота, 12:00\"}],\n  \"type\": \"regular\",\n  \"is_anonymous\": false,\n  \"allows_multiple_answers\": false,\n  \"allows_revoting\": true,\n  \"shuffle_options\": false,\n  \"allow_adding_options\": false,\n  \"open_period\": 300\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Опрос открыт пять минут и допускает изменение выбора. Options — массив объектов InputPollOption с text, а не массив строк. Ответ sendPoll содержит Message: сохраните result.chat.id, result.message_id и result.poll.id только после ok=true."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В таблице polls храните bot_id, poll_id, chat_id, message_id, тип, варианты, правила голосования и статус. Poll_id — строка. Он связывает входящие ответы с вашим событием, а chat_id/message_id нужны для stopPoll. Подготовьте локальную операцию создания заранее, чтобы её результат не потерялся между HTTP-ответом и записью БД."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После таймаута sendPoll нельзя уверенно считать, что опрос не создан. Безусловный повтор может показать два опроса. Отметьте неизвестный результат и разберите его до повторной отправки. Если poll_answer пришёл раньше сохранения poll_id, оставьте его в надёжном входящем журнале и повторите сопоставление после сохранения, вместо удаления события."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "quiz",
+        "label": "Делаем небольшую викторину",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Делаем небольшую викторину"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · параметры sendPoll для викторины",
+                  "code": "{\n  \"chat_id\": 123456789,\n  \"question\": \"Какой метод отправляет текстовое сообщение?\",\n  \"options\": [{\"text\": \"getMe\"}, {\"text\": \"sendMessage\"}, {\"text\": \"getFile\"}],\n  \"type\": \"quiz\",\n  \"is_anonymous\": false,\n  \"allows_multiple_answers\": false,\n  \"allows_revoting\": false,\n  \"correct_option_ids\": [1],\n  \"explanation\": \"sendMessage отправляет текст в указанный чат.\",\n  \"open_period\": 300\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В актуальном API правильные варианты передаются массивом correct_option_ids. Индексы начинаются с нуля, поэтому [1] означает второй вариант. Для нашего теста правильный ответ один, выбор тоже один, изменение ответа выключено. Не переносите в этот пример старое имя поля correct_option_id из устаревших руководств."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните ключ правильных ответов вместе с локальной записью опроса. Для персонального результата сравните нормализованный набор выбранных индексов с этим ключом. Одна викторина Telegram — один вопрос; последовательность урока, несколько вопросов и итоговый балл хранит ваше приложение."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не используйте текст варианта как ключ результата: формулировка может измениться. Если разрешите несколько правильных вариантов, отдельно определите правило оценивания: полное совпадение набора или частичные баллы. В данном примере оценивается полное совпадение."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "answer",
+        "label": "Обрабатываем полный снимок ответа участника",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обрабатываем полный снимок ответа участника"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Poll_answer содержит poll_id и option_ids. Это текущий выбор, а не прибавка к предыдущему: при смене [0] на [2] старый ответ заменяется. Пустой массив означает отзыв голоса. User может отсутствовать, если ответ связан с voter_chat; такой голос нельзя приписывать выдуманному user_id."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · poll-answer.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\n/** @param array<string, mixed> $answer\n * @return array{voter_key: string, option_ids: list<int>}|null\n */\nfunction normalizedVote(array $answer, string $pollId, int $optionCount): ?array\n{\n    if (($answer['poll_id'] ?? null) !== $pollId) {\n        return null;\n    }\n    $user = $answer['user']['id'] ?? null;\n    $chat = $answer['voter_chat']['id'] ?? null;\n    if (is_int($user) && $chat === null) {\n        $voter = 'user:'.$user;\n    } elseif (is_int($chat) && $user === null) {\n        $voter = 'chat:'.$chat;\n    } else {\n        return null;\n    }\n    $ids = $answer['option_ids'] ?? null;\n    if (!is_array($ids) || !array_is_list($ids)) {\n        return null;\n    }\n    foreach ($ids as $id) {\n        if (!is_int($id) || $id < 0 || $id >= $optionCount) {\n            return null;\n        }\n    }\n    $ids = array_values(array_unique($ids));\n    sort($ids, SORT_NUMERIC);\n    return ['voter_key' => $voter, 'option_ids' => $ids];\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция проверяет форму данных, но право учесть ответ определяется отдельно: poll_id должен относиться к опросу вашего бота, а ученик — к нужной учебной группе, если отчёт ограничен её составом. Voter_key с префиксом chat храните отдельно от личных результатов учащихся."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Заведите poll_votes с UNIQUE(bot_id, poll_id, voter_key). В одной транзакции сохраните обработанный update и замените option_ids целиком. Повтор (bot_id, update_id) не меняет счётчики. Отозванный голос сохраняйте как пустой набор: это позволит отличить отзыв от отсутствия каких-либо событий."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При параллельной обработке более старое событие не должно затереть новое. Для короткого опроса из примера сохраняйте last_update_id возле голоса и обновляйте строку только при большем update_id; проверка и запись выполняются атомарно. Этот порядок относится к потоку конкретного бота. Для долгоживущих процессов учитывайте, что Telegram после длительного отсутствия обновлений может начать новую последовательность update_id."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Счётчики можно пересчитать из текущих наборов. При множественном выборе сумма голосов по вариантам может превышать число участников. Не называйте эту сумму количеством проголосовавших людей."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "close",
+        "label": "Получаем общие результаты и закрываем опрос",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Получаем общие результаты и закрываем опрос"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Update.poll содержит агрегированные сведения: options с voter_count, total_voter_count и is_closed. Он полезен для итоговой карточки и анонимных опросов, но не раскрывает список участников. Не пытайтесь восстановить персональные ответы из изменения общего счётчика."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Опрос примера закроется по open_period. Для ручного завершения вызовите stopPoll с сохранёнными chat_id и message_id. Poll_id для этого метода не заменяет адрес сообщения."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · параметры stopPoll",
+                  "code": "{\"chat_id\": 123456789, \"message_id\": 450}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Успешный stopPoll возвращает Poll: сохраните итоговые счётчики и is_closed. После нажатия кнопки администратора сначала проверьте его права на закрытие. Простое наличие callback с номером опроса не даёт такое право."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не отбрасывайте уже полученные, но ещё не обработанные poll_answer только потому, что успели сохранить is_closed=true. Голос мог быть принят до закрытия, а доставлен позже. Дождитесь обработки входящего журнала, после чего формируйте персональный отчёт. Агрегированный итог Telegram и локальный список ответов полезно сверять, но они не всегда описывают одну аудиторию, если вы исключаете внешних участников."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При таймауте stopPoll результат неизвестен: дождитесь poll с is_closed или повторно выясните состояние предусмотренным вашим обработчиком способом. Не помечайте опрос открытым лишь потому, что подтверждение закрытия не дошло. У Bot API нет универсального getPoll для произвольного poll_id."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "check",
+        "label": "Проверяем ответы и итоговую статистику",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем ответы и итоговую статистику"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Создайте неанонимный опрос ботом и сохраните все три идентификатора: chat_id, message_id и poll.id."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выберите первый вариант, затем третий: в локальной записи остаётся третий, а число участников не растёт."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отзовите голос, если режим это допускает: сохранится пустой набор."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторите один update и поменяйте порядок обработки двух ответов: старый не должен перезаписать новый."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Проверьте анонимный опрос: отчёт содержит общие числа без обещания персональных результатов."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Закройте опрос и обработайте задержанный ответ, затем сверьте итоговый отчёт."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если ответы не приходят, проверьте is_anonymous, происхождение опроса, allowed_updates и журнал webhook. Общую диагностику доставки смотрите в "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-webhook-not-working"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При подключении через BotGate параметры sendPoll и stopPoll передаются через "
+                },
+                {
+                  "type": "text",
+                  "text": "API сервиса",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#proxy"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", а результаты и права участников остаются в вашем приложении. Первичные источники: "
+                },
+                {
+                  "type": "text",
+                  "text": "sendPoll",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#sendpoll"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "PollAnswer",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#pollanswer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "stopPoll",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#stoppoll"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

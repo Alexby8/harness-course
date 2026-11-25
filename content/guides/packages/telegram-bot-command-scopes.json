@@ -1,0 +1,783 @@
+[
+  {
+    "slug": "telegram-bot-command-scopes",
+    "title": "Как настроить разные меню команд для клиента и менеджера в Telegram-боте",
+    "seo_title": "Как настроить разные меню команд для клиента и менеджера в Telegram-боте",
+    "description": "Настраиваем setMyCommands по ролям и языкам: scope для личного чата менеджера, удаление старых списков и серверная проверка полномочий.",
+    "card_description": "Настраиваем setMyCommands по ролям и языкам: scope для личного чата менеджера, удаление старых списков и серверная проверка полномочий.",
+    "category": "Практика",
+    "topics": "Telegram Bot API · Команды · Роли",
+    "reading_time": "9 минут",
+    "published_at": "2026-11-04",
+    "is_published": true,
+    "sort_order": 35,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера бот сервисного центра показывает клиенту команды записи и помощи, а менеджеру — ещё очередь заявок. Сделаем разные списки для личных чатов, добавим русский и английский языки и разберём снятие роли. Меню будет помогать навигации, а доступ к данным проверит сервер."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "scope",
+        "label": "Выбираем область команд под задачу",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выбираем область команд под задачу"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "setMyCommands задаёт список подсказок для конкретной области — scope — и языка. Сначала полезно отделить "
+                },
+                {
+                  "type": "text",
+                  "text": "сценарий общения с клиентом",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-business"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " от настройки Telegram: какие действия доступны каждому, какие требуют роли и что произойдёт при ручном вводе команды."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Задача"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Подходящая область"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Общий запасной набор"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "default"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Все личные диалоги"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "all_private_chats"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Личный диалог конкретного менеджера"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "chat с ID его личного чата"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Все администраторы одной рабочей группы"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "chat_administrators с ID группы"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Один сотрудник в определённой группе"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "chat_member с ID группы и user_id"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Область chat_member относится к участнику группы, а не к роли сотрудника во всех разговорах с ботом. В нашем примере менеджер работает в личном чате: используем chat. Роль manager существует в базе приложения, Telegram о ней не знает. При назначении и снятии роли приложение само обновляет меню."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пользователь должен заранее открыть диалог с ботом. Сохраните его числовой Telegram ID из проверенного входящего события. Не разрешайте сотруднику назначать себе роль передачей произвольного ID в публичной форме."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "priority",
+        "label": "Понимаем приоритет и языковые версии",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Понимаем приоритет и языковые версии"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В личном диалоге Telegram ищет первый настроенный список в таком порядке: chat с языком пользователя, chat без языка, all_private_chats с языком, all_private_chats без языка, default с языком, default без языка. Найденные списки не объединяются."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Поэтому менеджерское меню должно содержать и обычные клиентские команды, если сотруднику они тоже нужны. Персональный список без языка перекрывает даже русскую версию более общей области. Если менеджеру требуется перевод, запишите его в той же персональной области."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пустой language_code — запасной список для языков без отдельной настройки. ru и en — языки интерфейса, а не признак роли и не язык, который пользователь выбрал в вашей CRM. Если язык внутри сервиса выбирается отдельно, согласуйте это с логикой личных меню."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Настраиваем списки на PHP",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настраиваем списки на PHP"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера используем PHP 8.3+ с cURL и прямой Telegram Bot API. Создайте setup-commands.php вне публичного каталога. BOT_TOKEN и MANAGER_CHAT_ID передайте через окружение процесса. Обычный PHP не загружает .env самостоятельно. Скрипт изменяет настройки меню одного тестового бота; на каждом сообщении запускать его не нужно."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-commands.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction telegram(string $method, array $params): mixed\n{\n    $token = getenv('BOT_TOKEN');\n    if (!is_string($token) || $token === '') {\n        throw new RuntimeException('Set BOT_TOKEN');\n    }\n    $curl = curl_init('https://api.telegram.org/bot'.$token.'/'.$method);\n    curl_setopt_array($curl, [\n        CURLOPT_POST => true,\n        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],\n        CURLOPT_POSTFIELDS => json_encode($params, JSON_THROW_ON_ERROR),\n        CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 5,\n        CURLOPT_TIMEOUT => 15,\n    ]);\n    try {\n        $raw = curl_exec($curl);\n        if ($raw === false) {\n            throw new RuntimeException('Transport error; inspect current settings');\n        }\n        $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);\n        $body = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);\n        if ($status !== 200 || !is_array($body) || ($body['ok'] ?? false) !== true) {\n            throw new RuntimeException('Telegram rejected command settings');\n        }\n        return $body['result'];\n    } finally {\n        unset($curl);\n    }\n}\n\n$manager = filter_var(getenv('MANAGER_CHAT_ID'), FILTER_VALIDATE_INT);\nif ($manager === false || $manager <= 0) {\n    throw new RuntimeException('Set a positive MANAGER_CHAT_ID');\n}\n$client = [\n    '' => [['command' => 'start', 'description' => 'Start'],\n           ['command' => 'request', 'description' => 'New request'],\n           ['command' => 'help', 'description' => 'Help']],\n    'ru' => [['command' => 'start', 'description' => 'Начать'],\n             ['command' => 'request', 'description' => 'Создать заявку'],\n             ['command' => 'help', 'description' => 'Помощь']],\n];\nforeach ($client as $language => $commands) {\n    telegram('setMyCommands', [\n        'scope' => ['type' => 'all_private_chats'],\n        'language_code' => $language, 'commands' => $commands,\n    ]);\n    $commands[] = ['command' => 'queue',\n        'description' => $language === 'ru' ? 'Очередь заявок' : 'Request queue'];\n    telegram('setMyCommands', [\n        'scope' => ['type' => 'chat', 'chat_id' => $manager],\n        'language_code' => $language, 'commands' => $commands,\n    ]);\n}\n// Explicit English variants also replace any older English lists.\nforeach ([['type' => 'all_private_chats'],\n    ['type' => 'chat', 'chat_id' => $manager]] as $scope) {\n    $commands = $client[''];\n    if ($scope['type'] === 'chat') {\n        $commands[] = ['command' => 'queue', 'description' => 'Request queue'];\n    }\n    telegram('setMyCommands', [\n        'scope' => $scope, 'language_code' => 'en', 'commands' => $commands,\n    ]);\n}\necho \"Command lists updated\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · Запуск после настройки окружения",
+                  "code": "php setup-commands.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Имена команд записываются без /. Для каждого списка указывайте полный набор: setMyCommands заменяет его целиком. Допустимы до 100 команд; имя — от 1 до 32 строчных латинских букв, цифр и подчёркиваний. Наши списки намеренно короткие, чтобы меню оставалось понятным."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Успех всех вызовов означает сохранение этих комбинаций scope/language_code. Сценарий из нескольких запросов не атомарен: если связь оборвалась посередине, часть списков уже могла обновиться. Сверьте фактические значения и повторно примените желаемую конфигурацию. Не выводите в журнал URL с токеном."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "cleanup",
+        "label": "Убираем старые настройки при смене роли",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Убираем старые настройки при смене роли"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала отзовите роль менеджера в своей базе. Это сразу закроет доступ к очереди. Затем удалите персональные меню, чтобы Telegram вернулся к общему набору. Следующий фрагмент использует функцию telegram из setup-commands.php; выполняйте его вместо блока установки после получения ID сотрудника из своей базы."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · Снятие персональных списков",
+                  "code": "foreach (['', 'ru', 'en'] as $language) {\n    telegram('deleteMyCommands', [\n        'scope' => ['type' => 'chat', 'chat_id' => $manager],\n        'language_code' => $language,\n    ]);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Удаляются только перечисленные комбинации. Если раньше были de или другие языки, их тоже нужно удалить. Telegram не предоставляет здесь метод перечисления всех когда-либо заданных областей: храните собственный реестр управляемых пар scope/language_code."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При переходе со старого default-меню на all_private_chats удалите или замените ненужные default-списки, если они могли содержать служебные команды для других чатов. Не стирайте все области без разбора: у рабочей группы может быть отдельный согласованный набор."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "auth",
+        "label": "Проверяем полномочия при выполнении команды",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем полномочия при выполнении команды"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Клиент может вручную отправить /queue, даже если её нет в меню. В update нет доказательства того, из какой области была выбрана команда. Полномочия проверяются по ID отправителя и текущей роли в базе на каждое защищённое действие, включая callback-кнопки и открытие конкретной заявки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера такая функция защищает команду в личном чате. Предполагается существующая таблица staff с telegram_user_id, active и role. Это образец запроса к вашей модели ролей, а не требование создавать отдельную таблицу именно с таким именем."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · Проверка доступа к очереди",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction canViewQueue(PDO $db, array $message): bool\n{\n    if (($message['chat']['type'] ?? null) !== 'private'\n        || !is_int($message['from']['id'] ?? null)) {\n        return false;\n    }\n    $query = $db->prepare('SELECT 1 FROM staff\n        WHERE telegram_user_id = ? AND active = 1 AND role = ? LIMIT 1');\n    $query->execute([$message['from']['id'], 'manager']);\n\n    return $query->fetchColumn() !== false;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если функция вернула false, не загружайте и не отправляйте список заявок. Ошибка БД тоже должна останавливать действие, а не давать запасной доступ. Для рабочих групп отдельно определите допустимые chat_id; роль сотрудника не означает, что персональные данные можно показать в любой группе."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verify",
+        "label": "Проверяем сохранённые списки и интерфейс",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем сохранённые списки и интерфейс"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "getMyCommands читает конкретную пару области и языка. Он не вычисляет итоговое меню произвольного пользователя по всем fallback-правилам. Для нашего менеджера проверьте ru, en и запасной список, затем аналогичные общие настройки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · Параметры getMyCommands для менеджера",
+                  "code": "{\n  \"scope\": {\"type\": \"chat\", \"chat_id\": 123456789},\n  \"language_code\": \"ru\"\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В ответе должны быть start, request, help и queue. После снятия роли запрос к удалённой персональной паре вернёт пустой список; общий набор продолжит существовать в all_private_chats. Проверьте итоговое отображение в двух аккаунтах: клиент и менеджер, с русским и английским интерфейсом. Если Telegram показывает старое меню, переоткройте диалог после сверки API; клиентское отображение может обновиться не мгновенно."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если вместо списка команд кнопка меню запускает Mini App, проверьте setChatMenuButton/getChatMenuButton: тип web_app управляется отдельно. Сохранённые setMyCommands при этом не исчезают. Для возвращения списка команд задайте menu_button с type=commands в нужном личном чате либо в настройке по умолчанию."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отдельно вручную отправьте /queue с клиентского аккаунта и со снятой ролью менеджера. Оба запроса должны быть отклонены. Это важнее того, скрылась ли подсказка визуально."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Если методы вызываются через BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если методы вызываются через BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Параметры setMyCommands, deleteMyCommands и getMyCommands сохраняются. Используйте настроенный API endpoint BotGate с авторизацией по API-ключу согласно "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#proxy"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", а не добавляйте ключ или Telegram-токен в браузер. Решение о роли остаётся в приложении: транспорт не назначает сотрудникам доступ к заявкам."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Официальная документация",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Официальная документация"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Команды и области",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/features#commands"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — назначение меню и необходимость проверки доступа."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Приоритет списков",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#determining-list-of-commands"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — выбор области и языка."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "setMyCommands",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#setmycommands"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ", "
+                        },
+                        {
+                          "type": "text",
+                          "text": "deleteMyCommands",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#deletemycommands"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ", "
+                        },
+                        {
+                          "type": "text",
+                          "text": "getMyCommands",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#getmycommands"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " — запись, удаление и чтение."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

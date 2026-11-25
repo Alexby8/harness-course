@@ -1,0 +1,516 @@
+[
+  {
+    "slug": "telegram-bot-testing-without-client-messages",
+    "title": "Как тестировать Telegram-бота, не отправляя сообщения клиентам",
+    "seo_title": "Как тестировать Telegram-бота, не отправляя сообщения клиентам",
+    "description": "Разделяем тестового и рабочего бота, используем фиктивные updates и подмену API. Проверяем дубли, таймауты, старые кнопки и права без отправки клиентам.",
+    "card_description": "Разделяем тестового и рабочего бота, используем фиктивные updates и подмену API. Проверяем дубли, таймауты, старые кнопки и права без отправки клиентам.",
+    "category": "Практика",
+    "topics": "Telegram · PHP · Тестирование",
+    "reading_time": "10 минут",
+    "published_at": "2026-11-06",
+    "is_published": true,
+    "sort_order": 45,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера вы меняете обработчик заявки и хотите проверить ответ, повтор webhook и нажатие старой кнопки. Нужны два разных уровня: локальная проверка без сети и короткая проверка интеграции с отдельным тестовым ботом. Подготовим их так, чтобы тестовые события не могли запустить рабочую рассылку."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "isolation",
+        "label": "Отделяем тестовое окружение целиком",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отделяем тестовое окружение целиком"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте отдельного бота через BotFather и выделенный чат команды. Используйте другую БД или схему, отдельные очереди, webhook URL и конфигурацию. Подмена только chat_id недостаточна: тест может изменить реальную заявку, запустить платёжный сценарий или передать данные в CRM ещё до отправки сообщения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Рабочие секреты не должны быть доступны тестовому процессу. Для сетевой проверки заведите явный список разрешённых тестовых получателей и остановку при попытке отправить вне этого списка. Для локальных тестов по возможности запретите исходящую сеть: ошибочно подключённый реальный клиент тогда не выполнит запрос."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не меняйте webhook рабочего бота на тестовый адрес и не запускайте getUpdates тем же токеном параллельно. Это вмешательство в доставку действующих событий. Локальные фикстуры передавайте в обработчик напрямую, а end-to-end проверку выполняйте отдельным ботом."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "fixtures",
+        "label": "Готовим небольшие фиктивные события",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Готовим небольшие фиктивные события"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните по одному понятному JSON на каждый существенный тип: сообщение, callback_query, файл, альбом или заявка на вступление. Используйте вымышленные ID и тексты. Реальные updates перед копированием нужно очистить от токенов, имён, телефонов, ссылок доступа и иных персональных данных."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JSON · fixture-message.json",
+                  "code": "{\n  \"update_id\": 101,\n  \"message\": {\n    \"message_id\": 11,\n    \"date\": 1793952000,\n    \"from\": {\"id\": 1001, \"is_bot\": false, \"first_name\": \"Тест\"},\n    \"chat\": {\"id\": 1001, \"type\": \"private\"},\n    \"text\": \"/start\"\n  }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обработчик бизнес-логики получает уже проверенное событие. Подлинность webhook тестируйте отдельно на уровне HTTP-входа. Для BotGate проверьте его HMAC-контракт: правильная подпись проходит, отсутствующая подпись и изменение подписанного тела дают отказ. Для прямого Telegram webhook проверьте совпадение заголовка X-Telegram-Bot-Api-Secret-Token с настроенным secret_token и отказ при отсутствующем или неверном значении. Этот заголовок не является подписью тела. Не выключайте проверку подлинности в рабочем маршруте ради загрузки фикстуры."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Фикстуры должны включать также отсутствующие необязательные поля и незнакомый тип update. Нельзя предполагать, что каждое событие содержит message.text или что callback обязательно содержит обычное доступное сообщение."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "fake",
+        "label": "Подменяем API на границе приложения",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подменяем API на границе приложения"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Вынесите вызов API в небольшой интерфейс. Обработчик должен знать, какой метод и параметры он отправляет, а тест решает, какой ответ вернуть. Ниже законченный локальный пример для PHP 8.3+: он не содержит HTTP-клиента, токена и сетевых вызовов."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · test-reply.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\ninterface TelegramTransport\n{\n    public function call(string $method, array $parameters): array;\n}\n\nfinal class FakeTelegram implements TelegramTransport\n{\n    public array $calls = [];\n    public function __construct(private array|Throwable $outcome) {}\n    public function call(string $method, array $parameters): array\n    {\n        $this->calls[] = [$method, $parameters];\n        if ($this->outcome instanceof Throwable) throw $this->outcome;\n        return $this->outcome;\n    }\n}\n\nfunction sendGreeting(TelegramTransport $api, int $chatId): string\n{\n    try {\n        $response = $api->call('sendMessage', [\n            'chat_id' => $chatId, 'text' => 'Здравствуйте! Чем помочь?',\n        ]);\n    } catch (Throwable) {\n        return 'unknown';\n    }\n    if (($response['ok'] ?? null) === true) return 'sent';\n    if (($response['ok'] ?? null) === false) return 'rejected';\n    return 'unknown';\n}\n\nfunction check(bool $condition, string $label): void\n{\n    if (!$condition) throw new RuntimeException('FAIL: '.$label);\n}\n\n$success = new FakeTelegram(['ok' => true, 'result' => ['message_id' => 7]]);\ncheck(sendGreeting($success, 1001) === 'sent', 'successful reply');\ncheck($success->calls === [['sendMessage', [\n    'chat_id' => 1001, 'text' => 'Здравствуйте! Чем помочь?',\n]]], 'method, recipient and text');\n\n$rejected = new FakeTelegram(['ok' => false, 'error_code' => 403]);\ncheck(sendGreeting($rejected, 1001) === 'rejected', 'explicit rejection');\n$timeout = new FakeTelegram(new RuntimeException('Simulated lost response'));\ncheck(sendGreeting($timeout, 1001) === 'unknown', 'unknown outcome');\ncheck(count($timeout->calls) === 1, 'no blind retry');\n$invalid = new FakeTelegram([]);\ncheck(sendGreeting($invalid, 1001) === 'unknown', 'malformed response');\necho \"All checks passed without network calls\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · Локальный запуск",
+                  "code": "php test-reply.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В рабочем проекте реализация интерфейса вызывает ваш клиент Telegram или BotGate; в тесте передаётся FakeTelegram. Пример проверяет только принятие решения по ответу и параметры отправки, не webhook, очередь или доставку. Не переносите catch всех исключений без отдельной диагностики программных ошибок: здесь это упрощённая граница учебного клиента."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если приложение использует Laravel Http, доступны Http::fake и Http::preventStrayRequests. Они подменяют именно Laravel HTTP client. Отдельный SDK на Guzzle или PSR-18 потребует подмены его собственного транспорта: Http::fake не перехватывает любой PHP-запрос автоматически."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "retries",
+        "label": "Проверяем дубликаты и неизвестный результат",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем дубликаты и неизвестный результат"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Дважды передайте один update одного бота: ожидается одна бизнес-операция. Затем передайте тот же update_id другого бота: при общей таблице это независимое событие. Уникальность только по update_id без идентификатора бота может ошибочно подавить обработку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте два параллельных обработчика на отдельной БД. Последовательный тест не доказывает отсутствие гонки между «проверил наличие» и «создал запись». Защиту должен обеспечивать уникальный ключ или атомарный переход состояния, а не надежда на редкую одновременность."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Смоделируйте сбой после сохранения задачи, но до её запуска: worker должен найти надёжно записанную работу. Отдельно смоделируйте падение после отправки, но до записи sent. Здесь результат остаётся неизвестным — очередной запуск не должен безусловно отправлять второе сообщение."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для 429 верните фиктивный retry_after и проверьте время следующей попытки и предел повторов через управляемые часы. Не заставляйте тест реально спать несколько минут. Таймаут, явный отказ и подтверждённый лимит — разные исходы, как описано в "
+                },
+                {
+                  "type": "text",
+                  "text": "статье о 429",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-api-error-429"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "buttons",
+        "label": "Проверяем старые кнопки и права",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем старые кнопки и права"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните callback с внутренним ID заявки. Затем измените состояние заявки и повторите нажатие. Если заявка закрыта, обработчик должен ответить понятным отказом и не повторить действие. Удаление кнопки из сообщения помогает интерфейсу, но не заменяет проверку текущего состояния на сервере."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте callback от другого пользователя, менеджера со снятой ролью, для другого бота и с изменённым ID. Пользовательские callback_data не должны определять доступ. Обработчик ищет запись в своей области и проверяет полномочия по отправителю подтверждённого update."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отдельно проверьте двойное нажатие и одновременное решение двух операторов. Ожидается один успешный переход состояния, а не два вызова внешнего действия. Для механики кнопок полезно "
+                },
+                {
+                  "type": "text",
+                  "text": "руководство по callback_query",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-inline-buttons-not-working"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "integration",
+        "label": "Проводим короткую проверку отдельным ботом",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проводим короткую проверку отдельным ботом"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После локальных проверок подключите тестовый бот к изолированному webhook. Отправьте /start, нажмите кнопку и загрузите маленький файл, если такой сценарий затронут. Проверьте путь от входящего события до записи в БД и ответа в разрешённый тестовый чат."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сверьте через getMe, что подключён тестовый бот, и проверьте его webhook URL. Настройки Privacy Mode, права в тестовой группе и способ запуска Mini App должны соответствовать проверяемому сценарию. Успешный fake не подтверждает права в Telegram, TLS, доставку файлов или ограничения клиента."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для BotGate тестовому окружению нужен отдельный тестовый бот и подходящий ключ доступа. Подмена транспорта проверяет вашу обработку ответа; настоящая интеграция проверяет ещё авторизацию шлюза и его контракт ошибок. В частности, отдельно моделируйте Telegram 429 внутри HTTP 400 и собственный HTTP 429 BotGate."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "result",
+        "label": "Что считать готовой проверкой",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что считать готовой проверкой"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В отчёте разделите проверенные локальные решения, проверки в тестовом Telegram и ещё не выполненную production-проверку. Укажите сценарии и ожидаемые последствия: одна заявка, один переход состояния, отсутствие повторной отправки при неизвестном исходе. Число зелёных тестов без описания границ не доказывает готовность всей интеграции."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраняйте только полезные фикстуры и проверки поведения, которое может сломаться. Не создавайте тест на каждую строку сообщения, если формулировка не является контрактом. После успешного запуска удалите временные тестовые данные по правилам вашего проекта и убедитесь, что в рабочую очередь они не попали."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Telegram: тестирование ботов",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/features#testing-your-bot"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Laravel HTTP client: testing",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://laravel.com/docs/13.x/http-client#testing"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "BotGate: webhook и ошибки",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "/docs#webhook"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

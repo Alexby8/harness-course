@@ -1,0 +1,1392 @@
+[
+  {
+    "slug": "telegram-bot-employee-tasks",
+    "title": "Как ставить задачи сотрудникам через Telegram-бота",
+    "seo_title": "Как ставить задачи сотрудникам через Telegram-бота",
+    "description": "Задачи небольшой команды на PHP: создание и назначение, сроки, личный список, кнопки статусов, напоминания о просрочке и история действий.",
+    "card_description": "Задачи небольшой команды на PHP: создание и назначение, сроки, личный список, кнопки статусов, напоминания о просрочке и история действий.",
+    "category": "Практика",
+    "topics": "Telegram Bot API · PHP · Команда",
+    "reading_time": "35 минут",
+    "published_at": "2026-11-23",
+    "is_published": true,
+    "sort_order": 79,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера руководитель сервисной команды создаёт задачу сотруднику: подготовить прайс к определённому сроку. Исполнитель получает карточку, переводит задачу в работу и отмечает готовность. Бот показывает личные задачи, напоминает о просрочке и сохраняет историю. Сделаем небольшой рабочий цикл на PHP без отдельного веб-интерфейса."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "roles",
+        "label": "Определите роли и допустимые переходы",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Определите роли и допустимые переходы"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Доступ к боту и доступ к отдельной задаче — разные проверки. Наличие Telegram ID в callback_data не делает человека исполнителем, а наличие кнопки в старом сообщении не означает, что переход ещё доступен. Каждое действие проверяет активного сотрудника, роль, связь с задачей и текущую версию карточки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-employee-tasks/task-statuses.jpg",
+                  "alt": "Задача подготовки прайса находится в работе с версией 2; исполнитель завершает её, руководитель может отменить, старая кнопка версии 1 отклоняется.",
+                  "caption": "Поясняющая схема карточки и прав из PHP-примера. Это условная композиция, а не снимок Telegram.",
+                  "width": 1080,
+                  "height": 692,
+                  "mobile_src": "/images/guides/telegram-bot-employee-tasks/task-statuses-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 849
+                }
+              }
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Действие"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Кому разрешено"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Создать и назначить задачу"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Активному руководителю"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Посмотреть личный список"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сотруднику — только собственные активные задачи"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Открыть карточку и историю"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Исполнителю или руководителю"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Новая → В работе"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Только исполнителю"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "В работе → Выполнена"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Только исполнителю"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Новая / В работе → Отменена"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Руководителю"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Руководитель не отмечает чужую задачу выполненной вместо исполнителя. Если нужен приём результата, добавьте отдельные состояния «На проверке» и «Принята». Сейчас «Выполнена» означает заявление исполнителя о завершении. Не называйте это доказательством качества работы или автоматической приёмкой."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В примере один исполнитель и один срок. Переоткрытие, переназначение и редактирование дедлайна не реализованы. Их можно добавить как отдельные проверяемые операции с новой версией и записью в истории; прямой UPDATE в базе лишит сотрудников объяснения, почему карточка изменилась."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Подготовьте приложение и списки сотрудников",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте приложение и списки сотрудников"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример — отдельное небольшое приложение на PHP 8.3+ в 64-битной среде. Нужны PDO SQLite, mbstring и HTTPS; для отправки сообщений также расширение curl. Composer не требуется. Веб-сервер открывает только public, база и CLI-файлы находятся выше публичного корня. Не переносите эти учебные таблицы в рабочую БД BotGate."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Структура проекта",
+                  "code": "public/webhook.php\nvalues.php\ncommon.php\ndomain.php\nschema.sql\noutbox.sql\noutbox.php\ntransport.php\nworker.php\nsetup-webhook.php\nadmin.php\ninit.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Окружение процесса · замените значения",
+                  "code": "APP_DB=/private/telegram-bot-employee-tasks.sqlite\nBOT_TOKEN=TOKEN_FROM_BOTFATHER\nWEBHOOK_URL=https://tasks.example.com/webhook.php\nWEBHOOK_SECRET=RANDOM_SECRET_FOR_THIS_BOT"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обычный PHP сам не читает .env. Передайте окружение PHP-FPM и CLI через свою конфигурацию или экспортируйте переменные в тестовом терминале. Каталог базы должен существовать и быть доступен пользователю PHP, но не посторонним пользователям сервера. Для первого опыта используйте отдельного тестового бота."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · values.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n *\n * @return array<string,mixed>\n */\nfunction objectValue(mixed $value): array\n{\n    if (!is_array($value)) {\n        throw new InvalidArgumentException('Expected object');\n    }\n    $result = [];\n    foreach ($value as $key => $item) {\n        if (!is_string($key)) {\n            throw new InvalidArgumentException('Expected object keys');\n        }\n        $result[$key] = $item;\n    }\n    return $result;\n}\n\nfunction stringValue(mixed $value): string\n{\n    if (!is_string($value)) {\n        throw new InvalidArgumentException('Expected string');\n    }\n    return $value;\n}\n\nfunction intValue(mixed $value): int\n{\n    if (!is_int($value) && !is_string($value)) {\n        throw new InvalidArgumentException('Expected integer');\n    }\n    $integer = filter_var($value, FILTER_VALIDATE_INT);\n    if ($integer === false) {\n        throw new InvalidArgumentException('Invalid integer');\n    }\n    return $integer;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire_once __DIR__.'/values.php';\n\nfunction envRequired(string $key): string\n{\n    $value = getenv($key);\n    if ($value === false || $value === '') {\n        throw new RuntimeException('Missing '.$key);\n    }\n    return $value;\n}\nfunction database(): PDO\n{\n    $db = new PDO('sqlite:'.envRequired('APP_DB'), null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);\n    $db->exec('PRAGMA foreign_keys=ON');\n    $db->exec('PRAGMA busy_timeout=5000');\n    return $db;\n}\n/**\n * @param list<int|string|null> $params\n */\nfunction run(PDO $db, string $sql, array $params = []): PDOStatement\n{\n    $query = $db->prepare($sql);\n    $query->execute($params);\n    return $query;\n}\n/**\n * @param list<int|string|null> $params\n * @return array<string,mixed>|null\n */\nfunction row(PDO $db, string $sql, array $params = []): ?array\n{\n    $value = run($db, $sql, $params)->fetch();\n    return $value === false ? null : objectValue($value);\n}\n/**\n * @template T\n * @param callable():T $action\n * @return T\n */\nfunction atomic(PDO $db, callable $action): mixed\n{\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $result = $action();\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $e) {\n        $db->exec('ROLLBACK');\n        throw $e;\n    }\n}\nfunction positive(mixed $value, int $max = 100000000): int\n{\n    $n = intValue($value);\n    if ($n < 1 || $n > $max) {\n        throw new DomainException('Число вне допустимого диапазона');\n    } return $n;\n}\nfunction token(mixed $value): string\n{\n    $v = stringValue($value);\n    if (!preg_match('/^[A-Za-z0-9_-]{8,80}$/D', $v)) {\n        throw new DomainException('Неверный ключ операции');\n    } return $v;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "atomic выполняет BEGIN IMMEDIATE: проверка состояния и запись проходят под одной короткой транзакцией SQLite. Эта БД допускает только одного пишущего участника одновременно; busy_timeout даёт время дождаться блокировки. Сетевые запросы внутри транзакции не выполняются. При переходе на другую БД понадобится её механизм блокировки нужных строк, а не механическая замена DSN. "
+                },
+                {
+                  "type": "text",
+                  "text": "Транзакции SQLite",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.sqlite.org/lang_transaction.html"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE employees(user_id INTEGER PRIMARY KEY,name TEXT NOT NULL,role TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1,started INTEGER NOT NULL DEFAULT 0);\nCREATE TABLE tasks(id INTEGER PRIMARY KEY,title TEXT NOT NULL,creator INTEGER NOT NULL REFERENCES employees(user_id),assignee INTEGER NOT NULL REFERENCES employees(user_id),due_at INTEGER NOT NULL,status TEXT NOT NULL DEFAULT 'new',version INTEGER NOT NULL DEFAULT 1);\nCREATE TABLE history(id INTEGER PRIMARY KEY,task_id INTEGER NOT NULL REFERENCES tasks(id),actor INTEGER NOT NULL,action TEXT NOT NULL,created_at INTEGER NOT NULL);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · outbox.sql",
+                  "code": "CREATE TABLE updates(update_id INTEGER PRIMARY KEY);\nCREATE TABLE outbox(\n id INTEGER PRIMARY KEY, event_key TEXT UNIQUE NOT NULL, chat_id INTEGER NOT NULL,\n payload TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,\n next_at INTEGER NOT NULL DEFAULT 0, message_id INTEGER, error_code INTEGER,\n guard_kind TEXT NOT NULL DEFAULT '', guard_id INTEGER, guard_version INTEGER\n);\nCREATE INDEX outbox_due ON outbox(state,next_at);"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\n$db = database();\nforeach (['schema.sql','outbox.sql'] as $name) {\n    if (!is_file(__DIR__.'/'.$name)) {\n        continue;\n    }\n    $sql = file_get_contents(__DIR__.'/'.$name);\n    if ($sql === false) {\n        throw new RuntimeException('Cannot read schema');\n    }$db->exec($sql);\n}\necho \"Tables created\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · admin.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/outbox.php';\nrequire __DIR__.'/domain.php';\n$argv = $argv ?? [];\n$db = database();\natomic($db, function () use ($db, $argv): void {\n    $cmd = $argv[1] ?? '';\n    if ($cmd === 'employee') {\n        $id = positive($argv[2] ?? 0, PHP_INT_MAX);\n        $role = $argv[3] ?? '';\n        $name = $argv[4] ?? '';\n        if (!in_array($role, ['manager','employee'], true) || mb_strlen($name) < 1 || mb_strlen($name) > 80) {\n            throw new DomainException('Invalid employee');\n        }\n        run($db, 'INSERT INTO employees(user_id,name,role) VALUES(?,?,?)', [$id,$name,$role]);\n    } elseif ($cmd === 'disable') {\n        run($db, 'UPDATE employees SET active=0 WHERE user_id=?', [positive($argv[2] ?? 0, PHP_INT_MAX)]);\n    } elseif ($cmd === 'tick') {\n        remind($db, time());\n    } else {\n        throw new DomainException('employee USER manager|employee NAME | disable USER | tick');\n    }\n});"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сотрудников добавляет администратор через закрытый CLI. Бот не выдаёт себе руководителей по /start, username, фамилии или владению общей ссылкой. Для маленькой команды достаточно заранее проверенных числовых Telegram ID. Для компании с учётными записями лучше добавить подтверждённую привязку и синхронизацию увольнений."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "started показывает, что зарегистрированный сотрудник открыл личный диалог и отправил /start. Создание задачи до этого запрещено: иначе руководитель может решить, что исполнитель уже получил сообщение. active отключает доступ и дальнейшие бизнес-уведомления; само отключение не переносит незавершённые задачи другому человеку."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "model",
+        "label": "Храните задачу, версию и историю отдельно",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Храните задачу, версию и историю отдельно"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "tasks содержит автора, исполнителя, заголовок, срок, статус и version. history добавляет запись на создание, каждое принятое изменение статуса и постановку напоминания. История не перезаписывается при новом статусе: по ней можно восстановить последовательность действий и отличить человека от фонового процесса."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Срок вводится в формате YYYY-MM-DD HH:MM по Москве и сохраняется Unix-временем. Обратная проверка форматирования не позволяет PHP незаметно превратить 30 февраля в март. В интерфейсе срок подписан МСК, а строки истории — UTC. Это технически корректно, но для рабочей команды можно привести оба представления к одному выбранному часовому поясу."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Идентификатор пользователя в history — автор действия, а не имя, которое можно поменять в Telegram. actor=0 означает планировщик. Для кадрового аудита дополнительно храните сведения о выдаче и отзыве ролей; текущий журнал относится к задачам, а не ко всем административным операциям приложения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Все таблицы здесь принадлежат одной команде. Если приложение обслуживает несколько организаций, tenant_id нужен в сотрудниках, задачах, истории и ключах уникальности. Проверка роли manager без ограничения организации в таком сервисе была бы недостаточной."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "logic",
+        "label": "Создайте задачу и обработайте кнопки",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте задачу и обработайте кнопки"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · domain.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nfunction deadline(string $value): int\n{\n    $d = DateTimeImmutable::createFromFormat('!Y-m-d H:i', $value, new DateTimeZone('Europe/Moscow'));\n    if (!$d || $d->format('Y-m-d H:i') !== $value) {\n        throw new DomainException('Срок: YYYY-MM-DD HH:MM по Москве');\n    }return $d->getTimestamp();\n}\n/**\n * @return array<string,mixed>\n */\nfunction employee(PDO $db, int $user): array\n{\n    return row($db, 'SELECT * FROM employees WHERE user_id=? AND active=1', [$user]) ?? throw new DomainException('Доступ не выдан. Обратитесь к руководителю');\n}\n/**\n * @param array<string,mixed> $task\n * @return list<list<array{text:string,callback_data:string}>>\n */\nfunction taskButtons(array $task, int $user, bool $manager): array\n{\n    $prefix = 'task:'.intValue($task['id']).':'.intValue($task['version']).':';\n    $buttons = [];\n    if (intValue($task['assignee']) === $user) {\n        if ($task['status'] === 'new') {\n            $buttons[] = ['text' => 'В работу','callback_data' => $prefix.'working'];\n        }\n        if ($task['status'] === 'working') {\n            $buttons[] = ['text' => 'Готово','callback_data' => $prefix.'done'];\n        }\n    }\n    if ($manager && in_array($task['status'], ['new','working'], true)) {\n        $buttons[] = ['text' => 'Отменить','callback_data' => $prefix.'cancelled'];\n    }\n    return $buttons === [] ? [] : [$buttons];\n}\n/**\n * @param array<string,mixed> $t\n */\nfunction taskText(array $t): string\n{\n    $labels = ['new' => 'Новая','working' => 'В работе','done' => 'Выполнена','cancelled' => 'Отменена'];\n    $date = (new DateTimeImmutable('@'.intValue($t['due_at'])))->setTimezone(new DateTimeZone('Europe/Moscow'))->format('d.m.Y H:i');\n    return '#'.intValue($t['id']).' '.stringValue($t['title']).\"\\n\".($labels[stringValue($t['status'])] ?? 'Неизвестный статус').\"\\nСрок: \".$date.' МСК · версия '.intValue($t['version']);\n}\nfunction audit(PDO $db, int $task, int $actor, string $action, int $now): void\n{\n    run($db, 'INSERT INTO history(task_id,actor,action,created_at) VALUES(?,?,?,?)', [$task,$actor,$action,$now]);\n}\nfunction handle(PDO $db, int $user, string $action, bool $callback, int $update, int $now): void\n{\n    $person = employee($db, $user);\n    $manager = $person['role'] === 'manager';\n    if ($action === '/start') {\n        run($db, 'UPDATE employees SET started=1 WHERE user_id=?', [$user]);\n    }\n    $text = 'Команды: /tasks — личные активные задачи; /task ID — карточка и история. Руководителю: /new USER|YYYY-MM-DD HH:MM|Название';\n    $buttons = [];\n    if (str_starts_with($action, '/new ')) {\n        if (!$manager) {\n            throw new DomainException('Создавать задачи может руководитель');\n        }\n        $parts = explode('|', substr($action, 5), 3);\n        if (count($parts) !== 3) {\n            throw new DomainException('Нужны исполнитель, срок и название через |');\n        }\n        $assignee = positive(trim($parts[0]), PHP_INT_MAX);\n        $target = employee($db, $assignee);\n        if (intValue($target['started']) !== 1) {\n            throw new DomainException('Исполнитель должен сначала отправить /start');\n        }\n        $due = deadline(trim($parts[1]));\n        $title = trim($parts[2]);\n        if ($due <= $now || $due > $now + 366 * 86400 || mb_strlen($title) < 3 || mb_strlen($title) > 200) {\n            throw new DomainException('Проверьте будущий срок до года и название 3–200 символов');\n        }\n        run($db, 'INSERT INTO tasks(title,creator,assignee,due_at) VALUES(?,?,?,?)', [$title,$user,$assignee,$due]);\n        $id = (int)$db->lastInsertId();\n        audit($db, $id, $user, 'Создана, назначена '.$assignee, $now);\n        $t = row($db, 'SELECT * FROM tasks WHERE id=?', [$id]) ?? throw new RuntimeException('Task missing');\n        enqueue($db, $assignee, 'assigned:'.$id, taskText($t), taskButtons($t, $assignee, $target['role'] === 'manager'), 'task', $id, 1);\n        $text = 'Создана задача #'.$id.'. Постановка уведомления в очередь ещё не подтверждает прочтение.';\n    } elseif (preg_match('~^/tasks(?: ([1-9][0-9]*))?$~D', $action, $m)) {\n        $before = isset($m[1]) ? positive($m[1], PHP_INT_MAX) : PHP_INT_MAX;\n        $items = run($db, \"SELECT * FROM tasks WHERE assignee=? AND status IN ('new','working') AND id<? ORDER BY id DESC LIMIT 6\", [$user,$before])->fetchAll();\n        $more = count($items) > 5;\n        $items = array_slice($items, 0, 5);\n        $lines = [];\n        $last = null;\n        foreach ($items as $value) {\n            $t = objectValue($value);\n            $lines[] = taskText($t).' · /task '.intValue($t['id']);\n            $last = intValue($t['id']);\n        }\n        $text = $lines === [] ? 'Активных личных задач нет.' : implode(\"\\n\\n\", $lines).($more ? \"\\n\\nДалее: /tasks \".$last : '');\n    } elseif (preg_match('~^/task ([1-9][0-9]*)$~D', $action, $m)) {\n        $id = positive($m[1]);\n        $t = row($db, 'SELECT * FROM tasks WHERE id=?', [$id]);\n        if (!$t || (!$manager && intValue($t['assignee']) !== $user)) {\n            throw new DomainException('Задача недоступна');\n        }\n        $text = taskText($t);\n        $buttons = taskButtons($t, $user, $manager);\n        foreach (run($db, 'SELECT * FROM history WHERE task_id=? ORDER BY id DESC LIMIT 10', [$id])->fetchAll() as $value) {\n            $h = objectValue($value);\n            $text .= \"\\n\".gmdate('d.m H:i', intValue($h['created_at'])).' UTC · '.intValue($h['actor']).': '.stringValue($h['action']);\n        }\n    } elseif ($callback && preg_match('/^task:([1-9][0-9]*):([1-9][0-9]*):(working|done|cancelled)$/D', $action, $m)) {\n        $id = positive($m[1]);\n        $version = positive($m[2]);\n        $next = $m[3];\n        $t = row($db, 'SELECT * FROM tasks WHERE id=?', [$id]);\n        if (!$t || (!$manager && intValue($t['assignee']) !== $user)) {\n            throw new DomainException('Задача недоступна');\n        }\n        if (intValue($t['version']) !== $version) {\n            throw new DomainException('Карточка устарела. Откройте /task '.$id);\n        }\n        $allowed = $next === 'cancelled' ? ($manager && in_array($t['status'], ['new','working'], true)) :\n            (intValue($t['assignee']) === $user && (($next === 'working' && $t['status'] === 'new') || ($next === 'done' && $t['status'] === 'working')));\n        if (!$allowed) {\n            throw new DomainException('Этот переход статуса недоступен');\n        }\n        run($db, 'UPDATE tasks SET status=?,version=version+1 WHERE id=? AND version=?', [$next,$id,$version]);\n        audit($db, $id, $user, 'Статус: '.$next, $now);\n        $t = row($db, 'SELECT * FROM tasks WHERE id=?', [$id]) ?? throw new RuntimeException('Task missing');\n        $text = taskText($t);\n        $buttons = taskButtons($t, $user, $manager);\n        foreach (array_unique([intValue($t['creator']),intValue($t['assignee'])]) as $recipient) {\n            if ($recipient !== $user) {\n                enqueue($db, $recipient, 'change:'.$update.':'.$recipient, $text, [], 'task', $id, $version + 1);\n            }\n        }\n    } elseif ($callback) {\n        throw new DomainException('Неизвестная кнопка. Откройте актуальную карточку');\n    }\n    enqueue($db, $user, 'reply:'.$update, $text, $buttons);\n}\nfunction remind(PDO $db, int $now): void\n{\n    foreach (run($db, \"SELECT t.* FROM tasks t JOIN employees e ON e.user_id=t.assignee WHERE t.status IN ('new','working') AND t.due_at<=? AND e.active=1 AND e.started=1 ORDER BY t.id LIMIT 1000\", [$now])->fetchAll() as $value) {\n        $t = objectValue($value);\n        $id = intValue($t['id']);\n        $key = 'late:'.$id.':'.gmdate('Y-m-d', $now);\n        if (row($db, 'SELECT id FROM outbox WHERE event_key=?', [$key])) {\n            continue;\n        }\n        enqueue($db, intValue($t['assignee']), $key, 'Просрочена задача: '.taskText($t).\"\\nОткройте /task \".$id, [], 'late', $id, intValue($t['version']));\n        audit($db, $id, 0, 'Напоминание поставлено в очередь', $now);\n    }\n}\n/**\n * @param array<string,mixed> $r\n */\nfunction canDeliver(PDO $db, array $r, int $now): bool\n{\n    if (!row($db, 'SELECT user_id FROM employees WHERE user_id=? AND active=1 AND started=1', [intValue($r['chat_id'])])) {\n        return false;\n    }\n    if (!in_array($r['guard_kind'], ['task','late'], true)) {\n        return true;\n    }\n    $t = row($db,'SELECT * FROM tasks WHERE id=? AND version=?',[intValue($r['guard_id']),intValue($r['guard_version'])]);\n    if (!$t) {\n        return false;\n    }\n    return $r['guard_kind'] !== 'late' || (in_array($t['status'],['new','working'],true) && intValue($t['due_at']) <= $now && str_ends_with(stringValue($r['event_key']),gmdate('Y-m-d',$now)));\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Команда создания принимает три части через |: Telegram ID исполнителя, срок и заголовок. Название ограничено 200 символами, срок — будущим временем не более года вперёд. Стоимость работ, вложения и персональные клиентские данные в заголовок лучше не помещать: карточка будет храниться в истории личного чата."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Кнопка содержит ID задачи, её версию и требуемый следующий статус. Например, task:1:2:done подходит только версии 2. После любого принятого изменения version увеличивается. Старое сообщение не может отменить новое решение; бот предложит открыть актуальную карточку через /task 1."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Даже корректная версия не отменяет проверку роли. Сотрудник не завершит чужую задачу, а руководитель не переведёт чужую задачу в работу только из-за своей должности. Допустимые переходы перечислены явно. Произвольное значение статуса из callback_data не становится значением поля БД."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создание, история и исходящие уведомления проходят в одной транзакции. Если запись истории не удалась, статус не меняется отдельно от неё. Внешний запрос к Telegram выполняется уже после сохранения. Это позволяет повторить доставку уведомления без повторного изменения задачи."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "list",
+        "label": "Покажите личные задачи и актуальную карточку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Покажите личные задачи и актуальную карточку"
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Команда"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Назначение"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/start"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Подтвердить начало личного диалога"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/tasks"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Первые пять собственных активных задач"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/tasks ID"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Следующая страница с более старыми ID"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/task ID"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Карточка, кнопки и последние десять записей истории"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "/new USER|DATE|TITLE"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Создание руководителем"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Личный список не включает выполненные и отменённые задачи. Пагинация построена по ID, а не по номеру страницы: новые задачи не сдвигают уже выданную границу. Для списка «сначала самые срочные» нужен курсор из срока и ID; просто поменять ORDER BY без изменения условия перехода недостаточно."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Руководитель может открыть известную задачу через /task ID, но /tasks всё равно означает его собственные задачи. Общая панель команды здесь не реализована. Для небольшой команды ID из подтверждения создания достаточно; при росте добавьте отдельную команду обзора с фильтрами, сохранив смысл личного списка."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "История в карточке ограничена десятью последними событиями, чтобы сообщение оставалось коротким. Полная история остаётся в БД. Вывод строится без parse_mode: пользовательский заголовок не интерпретируется как Telegram HTML или Markdown. Если добавите разметку, экранируйте переменные отдельно."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Проверьте отправителя и повторную доставку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте отправителя и повторную доставку"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Webhook принимает только личные чаты. Проверяется секретный заголовок, а from.id должен совпадать с chat.id. В одной транзакции отмечаем update_id, выполняем действие и создаём ответы. Повтор сохранённого Update ничего не меняет. Ошибка предметной области откатывает действие до SAVEPOINT и становится понятным сообщением; внутренняя ошибка откатывает весь Update и возвращает 503."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/common.php';\nrequire dirname(__DIR__).'/outbox.php';\nrequire dirname(__DIR__).'/domain.php';\nheader('Content-Type: application/json; charset=utf-8');\ntry {\n    if (!hash_equals(envRequired('WEBHOOK_SECRET'), stringValue($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? ''))) {\n        http_response_code(403);\n        exit;\n    }\n    $raw = file_get_contents('php://input');\n    if ($raw === false || strlen($raw) > 131072) {\n        http_response_code(413);\n        exit;\n    }\n    $u = objectValue(json_decode($raw, true, 32, JSON_THROW_ON_ERROR));\n    $cb = is_array($u['callback_query'] ?? null) ? objectValue($u['callback_query']) : null;\n    $msg = is_array($cb['message'] ?? $u['message'] ?? null) ? objectValue($cb['message'] ?? $u['message']) : [];\n    $from = is_array($cb['from'] ?? $msg['from'] ?? null) ? objectValue($cb['from'] ?? $msg['from']) : [];\n    $chat = is_array($msg['chat'] ?? null) ? objectValue($msg['chat']) : [];\n    $ack = $cb !== null ? ['method' => 'answerCallbackQuery','callback_query_id' => stringValue($cb['id'])] : ['ok' => true];\n    if (($chat['type'] ?? '') === 'private' && is_int($from['id'] ?? null) && $from['id'] > 0 && ($chat['id'] ?? null) === $from['id']) {\n        $db = database();\n        $uid = positive($u['update_id'], PHP_INT_MAX);\n        $actor = $from['id'];\n        $action = stringValue($cb['data'] ?? $msg['text'] ?? '');\n        atomic($db, function () use ($db, $uid, $actor, $action, $cb): void {\n            if (run($db, 'INSERT OR IGNORE INTO updates(update_id) VALUES(?)', [$uid])->rowCount() === 0) {\n                return;\n            }\n            // Domain errors become readable replies; internal errors roll back the Update.\n            run($db, 'SAVEPOINT action');\n            try {\n                handle($db, $actor, trim($action), $cb !== null, $uid, time());\n                run($db, 'RELEASE action');\n            } catch (DomainException $e) {\n                run($db, 'ROLLBACK TO action');\n                run($db, 'RELEASE action');\n                enqueue($db, $actor, 'error:'.$uid, $e->getMessage());\n            }\n        });\n    }\n    echo json_encode($ack, JSON_THROW_ON_ERROR);\n} catch (Throwable) {\n    http_response_code(503);\n    echo '{\"ok\":false}';\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-webhook.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/transport.php';\n$url = envRequired('WEBHOOK_URL');\n$secret = envRequired('WEBHOOK_SECRET');\nif (!str_starts_with($url, 'https://') || !preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $secret)) {\n    throw new RuntimeException('Check HTTPS and secret');\n}\n$settings = sendTelegram('setMySettings', ['callback_query_mode' => 'default']);\nif ($settings['state'] !== 'sent') {\n    throw new RuntimeException('Callback settings not confirmed');\n}\n$result = sendTelegram('setWebhook', ['url' => $url,'secret_token' => $secret,'allowed_updates' => ['message','callback_query'],'max_connections' => 1]);\necho $result['state'].PHP_EOL;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В setup-webhook.php явно выбран callback_query_mode=default: обработчик использует message.chat из callback_query. Режимы auto и inline могут передавать inline_message_id вместо message и требуют другого разрешения контекста. Настройка выполняется для отдельного учебного бота. answerCallbackQuery возвращается в HTTP-ответе webhook только для снятия индикатора; подтверждение бизнес-действия идёт через outbox. "
+                },
+                {
+                  "type": "text",
+                  "text": "CallbackQuery",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#callbackquery"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "setMySettings",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#setmysettings"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Дедупликация update_id защищает повтор одного входящего события. Она не объединяет два разных сообщения /new с одинаковым текстом: это две отдельные команды пользователя. Перед повторным ручным созданием после сбоя руководителю нужно проверить выданный ID или закрытый журнал задач. Для интеграции с внешней системой добавьте стабильный ID исходной заявки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ошибка предметной области не должна оставлять половину изменений. SAVEPOINT в обработчике откатывает действие, но позволяет записать понятный ответ об ошибке и отметить Update обработанным. Сбой БД или программная ошибка откатывает всё целиком и не подтверждается успешным ответом Telegram. Это разные классы событий."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "reminders",
+        "label": "Напоминайте о просрочке, не создавая поток дублей",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Напоминайте о просрочке, не создавая поток дублей"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "remind выбирает активные задачи, у которых due_at ≤ now. Ключ late:ID:YYYY-MM-DD ограничивает напоминание одним на календарный день UTC. Это не интервал в 24 часа: по обе стороны полуночи два напоминания теоретически могут оказаться близко. Для рабочих часов и персональных часовых поясов понадобится отдельное расписание."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При постановке напоминания сохраняется текущая версия задачи. Перед отправкой canDeliver проверяет активного получателя, ту же версию, статус и день. Если задача выполнена, отменена, изменилась или сообщение задержалось до следующего дня, старая строка становится cancelled. Следующий запуск планировщика создаст актуальное напоминание при необходимости."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запись «Напоминание поставлено в очередь» в истории не означает отправку или прочтение. Подтверждённый результат Telegram лежит в outbox. Между последней проверкой и сетевым запросом остаётся короткое окно гонки: уже начатое сообщение может прийти после завершения задачи. Поэтому бот не должен считать нажатие старой кнопки новым достоверным состоянием."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В учебной реализации один проход ограничен тысячей просроченных задач и предназначен для небольшой команды. При росте объёма выбирайте только ещё не поставленные в очередь задания текущего дня и обрабатывайте их порциями по курсору, иначе первые записи будут занимать лимит каждого прохода. Для эскалации руководителю нужен отдельный ключ и собственное правило частоты."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "delivery",
+        "label": "Отправляйте карточки после сохранения задачи",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправляйте карточки после сохранения задачи"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Бизнес-операция сохраняет исходящее сообщение в outbox, а worker.php отправляет его позже. Уникальный event_key предотвращает повторное создание строки. Файловая блокировка защищает от двух локальных отправителей; она подходит одному серверу с общим APP_DB, но не заменяет распределённую блокировку в кластере."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · outbox.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n/**\n * @param list<list<array{text:string,callback_data:string}>> $buttons\n */\nfunction enqueue(PDO $db, int $chat, string $key, string $text, array $buttons = [], string $kind = '', ?int $id = null, ?int $version = null): void\n{\n    $payload = ['chat_id' => $chat,'text' => $text];\n    if ($buttons !== []) {\n        $payload['reply_markup'] = ['inline_keyboard' => $buttons];\n    }\n    run(\n        $db,\n        'INSERT OR IGNORE INTO outbox(event_key,chat_id,payload,guard_kind,guard_id,guard_version) VALUES(?,?,?,?,?,?)',\n        [$key,$chat,json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),$kind,$id,$version]\n    );\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · transport.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\n/**\n * @param array<string,mixed> $params\n *\n * @return array{state:string,retry_after:int,message_id:?int,code:?int}\n */\nfunction sendTelegram(string $method, array $params): array\n{\n    $curl = curl_init('https://api.telegram.org/bot'.envRequired('BOT_TOKEN').'/'.$method);\n    if ($curl === false) {\n        throw new RuntimeException('HTTP init failed');\n    }\n    curl_setopt_array($curl, [CURLOPT_POST => true,CURLOPT_POSTFIELDS => json_encode($params, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),\n        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],CURLOPT_RETURNTRANSFER => true,CURLOPT_CONNECTTIMEOUT => 5,CURLOPT_TIMEOUT => 20]);\n    $raw = curl_exec($curl);\n    $http = (int)curl_getinfo($curl, CURLINFO_RESPONSE_CODE);\n    return classifyTelegram($http, is_string($raw) ? $raw : null);\n}\n\n/**\n * @return array{state:string,retry_after:int,message_id:?int,code:?int}\n */\nfunction classifyTelegram(int $http, ?string $raw): array\n{\n    $unknown = ['state' => 'unknown','retry_after' => 0,'message_id' => null,'code' => null];\n    if ($raw === null || $http >= 500) {\n        return $unknown;\n    }\n    $body = json_decode($raw, true);\n    if (!is_array($body)) {\n        return $unknown;\n    }\n    $result = $body['result'] ?? null;\n    if ($http === 200 && ($body['ok'] ?? false) === true) {\n        $id = is_array($result) && is_int($result['message_id'] ?? null) ? $result['message_id'] : null;\n        return ['state' => 'sent','retry_after' => 0,'message_id' => $id,'code' => null];\n    }\n    if (($body['ok'] ?? null) !== false || !is_int($body['error_code'] ?? null)) {\n        return $unknown;\n    }\n    $code = $body['error_code'];\n    $parameters = $body['parameters'] ?? null;\n    if ($code === 429 && is_array($parameters) && is_int($parameters['retry_after'] ?? null) && $parameters['retry_after'] > 0) {\n        return ['state' => 'retry','retry_after' => $parameters['retry_after'],'message_id' => null,'code' => $code];\n    }\n    return ['state' => $code >= 400 && $code < 500 ? 'failed' : 'unknown','retry_after' => 0,'message_id' => null,'code' => $code];\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · worker.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/common.php';\nrequire __DIR__.'/outbox.php';\nrequire __DIR__.'/transport.php';\nrequire __DIR__.'/domain.php';\n$db = database();\n$lock = fopen(envRequired('APP_DB').'.send.lock', 'c');\nif ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {\n    exit(0);\n}\nforeach (run($db, \"SELECT id FROM outbox WHERE state IN ('pending','retry') AND next_at<=? ORDER BY id LIMIT 30\", [time()])->fetchAll() as $candidate) {\n    $id = intValue(objectValue($candidate)['id']);\n    $message = atomic($db, function () use ($db, $id): ?array {\n        $r = row($db, \"SELECT * FROM outbox WHERE id=? AND state IN ('pending','retry') AND next_at<=?\", [$id,time()]);\n        if (!$r) {\n            return null;\n        }\n        if (!canDeliver($db, $r, time())) {\n            run($db, \"UPDATE outbox SET state='cancelled' WHERE id=?\", [$id]);\n            return null;\n        }\n        run($db, \"UPDATE outbox SET state='sending',attempts=attempts+1 WHERE id=?\", [$id]);\n        return $r;\n    });\n    if ($message === null) {\n        continue;\n    }\n    try {\n        $result = sendTelegram('sendMessage', objectValue(json_decode(stringValue($message['payload']), true, 512, JSON_THROW_ON_ERROR)));\n    } catch (Throwable) {\n        $result = ['state' => 'unknown','retry_after' => 0,'message_id' => null,'code' => null];\n    }\n    if ($result['state'] === 'sent' && $result['message_id'] === null) {\n        $result['state'] = 'unknown';\n    }\n    if ($result['state'] === 'retry' && intValue($message['attempts']) + 1 >= 5) {\n        $result['state'] = 'failed';\n    }\n    run($db, 'UPDATE outbox SET state=?,next_at=?,message_id=?,error_code=? WHERE id=?', [$result['state'],time() + $result['retry_after'],$result['message_id'],$result['code'],$id]);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Состояние pending означает ожидание, sent — подтверждённый ответ Telegram с message_id. Подтверждённый 429 переносит попытку на retry_after, не более пяти попыток. Таймаут, 5xx или потерянный ответ дают unknown: сообщение могло уже попасть в чат. Строка sending после падения процесса также требует проверки. Автоматического повтора таких сообщений нет; уникальность в БД не обеспечивает exactly-once между приложением и Telegram."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · диагностика доставки",
+                  "code": "SELECT id,event_key,chat_id,state,attempts,next_at,message_id,error_code\nFROM outbox ORDER BY id DESC LIMIT 20;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если pending не убывает, проверьте запуск worker.php, его окружение и путь к той же БД. Для unknown/sending сначала сопоставьте конкретную операцию с сообщениями в тестовом чате. Решение повторить отдельную строку принимается после проверки: остановите отправитель, сохраните причину, верните только нужный ID в pending с новым next_at. Повтор может дать дубль. Не сбрасывайте всю очередь одной командой."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Уведомления о назначении и изменении содержат версию задачи. Если до отправки задача уже изменилась, устаревшее уведомление отменяется. Пользователь может получить актуальную карточку по /task ID. Для строгого сохранения каждого уведомления как исторического события потребуется другая политика: такие сообщения надо подписывать временем и состоянием на момент события."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для отключённого сотрудника новые бизнес-уведомления не отправляются. Старые сообщения остаются в его Telegram-чате: отзыв доступа не удаляет историю, которую он уже получил. Не отправляйте в карточки сведения, которые должны быть доступны только через проверяемый закрытый интерфейс."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "run",
+        "label": "Запустите цикл руководитель → исполнитель → завершение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запустите цикл руководитель → исполнитель → завершение"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · замените ID на проверенные ID двух тестовых пользователей",
+                  "code": "php init.php\nphp admin.php employee 111111111 manager \"Руководитель\"\nphp admin.php employee 222222222 employee \"Исполнитель\"\nphp setup-webhook.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Оба пользователя открывают бота и отправляют /start. Руководитель создаёт задачу командой ниже; дату замените будущей относительно вашего теста. После этого запускается worker.php, который действительно отправит карточку тестовому исполнителю."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Сообщение руководителя боту",
+                  "code": "/new 222222222|2026-11-26 18:00|Подготовить новый прайс"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · доставка и проверка просроченных задач",
+                  "code": "php worker.php\nphp admin.php tick\nphp worker.php"
+                }
+              }
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Исполнитель открывает /tasks, затем /task 1 и нажимает «В работу». Версия становится 2."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Попытка нажать старую кнопку версии 1 отклоняется. Актуальная карточка позволяет отметить готовность."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Другой сотрудник не может открыть задачу или изменить её статус."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Руководитель может отменить новую задачу или задачу в работе, но не завершённую через старую кнопку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Два запуска tick в один UTC-день дают одну строку late:ID:DATE и одну запись о постановке напоминания."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Завершение задачи до отправки отменяет ожидающее напоминание, а отключение сотрудника закрывает доступ к новым действиям."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для проверки просрочки используйте подставное время в автоматическом тесте или отдельную учебную задачу. Не меняйте системные часы сервера ради теста. В рабочем окружении tick и worker запускаются по расписанию с явными путями и окружением; PHP-скрипты здесь выполняют один проход, а не остаются демонами."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · сверка задачи с журналом",
+                  "code": "SELECT id,creator,assignee,due_at,status,version FROM tasks WHERE id=1;\nSELECT actor,action,created_at FROM history WHERE task_id=1 ORDER BY id;\nSELECT event_key,state,message_id FROM outbox ORDER BY id DESC LIMIT 20;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При обращении «я нажал, но статус не сменился» сначала смотрите version и history, затем результат ответа бота. Отсутствие уведомления у руководителя ещё не означает, что задача не выполнена. Если нужна административная корректировка, добавьте отдельную операцию с автором и причиной, а не переписывайте прошлые строки истории."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Если команда использует BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если команда использует BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если запросы к Telegram идут через BotGate, бизнес-данные и решения остаются в вашем приложении. BotGate не пересчитывает стоимость, не исправляет баланс и не решает, кому доступно действие. Подключение описано в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "руководстве по PHP SDK",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/php-telegram-bot-sdk"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не заменяйте только URL в прямом Telegram-клиенте: у сервиса другая авторизация и собственные транспортные ошибки. Прямой webhook из этой статьи и webhook BotGate проверяются по разным контрактам. При переносе сохраните один уровень повторов и проверку подписи входящих событий; не назначайте одному боту два конкурирующих webhook."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

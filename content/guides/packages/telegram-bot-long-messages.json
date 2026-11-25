@@ -1,0 +1,752 @@
+[
+  {
+    "slug": "telegram-bot-long-messages",
+    "title": "Как отправить длинное сообщение в Telegram: разбивка текста без повреждения разметки",
+    "seo_title": null,
+    "description": "Делим длинный отчёт на части в PHP: сохраняем кириллицу и составные эмодзи, экранируем HTML после разбиения и контролируем последовательную отправку.",
+    "card_description": "Делим длинный отчёт на части в PHP: сохраняем кириллицу и составные эмодзи, экранируем HTML после разбиения и контролируем последовательную отправку.",
+    "category": "Практика",
+    "topics": "PHP · Unicode · Длинные сообщения",
+    "reading_time": "12 минут",
+    "published_at": "2026-10-26",
+    "is_published": true,
+    "sort_order": 21,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера возьмём ежедневный отчёт магазина: список заказов, комментарии сотрудников и итоговые суммы. Иногда он не помещается в одно сообщение. Подготовим части так, чтобы не разорвать эмодзи или HTML-тег, а затем выберем между несколькими сообщениями и документом."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "limits",
+        "label": "Почему длинный текст не отправляется",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Почему длинный текст не отправляется"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для обычного sendMessage Telegram указывает предел 4096 символов после разбора entities. Это не размер JSON в байтах. Длина UTF-8 строки в strlen, количество видимых символов и единицы UTF-16 — разные величины. Поэтому разрезать текст через substr по 4096 байт нельзя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ниже используем запас: не более 3000 единиц UTF-16 на часть и отдельную проверку длины с заголовком. Это консервативный бюджет нашего алгоритма, а не новая формулировка лимита Telegram. Он оставляет место для нумерации и не режет строку посреди UTF-8 последовательности."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Статья относится к обычному sendMessage. Подписи к файлам и фотографиям имеют другие ограничения: длинный отчёт не стоит переносить целиком в caption."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Официальные параметры sendMessage",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#sendmessage"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "strategy",
+        "label": "Сначала делим текст, потом добавляем оформление",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала делим текст, потом добавляем оформление"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Надёжный исходник для этого примера — обычный текст. Сначала делим его на части, затем экранируем каждую и оборачиваем собственный заголовок в HTML-тег. Пользовательские <, > и & остаются текстом, а не командами разметки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не передавайте в функцию готовый HTML или MarkdownV2. Чтобы сохранить сложное исходное форматирование, нужен разбор структуры и закрытие/повторное открытие тегов либо перерасчёт entities для каждой части. Обычное разрезание строки этого не делает. Для таблиц и сложного отчёта часто удобнее документ."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если проблема возникает даже у короткого текста, проверьте HTML и MarkdownV2",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-cant-parse-entities"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "splitter",
+        "label": "Функция разбиения для PHP",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция разбиения для PHP"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нужны PHP 8.2+ и mbstring. Сохраните функцию в split-text.php. Короткие абзацы стараемся не разрывать, а слишком длинный абзац делим по графемным кластерам через \\X. Кластер может включать несколько Unicode-символов — например, эмодзи с модификатором или букву с комбинируемым ударением."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · split-text.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction utf16Length(string $text): int\n{\n    return intdiv(strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')), 2);\n}\n\n/** Принимает обычный UTF-8 текст, не HTML и не Markdown.\n *  @return list<string>\n */\nfunction splitTelegramText(string $text, int $limit = 3000): array\n{\n    if ($limit < 1 || $limit > 3000 || !mb_check_encoding($text, 'UTF-8')) {\n        throw new InvalidArgumentException('Проверьте UTF-8 и limit от 1 до 3000');\n    }\n    if (!preg_match('/\\S/u', $text)) {\n        throw new InvalidArgumentException('Пустой текст');\n    }\n    $paragraphs = preg_split('/(\\R\\R+)/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE);\n    if ($paragraphs === false) {\n        throw new RuntimeException('Не удалось разобрать абзацы');\n    }\n    $parts = [];\n    $current = '';\n    $used = 0;\n    foreach ($paragraphs as $paragraph) {\n        $size = utf16Length($paragraph);\n        // Абзац, который целиком помещается в сообщение, не разрываем.\n        if ($size <= $limit) {\n            if ($used + $size > $limit) {\n                $parts[] = $current;\n                $current = '';\n                $used = 0;\n            }\n            $current .= $paragraph;\n            $used += $size;\n            continue;\n        }\n        if (preg_match_all('/\\X/u', $paragraph, $matches) === false) {\n            throw new RuntimeException('Не удалось разобрать Unicode');\n        }\n        foreach ($matches[0] as $cluster) {\n            $units = utf16Length($cluster);\n            if ($units > $limit) {\n                throw new LengthException('Один составной символ превышает лимит');\n            }\n            if ($used + $units > $limit) {\n                $parts[] = $current;\n                $current = '';\n                $used = 0;\n            }\n            $current .= $cluster;\n            $used += $units;\n        }\n    }\n    if ($current !== '') {\n        $parts[] = $current;\n    }\n    foreach ($parts as $part) {\n        if (!preg_match('/\\S/u', $part)) {\n            throw new InvalidArgumentException('Получилась часть только из пробелов: очистите исходный текст');\n        }\n    }\n    return $parts;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Функция сохраняет исходный текст: объединение частей без разделителя должно дать исходную строку. Невалидный UTF-8, пустой текст, часть только из пробелов или необычно длинный одиночный кластер приводят к явной ошибке до отправки. Для произвольного большого файла установите ограничение размера входа в вашем приложении: этот учебный вариант работает с текстом в памяти."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "prepare-parts",
+        "label": "Готовим HTML для каждой части",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Готовим HTML для каждой части"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте report.txt в UTF-8 рядом со скриптами. Положите туда тестовый отчёт с несколькими абзацами, кириллицей, символами < и & и эмодзи. Следующий скрипт только выводит подготовленные параметры, ничего не отправляя."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · prepare-parts.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/split-text.php';\n\n$text = file_get_contents(__DIR__.'/report.txt');\nif ($text === false) {\n    throw new RuntimeException('Не найден report.txt');\n}\n$parts = splitTelegramText($text);\n$payloads = [];\nforeach ($parts as $index => $part) {\n    $header = 'Отчёт — часть '.($index + 1).' из '.count($parts);\n    if (utf16Length($header.\"\\n\".$part) > 4096) {\n        throw new LengthException('Сообщение с заголовком слишком длинное');\n    }\n    $payloads[] = [\n        'text' => '<b>'.htmlspecialchars($header, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').\"</b>\\n\"\n            .htmlspecialchars($part, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),\n        'parse_mode' => 'HTML',\n    ];\n}\necho json_encode($payloads, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), PHP_EOL;"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash / PowerShell · локальный просмотр частей",
+                  "code": "php prepare-parts.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте нумерацию и границы абзацев. В JSON вы увидите HTML-сущности и теги — это нормально: Telegram обработает их при parse_mode: HTML. Для проверки лимита важен текст после разбора разметки, а не длина этой сериализации."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "delivery",
+        "label": "Отправляем части последовательно",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправляем части последовательно"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задания по одному отчёту должны выполняться последовательно. Сохраните подготовленные части и курсор следующей отправки в хранилище приложения. Не создавайте параллельную отправку всех частей: порядок выполнения сетевых запросов может отличаться от порядка отчёта."
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Перед вызовом отметьте конкретную часть как отправляемую."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "При подтверждённом ответе сохраните message_id этой части и переходите к следующей."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "При 429 отложите текущую часть на указанное время; следующие части пока не отправляйте."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "При таймауте или потерянном ответе остановите отчёт в состоянии неизвестного результата."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "После ошибки не начинайте отчёт заново с первой части."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Это схема обработки заданий, а не готовая реализация очереди. Даже транзакция в вашей БД не делает запись message_id атомарной с Telegram: процесс может завершиться после отправки, но до сохранения ответа. Для неизвестного результата нужна отдельная процедура проверки, а не обещание доставки без дублей."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Очередь и обработка ошибок в Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-telegram-notifications"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задержка при 429 и ограничения отправки",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-api-error-429"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Почему возникают повторные сообщения",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-duplicate-messages"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Проверяем одну часть через BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем одну часть через BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для отправки используйте composer require botgate/sdk и переменные окружения BOTGATE_API_KEY, BOTGATE_BOT_ID и TELEGRAM_CHAT_ID. PHP SDK требует PHP 8.2+. Сохраните следующую настройку в botgate.php:"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · botgate.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nrequire __DIR__.'/vendor/autoload.php';\n\nuse BotGate\\Client;\nuse BotGate\\Config;\n\n$apiKey = getenv('BOTGATE_API_KEY');\n$botId = getenv('BOTGATE_BOT_ID');\nif (!is_string($apiKey) || $apiKey === '' || !is_string($botId) || $botId === '') {\n    throw new RuntimeException('Задайте BOTGATE_API_KEY и BOTGATE_BOT_ID');\n}\n$bot = Client::fromConfig(new Config(\n    apiKey: $apiKey,\n    timeout: 60.0,\n    maxRetries: 0,\n))->bot($botId);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Этот CLI-скрипт намеренно отправляет только первую часть отчёта в тестовый чат. Он проверяет переносы, экранирование и внешний вид. Полную последовательность подключайте к описанной выше очереди после этой проверки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · send-first-part.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire __DIR__.'/botgate.php';\nrequire __DIR__.'/split-text.php';\n\n$chatId = getenv('TELEGRAM_CHAT_ID');\n$text = file_get_contents(__DIR__.'/report.txt');\nif (!is_string($chatId) || $chatId === '' || $text === false) {\n    throw new RuntimeException('Проверьте TELEGRAM_CHAT_ID и report.txt');\n}\n$parts = splitTelegramText($text);\n$header = 'Отчёт — часть 1 из '.count($parts);\nif (utf16Length($header.\"\\n\".$parts[0]) > 4096) {\n    throw new LengthException('Сообщение с заголовком слишком длинное');\n}\n$response = $bot->call('sendMessage', [\n    'chat_id' => $chatId,\n    'parse_mode' => 'HTML',\n    'text' => '<b>'.htmlspecialchars($header, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8').\"</b>\\n\"\n        .htmlspecialchars($parts[0], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'),\n]);\necho json_encode($response->result, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR), PHP_EOL;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "maxRetries: 0 оставляет решение о повторе вашему приложению. Смена транспорта не увеличивает допустимую длину сообщения и не исправляет повреждённую разметку. При прямой отправке к Telegram используются те же text и parse_mode."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "document",
+        "label": "Когда удобнее отправить документ",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда удобнее отправить документ"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если отчёт получается на десятки сообщений, содержит таблицы или нужен для скачивания, подготовьте TXT либо PDF и отправьте его через sendDocument с короткой подписью. Читателю будет проще сохранить один файл и вернуться к нему."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для TXT явно используйте UTF-8. Для PDF сначала проверьте переносы страниц и шрифты. Не делайте файл с персональными данными публично доступным ради передачи по URL: можно загрузить его с сервера через multipart."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Загрузка документа и диагностика ошибок файлов",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-files-not-sending"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "verification",
+        "label": "Проверяем разбиение до подключения очереди",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем разбиение до подключения очереди"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Короткий текст даёт одну часть; длинный — несколько, без потери и перестановки исходных символов."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Длинный абзац без пробелов укладывается в лимит; обычные короткие абзацы остаются целыми."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Кириллица, комбинируемые буквы, эмодзи с оттенком кожи и семейные эмодзи не разрываются внутри кластера."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Знаки <, >, &, кавычки и текст, похожий на HTML, отображаются как пользовательский текст."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Каждая часть вместе с заголовком проходит проверку длины до сетевого вызова."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Ошибка второй части не приводит к повторной отправке первой и бесконтрольной отправке третьей."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Источники",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Источники"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Telegram: sendMessage и форматирование",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#sendmessage"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PHP: \\X и Unicode-кластеры в PCRE",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/en/regexp.reference.escape.php"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PHP: mb_convert_encoding",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/en/function.mb-convert-encoding.php"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "PHP: htmlspecialchars",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/en/function.htmlspecialchars.php"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,942 @@
+[
+  {
+    "slug": "telegram-mini-app-iphone-android",
+    "title": "Как адаптировать Telegram Mini App под iPhone и Android",
+    "seo_title": "Как адаптировать Telegram Mini App под iPhone и Android",
+    "description": "Настраиваем высоту окна, прокрутку при открытой клавиатуре, светлую и тёмную темы, безопасные отступы и нижнюю кнопку в Telegram Mini App.",
+    "card_description": "Настраиваем высоту окна, прокрутку при открытой клавиатуре, светлую и тёмную темы, безопасные отступы и нижнюю кнопку в Telegram Mini App.",
+    "category": "Практика",
+    "topics": "Mini Apps · iPhone · Android · CSS",
+    "reading_time": "12 минут",
+    "published_at": "2026-11-09",
+    "is_published": true,
+    "sort_order": 47,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера сделаем экран, на котором покупатель указывает имя и комментарий к заказу. На маленьком экране форма прокручивается, нижняя кнопка остаётся доступной, а цвета меняются вместе с темой Telegram. Этот экран можно использовать и для записи на услугу."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "shell",
+        "label": "Собираем экран с прокручиваемой формой",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Собираем экран с прокручиваемой формой"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавьте "
+                },
+                {
+                  "type": "text",
+                  "text": "viewport-fit=cover",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " в meta viewport и подключите скрипт Telegram до скрипта приложения. Сохраните три блока ниже как "
+                },
+                {
+                  "type": "text",
+                  "text": "index.html",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", "
+                },
+                {
+                  "type": "text",
+                  "text": "app.css",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "app.js",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Это демонстрация вёрстки: форма покажет сообщение в интерфейсе, а запрос к серверу вы добавите в обработчик отправки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "HTML · index.html",
+                  "code": "<!doctype html>\n<html lang=\"ru\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n  <title>Контакт для заказа</title>\n  <link rel=\"stylesheet\" href=\"app.css\">\n  <script src=\"https://telegram.org/js/telegram-web-app.js\"></script>\n  <script src=\"app.js\" defer></script>\n</head>\n<body>\n  <form id=\"contact-form\" class=\"screen\">\n    <main class=\"screen__body\">\n      <h1>Контакт для заказа</h1>\n      <label>Имя <input name=\"name\" autocomplete=\"name\" required></label>\n      <label>Комментарий <textarea name=\"comment\" rows=\"5\"></textarea></label>\n      <p role=\"status\"></p>\n    </main>\n    <footer class=\"screen__actions\">\n      <button type=\"submit\">Продолжить</button>\n    </footer>\n  </form>\n</body>\n</html>"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задайте высоту всей оболочки через "
+                },
+                {
+                  "type": "text",
+                  "text": "--tg-viewport-stable-height",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". При растягивании окна Telegram обновляет это значение после завершения жеста. "
+                },
+                {
+                  "type": "text",
+                  "text": "viewportHeight",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " описывает текущую видимую высоту, но обновляется слишком редко для плавной привязки кнопки к нижней границе. В обычном браузере предусмотрите "
+                },
+                {
+                  "type": "text",
+                  "text": "100dvh",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " с запасным значением "
+                },
+                {
+                  "type": "text",
+                  "text": "100vh",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "CSS · app.css",
+                  "code": ":root {\n  --browser-height: 100vh;\n  color-scheme: light dark;\n  font: 16px/1.5 system-ui, sans-serif;\n}\n@supports (height: 100dvh) {\n  :root { --browser-height: 100dvh; }\n}\nbody {\n  margin: 0;\n  color: var(--tg-theme-text-color, CanvasText);\n  background: var(--tg-theme-bg-color, Canvas);\n}\n.screen {\n  box-sizing: border-box;\n  block-size: min(\n    var(--tg-viewport-stable-height, var(--browser-height)),\n    var(--editing-height, 100vh)\n  );\n  display: grid;\n  grid-template-rows: minmax(0, 1fr) auto;\n  padding-top: calc(var(--tg-safe-area-inset-top, env(safe-area-inset-top, 0px))\n    + var(--tg-content-safe-area-inset-top, 0px));\n  padding-left: calc(var(--tg-safe-area-inset-left, env(safe-area-inset-left, 0px))\n    + var(--tg-content-safe-area-inset-left, 0px));\n  padding-right: calc(var(--tg-safe-area-inset-right, env(safe-area-inset-right, 0px))\n    + var(--tg-content-safe-area-inset-right, 0px));\n  padding-bottom: calc(var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))\n    + var(--tg-content-safe-area-inset-bottom, 0px));\n}\n.screen__body {\n  overflow: auto;\n  padding: 16px;\n  scroll-padding: 16px;\n}\n.screen__actions { padding: 12px 16px; }\nlabel { display: grid; gap: 6px; margin-block: 12px; }\ninput, textarea, button { font: inherit; }\ninput, textarea {\n  color: inherit;\n  background: var(--tg-theme-secondary-bg-color, Canvas);\n}\nbutton {\n  width: 100%;\n  min-height: 44px;\n  border: 0;\n  border-radius: 8px;\n  background: var(--tg-theme-button-color, ButtonFace);\n  color: var(--tg-theme-button-text-color, ButtonText);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Нижняя кнопка занимает отдельную строку сетки. Последнее поле можно прокрутить целиком, поскольку кнопка не наложена поверх него. Оставьте видимый индикатор фокуса на полях и кнопке."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "keyboard",
+        "label": "Учитываем экранную клавиатуру",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Учитываем экранную клавиатуру"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда клавиатура открывается, видимая область может уменьшаться отдельно от основного размера страницы. Пока поле редактируется, ограничьте высоту оболочки значением "
+                },
+                {
+                  "type": "text",
+                  "text": "visualViewport.height",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", если WebView его предоставляет. После потери фокуса уберите временное ограничение. Дополнительно слушайте "
+                },
+                {
+                  "type": "text",
+                  "text": "viewportChanged",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", чтобы обработать изменение окна Telegram."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-mini-app-iphone-android/viewport-keyboard.jpg",
+                  "alt": "Одна форма при закрытой и открытой клавиатуре: доступная высота уменьшается, кнопка остаётся в отдельной строке.",
+                  "caption": "Схема на основе HTML/CSS статьи. Клавиатура показана условно; поведение WebView необходимо проверять на реальных устройствах.",
+                  "width": 1080,
+                  "height": 894,
+                  "mobile_src": "/images/guides/telegram-mini-app-iphone-android/viewport-keyboard-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1596
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JavaScript · app.js",
+                  "code": "const app = window.Telegram?.WebApp;\nconst viewport = window.visualViewport;\nconst root = document.documentElement;\nconst form = document.querySelector('#contact-form');\n\nfunction updateTheme() {\n  root.style.colorScheme = app?.initData ? app.colorScheme : 'light dark';\n}\n\nfunction fitEditor() {\n  const field = document.activeElement;\n  const editing = form.contains(field) && field.matches('input, textarea');\n  if (editing && viewport?.height > 0) {\n    root.style.setProperty('--editing-height', viewport.height + 'px');\n    field.scrollIntoView({ block: 'nearest', inline: 'nearest' });\n  } else {\n    root.style.removeProperty('--editing-height');\n  }\n}\n\nfunction fitOnNextFrame() {\n  requestAnimationFrame(fitEditor);\n}\n\nform.addEventListener('focusin', fitOnNextFrame);\nform.addEventListener('focusout', fitOnNextFrame);\nviewport?.addEventListener('resize', fitOnNextFrame);\napp?.onEvent('viewportChanged', ({ isStateStable }) => {\n  if (isStateStable) fitOnNextFrame();\n});\napp?.onEvent('themeChanged', updateTheme);\n\nform.addEventListener('submit', (event) => {\n  event.preventDefault();\n  form.querySelector('[role=\"status\"]').textContent = 'Форма заполнена.';\n  form.querySelector('[role=\"status\"]').scrollIntoView({ block: 'nearest' });\n});\n\nupdateTheme();\napp?.ready();"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Клиенты Telegram по-разному меняют размер видимой области и прокручивают страницу при фокусе. Проверьте на телефоне, видно ли каретку и можно ли дойти до последнего поля. Если закреплённая кнопка отнимает слишком много высоты, перенесите действие внутрь прокручиваемой формы. При отсутствии "
+                },
+                {
+                  "type": "text",
+                  "text": "visualViewport",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " форма продолжит использовать высоту Telegram или браузера."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "На версиях с поддержкой "
+                },
+                {
+                  "type": "text",
+                  "text": "hideKeyboard()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " можно скрыть клавиатуру после явного действия пользователя. Проверьте "
+                },
+                {
+                  "type": "text",
+                  "text": "app.isVersionAtLeast('9.1')",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и наличие метода. Во время ввода оставьте клавиатуру открытой. "
+                },
+                {
+                  "type": "text",
+                  "text": "expand()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " разворачивает окно Mini App до доступной высоты и решает другую задачу."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если после закрытия клавиатуры остаётся пустая полоса, проверьте, снимается ли "
+                },
+                {
+                  "type": "text",
+                  "text": "--editing-height",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " на focusout и пришёл ли resize. Если последнее поле прячется за кнопкой, проверьте высоту "
+                },
+                {
+                  "type": "text",
+                  "text": ".screen__body",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и наличие "
+                },
+                {
+                  "type": "text",
+                  "text": "minmax(0, 1fr)",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ": без разрешённого сжатия содержимое может вытолкнуть нижнюю строку за экран. Эмулятор браузера помогает найти ошибку сетки, но поведение клавиатуры принимайте на настоящем телефоне."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "themes-and-insets",
+        "label": "Подстраиваем цвета и безопасные отступы",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подстраиваем цвета и безопасные отступы"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Переменные "
+                },
+                {
+                  "type": "text",
+                  "text": "--tg-theme-*",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " подставляют цвета темы Telegram. "
+                },
+                {
+                  "type": "text",
+                  "text": "color-scheme",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " синхронизирует системное оформление полей и полос прокрутки. Событие "
+                },
+                {
+                  "type": "text",
+                  "text": "themeChanged",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " нужно для настроек, которые считывает JavaScript. Например, при рисовании на canvas получите свежие "
+                },
+                {
+                  "type": "text",
+                  "text": "app.themeParams",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и перерисуйте сцену."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Системные отступы "
+                },
+                {
+                  "type": "text",
+                  "text": "safeAreaInset",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " учитывают вырез экрана и элементы ОС. "
+                },
+                {
+                  "type": "text",
+                  "text": "contentSafeAreaInset",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " учитывает элементы Telegram. В примере CSS использует оба набора, а при отсутствии системных переменных Telegram берёт "
+                },
+                {
+                  "type": "text",
+                  "text": "env(safe-area-inset-*)",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " браузера. Добавляйте отступ на одном уровне оболочки и проверяйте, что внутренний блок не учитывает тот же край второй раз."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если положение элементов рассчитывает JavaScript, обновляйте его при "
+                },
+                {
+                  "type": "text",
+                  "text": "safeAreaChanged",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "contentSafeAreaChanged",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Поддержку этих событий проверяйте через "
+                },
+                {
+                  "type": "text",
+                  "text": "isVersionAtLeast('8.0')",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Проверьте верх и низ в портретном режиме, а также левый и правый края после поворота."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-mini-app-iphone-android/themes-safe-areas.jpg",
+                  "alt": "Светлая и тёмная версии формы с обозначенными верхним и нижним безопасными отступами.",
+                  "caption": "Макет из примера с демонстрационными цветами темы. Цветные полосы поясняют безопасные отступы и не являются элементами интерфейса Telegram.",
+                  "width": 1080,
+                  "height": 840,
+                  "mobile_src": "/images/guides/telegram-mini-app-iphone-android/themes-safe-areas-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1440
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "bottom-button",
+        "label": "Выбираем нижнюю кнопку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выбираем нижнюю кнопку"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В примере кнопка принадлежит HTML-форме и работает в браузере. Если хотите использовать нативную нижнюю кнопку Telegram, задайте текст через "
+                },
+                {
+                  "type": "text",
+                  "text": "MainButton.setText()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", вызовите "
+                },
+                {
+                  "type": "text",
+                  "text": "show()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", а в "
+                },
+                {
+                  "type": "text",
+                  "text": "onClick()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " передайте обработчик с "
+                },
+                {
+                  "type": "text",
+                  "text": "form.requestSubmit()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Так выполнится встроенная валидация формы. В Telegram оставьте одно основное действие на экране, а HTML-кнопку используйте как запасной вариант в браузере."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При переходе на другой экран снимите обработчик через "
+                },
+                {
+                  "type": "text",
+                  "text": "offClick()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " с той же функцией и спрячьте кнопку. Пока сохраняется форма, используйте "
+                },
+                {
+                  "type": "text",
+                  "text": "disable()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и при необходимости "
+                },
+                {
+                  "type": "text",
+                  "text": "showProgress()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Для оформления заказа дополнительно нужна "
+                },
+                {
+                  "type": "text",
+                  "text": "серверная обработка повторов",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-cart-checkout#retry"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Добавьте этот блок в конец "
+                },
+                {
+                  "type": "text",
+                  "text": "app.js",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", если выбираете кнопку Telegram. Он использует уже созданные "
+                },
+                {
+                  "type": "text",
+                  "text": "app",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "form",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", поэтому второй обработчик отправки формы не нужен. В обычном браузере останется HTML-кнопка. Возвращённую функцию вызывайте при уходе с экрана в одностраничном приложении."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "JavaScript · подключение нативной кнопки к той же форме",
+                  "code": "function mountTelegramButton() {\n  const button = app?.initData ? app.MainButton : null;\n  const footer = form.querySelector('.screen__actions');\n  if (!button) return () => {};\n  const submit = () => form.requestSubmit();\n  button.setText('Продолжить');\n  button.enable();\n  button.onClick(submit);\n  button.show();\n  footer.hidden = true;\n  return () => {\n    button.offClick(submit);\n    button.hideProgress();\n    button.hide();\n    footer.hidden = false;\n  };\n}\nconst unmountTelegramButton = mountTelegramButton();\n// При размонтировании экрана вызовите unmountTelegramButton()."
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала нажмите кнопку с пустым обязательным полем: браузер должен показать ошибку, а обработчик submit не выполниться. Затем заполните поле и убедитесь, что сообщение «Форма заполнена» появляется один раз. При подключении серверного сохранения блокируйте повторный submit переменной busy внутри обработчика и сбрасывайте её в finally; состояние MainButton только отражает эту переменную."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Различайте три состояния формы: ещё не заполнена, отправляется, сохранена. При сетевой ошибке сохраняйте введённые поля и показывайте сообщение рядом с действием, чтобы человек мог повторить попытку. Не закрывайте Mini App до подтверждённого ответа сервера. Сбой ввода и недоступность сервера пользователь должен отличать без открытия консоли."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "device-checks",
+        "label": "Проверяем на iPhone и Android",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем на iPhone и Android"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Откройте приложение в Telegram на iPhone и Android. Сверните и разверните окно. Нижняя кнопка должна оставаться доступной, а форма — прокручиваться."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Нажмите на последнее поле, наберите несколько строк и закройте клавиатуру. Проверьте каретку, кнопку и возврат формы к исходной высоте."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Переключите тему Telegram. Проверьте читаемость текста, подсказок, границ полей и кнопки в обеих темах."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "На телефоне с вырезом или жестовой навигацией проверьте края экрана после поворота. Повторите проверку в компактном и развёрнутом окне, если приложение поддерживает оба режима."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Интерфейс Telegram Mini Apps",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/webapps",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " · "
+                },
+                {
+                  "type": "text",
+                  "text": "Спецификация VisualViewport",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://drafts.csswg.org/cssom-view/#the-visualviewport-interface",
+                        "target": "_blank",
+                        "rel": "noopener noreferrer"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

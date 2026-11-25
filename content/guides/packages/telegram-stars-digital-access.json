@@ -1,0 +1,1036 @@
+[
+  {
+    "slug": "telegram-stars-digital-access",
+    "title": "Как принимать оплату за цифровой доступ через Telegram Stars",
+    "seo_title": "Как принимать оплату за цифровой доступ через Telegram Stars",
+    "description": "Практический пример оплаты цифрового доступа на PHP: счёт в Stars, pre_checkout_query, успешный платёж, однократная выдача доступа и возврат с учётом повторов событий.",
+    "card_description": "Практический пример оплаты цифрового доступа на PHP: счёт в Stars, pre_checkout_query, успешный платёж, однократная выдача доступа и возврат с учётом повторов событий.",
+    "category": "Практика",
+    "topics": "Telegram Stars · Платежи · Цифровой доступ · PHP",
+    "reading_time": "29 минут",
+    "published_at": "2026-11-11",
+    "is_published": true,
+    "sort_order": 55,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера продадим доступ к небольшому PHP-практикуму за 100 Stars. Пользователь вызывает /buy, оплачивает счёт и получает материал по /access. Код хранит платёж и право доступа одной транзакцией, узнаёт повтор события и обрабатывает возврат. Цена и получатель определяются сервером, а нажатие кнопки оплаты само по себе ничего не открывает."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "scenario",
+        "label": "Выбираем продукт и условия доступа",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выбираем продукт и условия доступа"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для цифровых товаров и услуг внутри Telegram используется валюта XTR — Telegram Stars. В этой статье разовая покупка без автопродления. Не переносите пример как готовую реализацию ежемесячной подписки: у неё другой жизненный цикл продления и окончания доступа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Продукт в примере один: course-php. После оплаты бот разрешает читать короткий урок из приватного текстового файла. Это позволяет проверить весь путь без внешней системы обучения. В рабочем практикуме тот же hasCourseAccess можно вызывать перед выдачей каждого материала либо перед открытием страницы после подтверждённого входа пользователя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перед покупкой укажите, что именно получит человек, на какой срок и как обратиться за помощью или возвратом. Для примера доступ действует до возврата. Команда /paysupport должна вести к реальному каналу поддержки; её обработчик будет ниже. Уже полученный текст невозможно стереть у пользователя — возврат закрывает дальнейшую выдачу материалов."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Официальное руководство по оплате цифровых товаров в Stars",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/payments-stars"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "prepare",
+        "label": "Подготавливаем тестовую среду и файлы",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготавливаем тестовую среду и файлы"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Используем PHP 8.3+ с curl, pdo_sqlite и mbstring, одного бота и одну приватную SQLite-БД. Создайте отдельного бота в выделенной тестовой среде Telegram: она отличается от обычного аккаунта и обычного «тестового бота» в production. В ней можно пройти покупку Stars без рабочей оплаты. Инструкцию входа для своего клиента возьмите из документации Telegram."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Выделенная тестовая среда Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/features#dedicated-test-environment"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Text · структура проекта",
+                  "code": "stars-demo/\n  common.php\n  stars.php\n  schema.sql\n  init.php\n  setup-webhook.php\n  refund.php\n  private/course.txt\n  public/webhook.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сайт должен отдавать только public. В private/course.txt сохраните UTF-8-текст тестового урока длиной до 3000 единиц UTF-16. Например: «Урок 1. Значения SQL передавайте через параметры PDO::prepare, а не вставляйте в строку запроса». Это демонстрационный материал: замените его содержимым своего продукта. Файл не должен скачиваться напрямую через веб-сервер."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · окружение приложения",
+                  "code": "export BOT_TOKEN='ТОКЕН_БОТА_ИЗ_TEST_СРЕДЫ'\nexport TELEGRAM_TEST_ENV=1\nexport WEBHOOK_SECRET='СЛУЧАЙНЫЙ_СЕКРЕТ_ИЗ_ЛАТИНИЦЫ_ЦИФР_И_ПОДЧЕРКИВАНИЙ'\nexport BOT_DB_PATH='/srv/stars-demo/private/stars.sqlite'\nexport COURSE_TEXT_PATH='/srv/stars-demo/private/course.txt'\nexport PAY_SUPPORT_CONTACT='@your_real_support'\nexport WEBHOOK_URL='https://stars.example.com/webhook.php'"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пути, контакт и HTTPS-адрес замените своими. PHP-FPM и CLI должны получать одинаковое окружение. В отдельном FPM-пуле переменные задаются через env[ИМЯ]; файл .env сам по себе обычный PHP не читает. На рабочем запуске используйте production-токен, TELEGRAM_TEST_ENV=0 и отдельную рабочую БД, сохранив тестовые данные в тестовом окружении."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "common.php переключает только фиксированный префикс прямого Bot API: /test/ для тестовой среды и / для рабочей. Токен не отправляется в браузер. Входящий webhook проверяется по отдельному secret_token. Для одного бота и одной БД достаточно charge_id; при объединении нескольких ботов добавьте bot_id в ключи платежей и заказов."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · common.php",
+                  "code": "<?php\ndeclare(strict_types=1);\n\nfunction database(): PDO\n{\n    $path = getenv('BOT_DB_PATH');\n    if (!$path || !is_file($path)) throw new RuntimeException('Создайте БД и задайте BOT_DB_PATH');\n    $db = new PDO('sqlite:'.$path, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n    $db->exec('PRAGMA foreign_keys = ON');\n    $db->exec('PRAGMA busy_timeout = 1000');\n    return $db;\n}\n\n/** @template T\n * @param callable(): T $work\n * @return T\n */\nfunction atomic(PDO $db, callable $work): mixed\n{\n    $db->exec('BEGIN IMMEDIATE');\n    try {\n        $result = $work();\n        $db->exec('COMMIT');\n        return $result;\n    } catch (Throwable $error) {\n        $db->exec('ROLLBACK');\n        throw $error;\n    }\n}\n\n/** @return array<string, int|string|null>|false */\nfunction row(PDOStatement $query): array|false\n{\n    $value = $query->fetch(PDO::FETCH_ASSOC);\n    if ($value === false) return false;\n    if (!is_array($value)) throw new RuntimeException('Некорректная строка БД');\n    foreach ($value as $key => $field) {\n        if (!is_string($key) || !(is_int($field) || is_string($field) || $field === null)) {\n            throw new RuntimeException('Некорректное поле БД');\n        }\n    }\n    return $value;\n}\n\n/** @param array<string, mixed> $params\n * @return array{state: string, result?: mixed, code?: int, retry_after?: int}\n */\nfunction telegram(string $method, array $params, int $timeout = 8): array\n{\n    $token = getenv('BOT_TOKEN');\n    if (!$token) throw new RuntimeException('Задайте BOT_TOKEN');\n    $prefix = getenv('TELEGRAM_TEST_ENV') === '1' ? '/test/' : '/';\n    $curl = curl_init('https://api.telegram.org/bot'.$token.$prefix.$method);\n    curl_setopt_array($curl, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true,\n        CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_TIMEOUT => $timeout,\n        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],\n        CURLOPT_POSTFIELDS => json_encode($params, JSON_THROW_ON_ERROR)]);\n    $raw = curl_exec($curl);\n    $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);\n    unset($curl);\n    $body = is_string($raw) ? json_decode($raw, true) : null;\n    if ($status >= 200 && $status < 300 && is_array($body) && ($body['ok'] ?? null) === true) {\n        return ['state' => 'ok', 'result' => $body['result'] ?? null];\n    }\n    if ($status < 500 && is_array($body) && ($body['ok'] ?? null) === false\n        && is_int($body['error_code'] ?? null)) {\n        $parameters = $body['parameters'] ?? [];\n        $wait = is_array($parameters) ? ($parameters['retry_after'] ?? 60) : 60;\n        return ['state' => 'rejected', 'code' => $body['error_code'],\n            'retry_after' => is_int($wait) ? max(1, $wait) : 60];\n    }\n    return ['state' => 'unknown'];\n}\n\n/** @return array<array-key, mixed> */\nfunction incomingUpdate(): array\n{\n    $secret = getenv('WEBHOOK_SECRET');\n    $provided = $_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '';\n    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !$secret\n        || !is_string($provided) || !hash_equals($secret, $provided)) {\n        http_response_code(403);\n        exit;\n    }\n    $raw = file_get_contents('php://input', false, null, 0, 1024 * 1024 + 1);\n    if (!is_string($raw) || strlen($raw) > 1024 * 1024) {\n        http_response_code(413);\n        exit;\n    }\n    $update = json_decode($raw, true, 64, JSON_THROW_ON_ERROR);\n    if (!is_array($update) || !is_int($update['update_id'] ?? null)) {\n        throw new InvalidArgumentException('Некорректное событие');\n    }\n    return $update;\n}"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "storage",
+        "label": "Разделяем заказ, платёж и право доступа",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разделяем заказ, платёж и право доступа"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Счёт связан с локальным заказом через случайный payload. Платёж хранится по telegram_payment_charge_id, а право доступа ссылается на этот платёж. Так можно отдельно ответить на вопросы «пользователь собирался купить», «деньги подтверждены» и «материал разрешено выдавать»."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE star_orders (\n  payload TEXT PRIMARY KEY, user_id INTEGER NOT NULL, sku TEXT NOT NULL,\n  stars INTEGER NOT NULL CHECK (stars > 0), expires_at INTEGER NOT NULL,\n  state TEXT NOT NULL DEFAULT 'pending', charge_id TEXT UNIQUE\n);\nCREATE INDEX star_orders_owner ON star_orders(user_id, sku, state);\nCREATE TABLE star_payments (\n  charge_id TEXT PRIMARY KEY, payload TEXT NOT NULL, user_id INTEGER NOT NULL,\n  currency TEXT NOT NULL, amount INTEGER NOT NULL, state TEXT NOT NULL,\n  reason TEXT, received_at INTEGER NOT NULL\n);\nCREATE TABLE star_access (\n  charge_id TEXT PRIMARY KEY REFERENCES star_payments(charge_id),\n  user_id INTEGER NOT NULL, sku TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1\n);\nCREATE INDEX star_access_owner ON star_access(user_id, sku, active);\nCREATE TABLE star_refunds (\n  charge_id TEXT PRIMARY KEY REFERENCES star_payments(charge_id),\n  state TEXT NOT NULL DEFAULT 'sending', requested_at INTEGER NOT NULL\n);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "star_payments сохраняет и платежи, требующие сверки: например, пришла другая сумма или неизвестный payload. Такой факт нельзя терять только потому, что доступ выдавать пока нельзя. Оператор разбирает state = review и reason. Срок хранения платёжного журнала и доступ сотрудников задайте в правилах своего сервиса."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · init.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nif (PHP_SAPI !== 'cli') exit(1);\n$path = getenv('BOT_DB_PATH');\nif (!$path || file_exists($path)) throw new RuntimeException('Нужен путь к новой БД');\n$db = new PDO('sqlite:'.$path, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);\n$db->exec('PRAGMA foreign_keys = ON');\n$db->exec(file_get_contents(__DIR__.'/schema.sql'));\necho \"База создана\\n\";"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · создание новой учебной БД",
+                  "code": "php init.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "SQLite удобна для небольшого примера: BEGIN IMMEDIATE получает право записи до чтения состояния. Все финансовые изменения ниже короткие, без внешних запросов внутри транзакции. Для нескольких серверов используйте общую БД с аналогичной атомарностью и уникальными ключами. Не копируйте синтаксис SQLite в другую СУБД без адаптации."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "invoice",
+        "label": "Создаём заказ и формируем счёт в Stars",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создаём заказ и формируем счёт в Stars"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Начните stars.php следующим блоком. Все следующие фрагменты этого файла дописывайте в его конец, без нового открывающего тега PHP. Цена 100 задаётся в коде каталога на сервере и сохраняется в заказе. Для XTR сумма здесь равна 100 Stars; умножать её на 100 как рубли на копейки не нужно. prices содержит одну позицию, provider_token пустой. В payload передаётся только случайный ID заказа."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · stars.php — материал, доступ и счёт",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire_once __DIR__.'/common.php';\n\nfunction courseText(): string\n{\n    $path = getenv('COURSE_TEXT_PATH');\n    if (!$path || !is_readable($path)) throw new RuntimeException('Материал недоступен');\n    $text = file_get_contents($path, false, null, 0, 12001);\n    if (!is_string($text) || trim($text) === '' || strlen($text) > 12000 || !mb_check_encoding($text, 'UTF-8')\n        || strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')) / 2 > 3000) {\n        throw new RuntimeException('Проверьте UTF-8 и длину материала');\n    }\n    return $text;\n}\n\nfunction hasCourseAccess(PDO $db, int $userId, string $sku = 'course-php'): bool\n{\n    $q = $db->prepare('SELECT 1 FROM star_access WHERE user_id = ? AND sku = ? AND active = 1 LIMIT 1');\n    $q->execute([$userId, $sku]);\n    return $q->fetchColumn() !== false;\n}\n\n/** @return array<string, mixed> */\nfunction invoiceFor(PDO $db, int $userId): array\n{\n    if ($userId <= 0) throw new InvalidArgumentException('Нужен пользователь');\n    return atomic($db, function () use ($db, $userId): array {\n        if (hasCourseAccess($db, $userId)) throw new DomainException('Доступ уже открыт');\n        $q = $db->prepare(\"SELECT * FROM star_orders WHERE user_id = ? AND sku = 'course-php'\n            AND state = 'pending' AND expires_at > ? ORDER BY expires_at DESC LIMIT 1\");\n        $q->execute([$userId, time()]);\n        $order = row($q);\n        if (!$order) {\n            $order = ['payload' => bin2hex(random_bytes(16)), 'stars' => 100];\n            $db->prepare('INSERT INTO star_orders (payload, user_id, sku, stars, expires_at)\n                VALUES (?, ?, ?, ?, ?)')->execute([$order['payload'], $userId, 'course-php', 100, time() + 1200]);\n        }\n        return ['chat_id' => $userId, 'title' => 'Доступ к PHP-практикуму',\n            'description' => 'Однократная оплата без автопродления. После оплаты отправьте /access для получения урока.',\n            'payload' => $order['payload'], 'provider_token' => '', 'currency' => 'XTR',\n            'prices' => [['label' => 'Практикум', 'amount' => (int) $order['stars']]],\n            'start_parameter' => 'course_php'];\n    });\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Повтор /buy в течение 20 минут использует прежний неоплаченный заказ. Если доступ уже есть, новый счёт не создаётся. Пересланная карточка не должна давать доступ постороннему: помимо start_parameter, на предварительной проверке мы сравним плательщика с владельцем заказа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Тело результата invoiceFor передаётся в sendInvoice. Только ответ ok=true подтверждает создание сообщения со счётом. Даже этот ответ ещё ничего не говорит об оплате. Если отправка неизвестна, пользователь может запросить /buy снова; карточек может оказаться несколько, поэтому доступ всё равно защищён платёжным журналом и проверкой состояния заказа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Параметры sendInvoice",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#sendinvoice"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "pre-checkout",
+        "label": "Быстро отвечаем на предварительную проверку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Быстро отвечаем на предварительную проверку"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После подтверждения счёта пользователем приходит pre_checkout_query. Ответ answerPreCheckoutQuery должен успеть в десятисекундное окно Telegram. Не ставьте его за обычной рассылкой или долгой задачей CRM: здесь нужны короткая проверка локального заказа и быстрый HTTP-ответ API."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · stars.php — проверка перед оплатой",
+                  "code": "/** @param array<string, mixed> $query */\nfunction preCheckout(PDO $db, array $query): bool\n{\n    $from = $query['from'] ?? null;\n    $userId = is_array($from) ? ($from['id'] ?? null) : null;\n    $payload = $query['invoice_payload'] ?? null;\n    if (!is_int($userId) || !is_string($payload) || ($query['currency'] ?? null) !== 'XTR'\n        || !is_int($query['total_amount'] ?? null)) return false;\n    $q = $db->prepare(\"SELECT * FROM star_orders WHERE payload = ? AND user_id = ? AND state = 'pending'\");\n    $q->execute([$payload, $userId]);\n    $order = row($q);\n    if ($order && !is_string($order['sku'])) throw new RuntimeException('Некорректный товар в БД');\n    return $order && (int) $order['expires_at'] > time()\n        && (int) $order['stars'] === $query['total_amount'] && !hasCourseAccess($db, $userId, $order['sku']);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем владельца, валюту, сумму, состояние и срок счёта. Общий webhook дополнительно проверит наличие материала перед согласием. Если материал временно недоступен или счёт устарел, возвращаем ok=false с понятной причиной. При ok=true право доступа пока не записывается."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Срок счёта ограничивает разрешение новой попытки оплаты. Если успешный платёж уже произошёл и его событие задержалось, истёкший expires_at не является основанием забыть деньги: обработчик successful_payment ниже проверяет оплаченный заказ и сохраняет факт платежа."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Срок ответа answerPreCheckoutQuery",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#answerprecheckoutquery"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "successful-payment",
+        "label": "Открываем доступ только по успешному платежу",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Открываем доступ только по успешному платежу"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Допишите в stars.php функцию recordPayment. Её вызывают только для платёжного служебного сообщения из проверенного webhook. В примере покупка идёт в личном чате: владельца определяет message.chat.id. Для уведомления о возврате не полагайтесь на from.id — обработка опирается на сохранённый заказ, чат и идентификатор платежа."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · stars.php — сохранение платежа и доступа",
+                  "code": "/** @param array<string, mixed> $payment */\nfunction recordPayment(PDO $db, int $userId, array $payment, bool $refund = false): string\n{\n    $charge = $payment['telegram_payment_charge_id'] ?? null;\n    $payload = $payment['invoice_payload'] ?? null;\n    $currency = $payment['currency'] ?? null;\n    $amount = $payment['total_amount'] ?? null;\n    if (!is_string($charge) || $charge === '' || !is_string($payload) || $payload === ''\n        || !is_string($currency) || $currency === '' || !is_int($amount) || $amount <= 0) {\n        throw new InvalidArgumentException('Некорректный платёж');\n    }\n    $payment = ['telegram_payment_charge_id' => $charge, 'invoice_payload' => $payload,\n        'currency' => $currency, 'total_amount' => $amount];\n    return atomic($db, function () use ($db, $userId, $payment, $refund): string {\n        $charge = $payment['telegram_payment_charge_id'];\n        $payload = $payment['invoice_payload'];\n        $q = $db->prepare('SELECT * FROM star_payments WHERE charge_id = ?');\n        $q->execute([$charge]);\n        $existing = row($q);\n        if ($existing && !is_string($existing['state'])) throw new RuntimeException('Некорректный статус в БД');\n        if ($existing && ((int) $existing['user_id'] !== $userId || $existing['payload'] !== $payload\n            || $existing['currency'] !== $payment['currency'] || (int) $existing['amount'] !== $payment['total_amount'])) {\n            throw new RuntimeException('Конфликт идентификатора платежа: нужна сверка');\n        }\n        if ($existing && (!$refund || $existing['state'] === 'refunded')) return $existing['state'];\n        $q = $db->prepare('SELECT * FROM star_orders WHERE payload = ?');\n        $q->execute([$payload]);\n        $order = row($q);\n        if ($order && !is_string($order['sku'])) throw new RuntimeException('Некорректный товар в БД');\n        $matches = $order && (int) $order['user_id'] === $userId && $payment['currency'] === 'XTR'\n            && (int) $order['stars'] === $payment['total_amount'];\n        $duplicatePurchase = $matches && !$refund &&\n            (($order['charge_id'] !== null && $order['charge_id'] !== $charge)\n             || hasCourseAccess($db, $userId, $order['sku']));\n        $state = $refund ? 'refunded' : ($matches && !$duplicatePurchase ? 'paid' : 'review');\n        $reason = !$matches ? 'order_mismatch' : ($duplicatePurchase ? 'extra_payment' : null);\n        $db->prepare('INSERT INTO star_payments\n            (charge_id, payload, user_id, currency, amount, state, reason, received_at)\n            VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n            ON CONFLICT(charge_id) DO UPDATE SET state = excluded.state, reason = excluded.reason')\n            ->execute([$charge, $payload, $userId, $payment['currency'], $payment['total_amount'], $state, $reason, time()]);\n        if ($refund) {\n            $db->prepare('UPDATE star_access SET active = 0 WHERE charge_id = ?')->execute([$charge]);\n            $db->prepare(\"UPDATE star_refunds SET state = 'done' WHERE charge_id = ?\")->execute([$charge]);\n        }\n        if ($matches && $state === 'paid') {\n            $db->prepare('INSERT INTO star_access (charge_id, user_id, sku) VALUES (?, ?, ?)')\n                ->execute([$charge, $userId, $order['sku']]);\n        }\n        if ($matches && in_array($state, ['paid', 'refunded'], true)) {\n            $db->prepare('UPDATE star_orders SET state = ?, charge_id = ?\n                WHERE payload = ? AND (charge_id IS NULL OR charge_id = ?)')\n                ->execute([$state, $charge, $payload, $charge]);\n        }\n        return $state;\n    });\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Новый подходящий successful_payment создаёт строку платежа и право доступа одной транзакцией. Если запись доступа не сохранилась, откатывается и платёж: webhook вернёт ошибку, а повтор можно обработать заново. Повтор с тем же charge_id возвращает уже сохранённое состояние без второй выдачи."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Другой charge_id по тому же заказу или оплата второго счёта при уже открытом доступе сохраняются как review. Это реальный дополнительный платёж, а не дубликат webhook: его нужно сверить и при необходимости вернуть. Уникальный update_id сам по себе такую ситуацию не решает."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Возврат может быть обработан раньше успешной оплаты, например после задержки или повторной доставки событий. Тогда сохранится refunded, а поздний successful_payment не откроет доступ снова. Возврат старой покупки также не выключает новую: отключается право, связанное с конкретным charge_id."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Успешный платёж и идентификатор Telegram",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#successfulpayment"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Соединяем команды и платёжные события",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Соединяем команды и платёжные события"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте public/webhook.php. Это точка входа прямого webhook Telegram. /buy проверяет доступность урока и отправляет счёт, /access проверяет право перед каждой выдачей текста. Платёжная ветка сохраняет результат в БД без дополнительной отправки: после оплаты пользователь видит квитанцию Telegram и следует подсказке /access из описания счёта."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · public/webhook.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nrequire dirname(__DIR__).'/stars.php';\n\ntry {\n    $update = incomingUpdate();\n    $db = database();\n    if (is_array($update['pre_checkout_query'] ?? null)) {\n        $q = $update['pre_checkout_query'];\n        $ok = preCheckout($db, $q);\n        try { courseText(); } catch (RuntimeException) { $ok = false; }\n        $answer = ['pre_checkout_query_id' => $q['id'], 'ok' => $ok];\n        if (!$ok) $answer['error_message'] = 'Счёт недоступен. Откройте /access или запросите новый /buy.';\n        $result = telegram('answerPreCheckoutQuery', $answer, 4);\n        if ($result['state'] !== 'ok') throw new RuntimeException('Ответ на проверку не подтверждён');\n    } else {\n        $m = $update['message'] ?? [];\n        $userId = $m['chat']['id'] ?? null;\n        if (($m['chat']['type'] ?? null) === 'private' && is_int($userId) && $userId > 0) {\n            if (isset($m['successful_payment'])) {\n                recordPayment($db, $userId, $m['successful_payment']);\n            } elseif (isset($m['refunded_payment'])) {\n                recordPayment($db, $userId, $m['refunded_payment'], true);\n            } elseif (($m['text'] ?? '') === '/buy') {\n                try {\n                    courseText();\n                    telegram('sendInvoice', invoiceFor($db, $userId));\n                } catch (DomainException) {\n                    telegram('sendMessage', ['chat_id' => $userId, 'text' => 'Доступ уже открыт: /access']);\n                }\n            } elseif (($m['text'] ?? '') === '/access') {\n                telegram('sendMessage', ['chat_id' => $userId, 'text' => hasCourseAccess($db, $userId)\n                    ? courseText() : 'Оплата не подтверждена: /buy']);\n            } elseif (($m['text'] ?? '') === '/paysupport') {\n                telegram('sendMessage', ['chat_id' => $userId,\n                    'text' => 'Вопросы об оплате: '.getenv('PAY_SUPPORT_CONTACT').'. Укажите дату покупки и свой Telegram ID.']);\n            }\n        }\n    }\n    http_response_code(200);\n} catch (Throwable) {\n    http_response_code(503);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для отправки большого курса замените выдачу одного текста своим контроллером материалов. Само право доступа уже хранится в star_access. На сайте проверяйте его по пользователю из подтверждённой сессии, а не по user_id из URL. Публичная ссылка на PDF без проверки доступа позволит обойти оплату."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Авторизация пользователя Mini App и проверка владельца на сервере",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-mini-app-initdata-auth-php-laravel"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · setup-webhook.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nif (PHP_SAPI !== 'cli') exit(1);\nrequire __DIR__.'/common.php';\n$url = getenv('WEBHOOK_URL');\n$secret = getenv('WEBHOOK_SECRET');\nif (!$url || !str_starts_with($url, 'https://') || !$secret) {\n    throw new RuntimeException('Задайте HTTPS URL и WEBHOOK_SECRET');\n}\n$answer = telegram('setWebhook', ['url' => $url, 'secret_token' => $secret,\n    'allowed_updates' => ['message', 'pre_checkout_query']]);\nif ($answer['state'] !== 'ok' || $answer['result'] !== true) {\n    throw new RuntimeException('Webhook не подтверждён; проверьте getWebhookInfo');\n}\necho \"Webhook установлен\\n\";"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После размещения файлов установите webhook командой ниже. В allowed_updates обязательно входят message и pre_checkout_query: успешная оплата находится внутри message, а не в отдельном типе update. Откройте чат бота именно в выбранной тестовой среде, отправьте /buy и пройдите оплату."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · установка webhook",
+                  "code": "php setup-webhook.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При ошибке сохранения возвращается 503, а не ложный успешный ответ. Если запросы повторяются, проверьте доступ к БД и журнал технических ошибок; не записывайте в открытый лог токен, секрет webhook или весь платёжный update. Для рабочего приложения добавьте мониторинг 5xx, review-платежей и времени ответа pre-checkout."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "refund",
+        "label": "Возвращаем Stars и закрываем дальнейший доступ",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Возвращаем Stars и закрываем дальнейший доступ"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Возврат запускает уполномоченный сотрудник по сохранённому платежу. Пользовательская кнопка не должна принимать произвольные charge_id и user_id для этой операции. В примере административный вход — CLI-скрипт на сервере; публичного маршрута возврата нет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · stars.php — возврат по сохранённому платежу",
+                  "code": "/** @param callable(string, array<string, mixed>): array{state: string, result?: mixed, code?: int, retry_after?: int} $call */\nfunction refundPayment(PDO $db, string $charge, callable $call): string\n{\n    $payment = atomic($db, function () use ($db, $charge) {\n        $q = $db->prepare(\"SELECT * FROM star_payments WHERE charge_id = ? AND state IN ('paid', 'review') AND currency = 'XTR'\");\n        $q->execute([$charge]);\n        $payment = row($q);\n        if (!$payment) return null;\n        $q = $db->prepare('INSERT INTO star_refunds (charge_id, requested_at) VALUES (?, ?) ON CONFLICT DO NOTHING');\n        $q->execute([$charge, time()]);\n        return $q->rowCount() === 1 ? $payment : null;\n    });\n    if (!$payment) return 'already_processed_or_requires_review';\n    $result = $call('refundStarPayment', ['user_id' => (int) $payment['user_id'],\n        'telegram_payment_charge_id' => $charge]);\n    if ($result['state'] === 'ok' && ($result['result'] ?? null) === true) {\n        recordPayment($db, (int) $payment['user_id'], [\n            'telegram_payment_charge_id' => $charge, 'invoice_payload' => $payment['payload'],\n            'currency' => $payment['currency'], 'total_amount' => (int) $payment['amount'],\n        ], true);\n        return 'refunded';\n    }\n    $state = $result['state'] === 'rejected' ? 'failed' : 'unknown';\n    $db->prepare(\"UPDATE star_refunds SET state = ? WHERE charge_id = ? AND state = 'sending'\")\n        ->execute([$state, $charge]);\n    return $state;\n}"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · refund.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nif (PHP_SAPI !== 'cli') exit(1);\nrequire __DIR__.'/stars.php';\n$charge = $argv[1] ?? '';\nif ($charge === '') throw new InvalidArgumentException('Передайте telegram_payment_charge_id');\necho refundPayment(database(), $charge, 'telegram').PHP_EOL;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После проверки обращения найдите telegram_payment_charge_id в star_payments и передайте его скрипту. Следующая команда действительно вызывает возврат выбранной оплаты в том окружении, которое задано конфигурацией:"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · возврат одной тестовой оплаты",
+                  "code": "php refund.php 'TELEGRAM_PAYMENT_CHARGE_ID'"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "refundStarPayment возвращает всю выбранную оплату; параметра частичной суммы в этом вызове нет. После подтверждённого результата true функция сохраняет refunded и выключает связанное право. Служебное сообщение refunded_payment проходит через ту же обработку, поэтому повтор не меняет итог."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если ответ потерян, заявка на возврат остаётся unknown, а при падении процесса — sending. Доступ до подтверждения возврата в этой модели сохраняется. Повторный запуск CLI не отправит второй запрос автоматически. При необходимости отдельного временного ограничения доступа оформите его как самостоятельное административное решение, не называя его уже выполненным возвратом."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Метод refundStarPayment",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#refundstarpayment"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "recovery",
+        "label": "Сверяем неизвестный результат и поддерживаем покупателя",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сверяем неизвестный результат и поддерживаем покупателя"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для зависших возвратов используйте сохранённое служебное сообщение и журнал getStarTransactions. Сверяйте charge_id, направление операции, пользователя и сумму; проходите нужные страницы по offset и limit. Идентификатор операции возврата совпадает с исходным, поэтому одного совпавшего ID недостаточно: исходящий возврат отличается от входящей покупки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · чтение страницы журнала без изменения платежей",
+                  "code": "$page = telegram('getStarTransactions', ['offset' => 0, 'limit' => 100]);\nif ($page['state'] !== 'ok') {\n    throw new RuntimeException('Журнал не получен: повторите чтение позже');\n}\n$transactions = $page['result']['transactions'] ?? [];\n// Сопоставьте записи с локальным charge_id и типом source/receiver.\n// Отсутствие в одной странице не означает отсутствие операции."
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если исход подтверждён журналом, уполномоченный обработчик применяет те же переходы БД. Если данных недостаточно, оставьте статус на разборе и сообщите клиенту, что проверка продолжается. Не переводите неизвестный возврат в failed только по таймауту и не удаляйте строку star_refunds ради нового POST."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Команда /paysupport в примере показывает настроенный контакт. Проверьте его до открытия продаж: человек должен получить ответ и возможность связать обращение с покупкой. Для полноценного кабинета сохраняйте обращения, решения и состояние возврата отдельно от истории платежей."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Журнал StarTransactions и направление операций",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#startransaction"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверяем покупку, дубли и возврат",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем покупку, дубли и возврат"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Вызовите /buy и закройте окно оплаты: /access не выдаёт урок, star_access остаётся пустой."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Подтвердите pre_checkout_query на тестовых данных, но не добавляйте successful_payment: доступ всё ещё закрыт."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Оплатите в test-среде: появляется один платёж и одно право; /access возвращает урок."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Повторите успешное событие на изолированной БД: число прав не увеличивается. Другой charge_id по тому же заказу попадает в review."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Передайте неверную сумму, валюту или чужого плательщика: pre-checkout отклоняется. Если уже пришёл успешный платёж с несоответствием, он сохраняется для разбора без выдачи доступа."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Выполните возврат: /access перестаёт выдавать материал. Повтор successful_payment после refunded не восстанавливает право."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Имитируйте потерянный ответ refundStarPayment: сохраняется unknown, автоматического повторного возврата нет."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "После новой покупки повторите возврат старой: новое право доступа сохраняется."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Локальные проверки с фиктивными событиями подтверждают правила вашей БД. Реальный прогон в тестовой среде нужен отдельно: он проверяет счёт, поступление pre_checkout_query, получение successful_payment, возврат и правильность токена окружения. Перед рабочим запуском также измерьте полное время предварительной проверки, включая доставку webhook."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "botgate",
+        "label": "Где в платёжном сценарии применяется BotGate",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Где в платёжном сценарии применяется BotGate"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Исходящие методы рабочего Bot API можно вызывать через BotGate: меняются адрес и авторизация транспорта, а payload, XTR и привязка к charge_id остаются частью вашего приложения. Для входящих обновлений проверяйте подпись BotGate по его документации. Показанная выделенная test-среда использует прямой Bot API."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Шлюз не подтверждает покупку вместо successful_payment и не хранит права доступа к вашему практикуму. Для pre_checkout_query проверьте задержку всего пути через доставку webhook: десятисекундное окно сохраняется. Разделите этот быстрый обработчик и долгие задания обычной очереди."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Документация BotGate API и webhook",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs#webhook"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Telegram Stars: оплата цифровых товаров и поддержка покупателей",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/payments-stars"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Структура RefundedPayment",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#refundedpayment"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

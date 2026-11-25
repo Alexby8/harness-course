@@ -1,0 +1,907 @@
+[
+  {
+    "slug": "laravel-telegram-broadcast",
+    "title": "Как сделать рассылку пользователям Telegram-бота на Laravel",
+    "seo_title": "Как сделать рассылку пользователям Telegram-бота на Laravel",
+    "description": "Собираем рассылку на Laravel: согласие и /stop, список получателей, очередь, ограничение скорости, обработка 429 и продолжение после перезапуска.",
+    "card_description": "Собираем рассылку на Laravel: согласие и /stop, список получателей, очередь, ограничение скорости, обработка 429 и продолжение после перезапуска.",
+    "category": "Практика",
+    "topics": "Laravel · Очереди · Рассылки",
+    "reading_time": "18 минут",
+    "published_at": "2026-10-30",
+    "is_published": true,
+    "sort_order": 25,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для примера отправим подписчикам учебного бота объявление о новом занятии. Получателей может быть много, кто-то уже отписался, а часть запросов завершится ошибкой. Подготовим кампанию с отдельной записью на каждого получателя, чтобы видеть результат и продолжать работу после перезапуска."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "subscribers",
+        "label": "Кому можно отправлять рассылку",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Кому можно отправлять рассылку"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для обычного личного диалога пользователь сначала должен открыть бота и начать с ним общение. Нельзя собрать произвольные Telegram ID и считать их доступной аудиторией. В нашем приложении рассылка дополнительно требует явного действия «Получать анонсы» или /subscribe после объяснения её содержания."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраняйте согласие отдельно от технической доступности чата. /stop переводит active в false. Новый /start не должен незаметно подписывать человека заново. Команды поступают через проверенный webhook; chat_id и user_id берутся из личного сообщения, а бот — из доверенной настройки обработчика."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отписку проверяем ещё раз перед каждой отправкой, даже если человек попал в снимок аудитории раньше. Если запрос к Telegram уже начался, полностью отозвать его нельзя: возможна одна отправка, начатая до обработки /stop. Формулировка интерфейса не должна обещать невозможного."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В отличие от одиночного "
+                },
+                {
+                  "type": "text",
+                  "text": "уведомления через Laravel",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/laravel-telegram-notifications"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ", здесь важно хранить ход всей кампании. Job в очереди — лишь сигнал обработать получателя, а не единственное место, где существует информация о нём."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "states",
+        "label": "Какие данные хранить",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Какие данные хранить"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ниже ядро небольшого приложения на Laravel 11–13. Для Laravel 11/12 нужен PHP 8.2+, для Laravel 13 — PHP 8.3+. Очередь и общий cache используют Redis, постоянные данные — транзакционную SQL-БД. Пример отправляет обычный текст через BotGate, без платных ускоренных рассылок."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте миграцию с такими таблицами: строки use расположите в начале файла перед классом, вызовы Schema::create — внутри метода up(). Добавьте down() с удалением таблиц в обратном порядке. Интерфейс запуска кампании должен быть доступен только уполномоченному администратору."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · импорты миграции и тело up()",
+                  "code": "use Illuminate\\Database\\Schema\\Blueprint;\nuse Illuminate\\Support\\Facades\\Schema;\n\nSchema::create('broadcast_subscribers', function (Blueprint $t): void {\n    $t->id();\n    $t->string('bot_id');\n    $t->bigInteger('chat_id');\n    $t->boolean('active')->default(false);\n    $t->boolean('reachable')->default(true);\n    $t->timestamp('consented_at')->nullable();\n    $t->unique(['bot_id', 'chat_id']);\n});\nSchema::create('broadcast_campaigns', function (Blueprint $t): void {\n    $t->id();\n    $t->string('bot_id');\n    $t->text('text');\n    $t->string('status')->default('draft');\n});\nSchema::create('broadcast_deliveries', function (Blueprint $t): void {\n    $t->id();\n    $t->foreignId('campaign_id')->constrained('broadcast_campaigns');\n    $t->foreignId('subscriber_id')->constrained('broadcast_subscribers');\n    $t->string('status')->default('pending');\n    $t->unsignedInteger('attempts')->default(0);\n    $t->timestamp('available_at');\n    $t->timestamp('started_at')->nullable();\n    $t->bigInteger('message_id')->nullable();\n    $t->string('last_error')->nullable();\n    $t->unique(['campaign_id', 'subscriber_id']);\n    $t->index(['status', 'available_at']);\n});\nSchema::create('broadcast_limits', function (Blueprint $t): void {\n    $t->string('bot_id')->primary();\n    $t->timestamp('next_send_at');\n});"
+                }
+              }
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "pending — ждёт отправки; available_at ограничивает время следующей попытки."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "sending — worker уже взял запись и мог начать сетевой запрос."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "sent — получен успешный ответ с message_id. Это принятие Telegram, а не подтверждение прочтения."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "skipped — отправка отменена из-за отписки или недоступного адресата."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "failed — получена определённая ошибка или исчерпаны повторы подтверждённого лимита."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "unknown — неизвестно, принял ли Telegram сообщение. Автоматически повторять нельзя."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Уникальность campaign_id + subscriber_id не позволяет дважды добавить человека в одну кампанию. Она не делает внешнюю отправку exactly-once: между ответом Telegram и записью sent остаётся окно сбоя. Если процесс погиб в этом окне, запись sending потребует разбора."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "campaign",
+        "label": "Создаём снимок аудитории",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создаём снимок аудитории"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Текст и список получателей фиксируем перед началом отправки. Для примера используем обычный текст без parse_mode и консервативный бюджет 3000 единиц UTF-16, учитывающий составные эмодзи. Сначала используйте только тестовые подписки. Переменные $botId и $text ниже приходят из проверенного административного действия; ID бота — публичный ID BotGate."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · создание кампании в административном сервисе",
+                  "code": "use Illuminate\\Support\\Facades\\DB;\n\nif (trim($text) === '' || strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')) / 2 > 3000) {\n    throw new InvalidArgumentException('Текст пустой или превышает бюджет длины.');\n}\n$campaignId = DB::transaction(function () use ($botId, $text): int {\n    DB::table('broadcast_limits')->insertOrIgnore([\n        'bot_id' => $botId, 'next_send_at' => now(),\n    ]);\n    $id = DB::table('broadcast_campaigns')->insertGetId([\n        'bot_id' => $botId, 'text' => $text, 'status' => 'draft',\n    ]);\n    DB::table('broadcast_subscribers')->where('bot_id', $botId)\n        ->where('active', true)->where('reachable', true)\n        ->orderBy('id')->chunkById(500, function ($subscribers) use ($id): void {\n            $rows = [];\n            foreach ($subscribers as $subscriber) {\n                $rows[] = [\n                    'campaign_id' => $id, 'subscriber_id' => $subscriber->id,\n                    'status' => 'pending', 'available_at' => now(),\n                ];\n            }\n            DB::table('broadcast_deliveries')->insert($rows);\n        });\n    DB::table('broadcast_campaigns')->where('id', $id)->update(['status' => 'running']);\n    return $id;\n});"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Планировщик увидит running после фиксации транзакции. Если вместо планировщика вы сразу dispatch-ите задания из этой транзакции, используйте afterCommit(). Для очень большой аудитории подготовку снимка вынесите в отдельную задачу и сохраняйте draft до её полного завершения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Повтор административного HTTP-запроса не должен создавать новую кампанию: в интерфейсе запуска нужен собственный уникальный ключ операции или переход существующего draft в running. В коде выше показана одна операция создания; его повторный вызов намеренно создаёт другую кампанию. После запуска не редактируйте её текст — для другой версии создавайте новую."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "transport",
+        "label": "Настраиваем транспорт и классифицируем результат",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Настраиваем транспорт и классифицируем результат"
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · установка и конфигурация",
+                  "code": "composer require botgate/laravel\nphp artisan vendor:publish --tag=botgate-config"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "dotenv · окружение приложения",
+                  "code": "BOTGATE_API_KEY=your-api-key\nBOTGATE_TIMEOUT=10\nBOTGATE_RETRY_MAX=0\nQUEUE_CONNECTION=redis\nCACHE_STORE=redis"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Laravel-пакет устанавливает SDK как зависимость. Автоматические повторы SDK отключены, потому что решения о повторе ниже принимает приложение. Для Redis-настройки соединения очереди задайте retry_after = 90 секунд: это время повторной выдачи потерянного задания, а не задержка после Telegram 429."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Вынесем один вызов в сервис. При подтверждённом лимите возвращаем limited и время ожидания. При неопределённой ошибке — unknown. В журнал получателя записываем короткий код причины, без ключей, полного HTTP-запроса и текста исключения."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Services/BroadcastTransport.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nnamespace App\\Services;\n\nuse BotGate\\Exception\\RateLimitException;\nuse BotGate\\Exception\\TelegramException;\nuse BotGate\\Laravel\\Facades\\BotGate;\nuse Throwable;\n\nfinal class BroadcastTransport\n{\n    public function send(string $botId, int $chatId, string $text): array\n    {\n        try {\n            $result = BotGate::bot($botId)->call('sendMessage', [\n                'chat_id' => $chatId, 'text' => $text,\n            ])->result;\n            if (!is_array($result) || !is_int($result['message_id'] ?? null)) {\n                return ['status' => 'unknown', 'error' => 'unexpected_response'];\n            }\n            return ['status' => 'sent', 'message_id' => $result['message_id']];\n        } catch (RateLimitException $e) {\n            return ['status' => 'limited', 'delay' => max(1, $e->retryAfter() ?? 60),\n                'error' => 'botgate_429'];\n        } catch (TelegramException $e) {\n            $code = $e->telegramErrorCode();\n            if ($code === 429) {\n                return ['status' => 'limited', 'delay' => max(1, $e->retryAfter() ?? 60),\n                    'error' => 'telegram_429'];\n            }\n            if ($code !== null && $code >= 400 && $code < 500) {\n                return ['status' => 'failed', 'error' => 'telegram_' . $code,\n                    'unreachable' => $code === 403];\n            }\n            return ['status' => 'unknown', 'error' => 'telegram_uncertain'];\n        } catch (Throwable) {\n            return ['status' => 'unknown', 'error' => 'transport_or_application'];\n        }\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Telegram 403 в личном чате может быть связан с блокировкой бота или другой недоступностью адресата. Ниже мы прекращаем доставку этому адресу через reachable=false, сохраняя отдельно active и согласие. Не называйте любой 403 доказательством добровольной отписки. Восстановление reachable выполняйте после проверки доступа или нового явного действия пользователя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Лимит BotGate и вложенный Telegram 429 различаются: первый даёт RateLimitException, второй — TelegramException с telegramErrorCode(). Если ограничение относится к общему API-ключу для нескольких ботов, общий регулятор должен охватывать все эти боты. Пример ниже предназначен для одного бота с отдельным потоком рассылки."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "job",
+        "label": "Отправляем одному получателю",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отправляем одному получателю"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Job использует общий Redis-lock на бота, чтобы два worker не отправляли рассылку одновременно. Под блокировкой он захватывает pending, проверяет отписку и общий next_send_at. Перед сетевым вызовом SQL-транзакция закрывается. Интервал в одну секунду — консервативная настройка примера, а не обещание отсутствия лимитов."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · app/Jobs/SendBroadcastRecipient.php",
+                  "code": "<?php\ndeclare(strict_types=1);\nnamespace App\\Jobs;\n\nuse App\\Services\\BroadcastTransport;\nuse Illuminate\\Bus\\Queueable;\nuse Illuminate\\Contracts\\Queue\\ShouldQueue;\nuse Illuminate\\Foundation\\Bus\\Dispatchable;\nuse Illuminate\\Support\\Facades\\Cache;\nuse Illuminate\\Support\\Facades\\DB;\n\nfinal class SendBroadcastRecipient implements ShouldQueue\n{\n    use Dispatchable, Queueable;\n\n    public int $tries = 1;\n    public int $timeout = 30;\n    public bool $failOnTimeout = true;\n\n    public function __construct(public int $deliveryId) {}\n\n    public function handle(BroadcastTransport $transport): void\n    {\n        $botId = DB::table('broadcast_deliveries as d')\n            ->join('broadcast_campaigns as c', 'c.id', '=', 'd.campaign_id')\n            ->where('d.id', $this->deliveryId)->value('c.bot_id');\n        if (!is_string($botId)) {\n            return;\n        }\n        $lock = Cache::lock('broadcast:' . $botId, 60);\n        if (!$lock->get()) {\n            return; // pending останется для следующего прохода планировщика.\n        }\n        try {\n            $item = DB::transaction(function () use ($botId): ?array {\n                $d = DB::table('broadcast_deliveries')->where('id', $this->deliveryId)\n                    ->lockForUpdate()->first();\n                if (!$d || $d->status !== 'pending' || $d->available_at > now()->toDateTimeString()) {\n                    return null;\n                }\n                $c = DB::table('broadcast_campaigns')->where('id', $d->campaign_id)->first();\n                if (!$c || $c->status !== 'running') {\n                    return null;\n                }\n                $s = DB::table('broadcast_subscribers')->where('id', $d->subscriber_id)\n                    ->lockForUpdate()->first();\n                $delivery = DB::table('broadcast_deliveries')->where('id', $d->id);\n                if (!$s || $s->bot_id !== $botId || !$s->active || !$s->reachable) {\n                    $delivery->update(['status' => 'skipped']);\n                    return null;\n                }\n                $limit = DB::table('broadcast_limits')->where('bot_id', $botId)\n                    ->lockForUpdate()->first();\n                if (!$limit || $limit->next_send_at > now()->toDateTimeString()) {\n                    return null;\n                }\n                DB::table('broadcast_limits')->where('bot_id', $botId)\n                    ->update(['next_send_at' => now()->addSecond()]);\n                $delivery->update([\n                    'status' => 'sending', 'started_at' => now(), 'attempts' => $d->attempts + 1,\n                ]);\n                return ['chat_id' => (int) $s->chat_id, 'subscriber_id' => (int) $s->id,\n                    'text' => $c->text, 'attempt' => $d->attempts + 1];\n            });\n            if ($item === null) {\n                return;\n            }\n            $outcome = $transport->send($botId, $item['chat_id'], $item['text']);\n            DB::transaction(function () use ($outcome, $item, $botId): void {\n                $changes = ['status' => $outcome['status'],\n                    'last_error' => $outcome['error'] ?? null];\n                if ($outcome['status'] === 'sent') {\n                    $changes['message_id'] = $outcome['message_id'];\n                }\n                if ($outcome['status'] === 'limited') {\n                    $next = now()->addSeconds($outcome['delay']);\n                    DB::table('broadcast_limits')->where('bot_id', $botId)\n                        ->update(['next_send_at' => $next]);\n                    $changes['status'] = $item['attempt'] < 5 ? 'pending' : 'failed';\n                    $changes['available_at'] = $next;\n                }\n                if ($outcome['unreachable'] ?? false) {\n                    DB::table('broadcast_subscribers')->where('id', $item['subscriber_id'])\n                        ->update(['reachable' => false]);\n                }\n                DB::table('broadcast_deliveries')->where('id', $this->deliveryId)\n                    ->where('status', 'sending')->update($changes);\n            });\n        } finally {\n            $lock->release();\n        }\n    }\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Задание не вызывает release(): повторный запуск обеспечивается выборкой pending из БД. Поэтому $tries=1 не конфликтует с отложенными попытками после 429. Счётчик attempts в самой записи ограничивает реальные вызовы до пяти; дубли заданий и ожидание lock его не увеличивают."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Все worker должны использовать один Redis и общий префикс cache. HTTP timeout равен 10 секундам, job timeout — 30, срок lock — 60, Redis retry_after — 90. При аварийном завершении job запись sending не возвращается автоматически в pending. Для таймаутов worker требуется поддерживаемое окружение с PCNTL; запуск в примере рассчитан на Linux."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "scheduler",
+        "label": "Планировщик, пауза и продолжение",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Планировщик, пауза и продолжение"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В routes/console.php добавьте выборку одного доступного получателя на каждого бота. Laravel scheduler должен быть настроен штатным способом. everySecond работает в течение запуска schedule:run; если scheduler остановился, строки pending сохранятся и будут выбраны после его восстановления."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · routes/console.php",
+                  "code": "use App\\Jobs\\SendBroadcastRecipient;\nuse Illuminate\\Support\\Facades\\DB;\nuse Illuminate\\Support\\Facades\\Schedule;\n\nSchedule::call(function (): void {\n    $bots = DB::table('broadcast_campaigns')->where('status', 'running')\n        ->distinct()->pluck('bot_id');\n    foreach ($bots as $botId) {\n        $id = DB::table('broadcast_deliveries as d')\n            ->join('broadcast_campaigns as c', 'c.id', '=', 'd.campaign_id')\n            ->join('broadcast_limits as l', 'l.bot_id', '=', 'c.bot_id')\n            ->where('l.next_send_at', '<=', now())\n            ->where('c.bot_id', $botId)->where('c.status', 'running')\n            ->where('d.status', 'pending')->where('d.available_at', '<=', now())\n            ->orderBy('d.id')->value('d.id');\n        if ($id !== null) {\n            SendBroadcastRecipient::dispatch((int) $id)->onQueue('telegram-broadcast');\n        }\n    }\n})->everySecond();"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash · отдельный worker в тестовом окружении",
+                  "code": "php artisan queue:work redis --queue=telegram-broadcast --tries=1 --timeout=30"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пока очередь недоступна или отстаёт, повторный проход может поставить дубликат задания. Job повторно проверяет состояние в БД и не отправляет sent заново. Контролируйте размер очереди: для большой базы добавьте ограничение выдачи заданий и отдельное состояние их резервирования с восстановлением после сбоя."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для паузы установите status=paused у выбранной кампании. Для продолжения верните running. Уже начатый сетевой запрос может завершиться; pending подождут, а sent, skipped, failed и unknown не попадут в выборку. Не используйте «повторить все failed jobs» как способ продолжить рассылку."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Показывайте администратору число записей по каждому статусу. Отсутствие pending ещё не означает успешное завершение, если есть sending или unknown. После подтверждённой остановки погибшего worker старые sending переводят в unknown с журналом решения; просто истёкшее время не доказывает, что сообщение не ушло."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пример не создаёт интерфейс отчётов и не переводит кампанию в completed автоматически. Завершайте её после разбора всех результатов. Массовые ошибки ключа, прав или параметров — повод поставить кампанию на паузу и исправить причину, а не повторять отправку каждому пользователю."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "limits",
+        "label": "Скорость и ограничения Telegram",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Скорость и ограничения Telegram"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Общий лимит бота разделяют рассылка, ответы на команды и другие уведомления. Начните с небольшой скорости, оставьте запас для диалогов и учитывайте лимиты выбранного транспорта. Ускорять отправку простым добавлением worker бесполезно, если они не используют общий регулятор."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В нашем примере bot-level lock и next_send_at координируют именно этот поток рассылки. Если другие части приложения тоже отправляют сообщения, подключите их к общему ограничителю. Для нескольких ботов с единым API-ключом дополнительно учитывайте ограничение на ключ. Значение retry_after нельзя сокращать ради скорости."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Таймаут не равен отказу: сообщение могло уйти до обрыва соединения. Для unknown администратор принимает отдельное решение с учётом риска дубля; API sendMessage не предоставляет универсальный пользовательский ключ идемпотентности. Подробнее — "
+                },
+                {
+                  "type": "text",
+                  "text": "ошибка 429",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-api-error-429"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "дубли сообщений",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-duplicate-messages"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "checks",
+        "label": "Проверяем на небольшой тестовой аудитории",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверяем на небольшой тестовой аудитории"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Создайте кампанию с двумя собственными тестовыми аккаунтами. Успешные записи должны стать sent с message_id."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Отпишитесь через /stop после создания снимка: ещё не начатая доставка этому адресату должна стать skipped."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Запустите два одинаковых задания: фактическая отправка получателю должна произойти один раз при нормальном ответе."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Подставьте Telegram 429 и отдельный HTTP 429 BotGate: проверьте задержку для всего бота и предел в пять попыток."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Подставьте 403: только этот адресат должен стать unreachable, а согласие active не должно измениться."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Сымитируйте таймаут после вызова: запись должна стать unknown и не попасть в следующую автоматическую отправку."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Остановите worker после захвата: запись sending не должна самопроизвольно повториться."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Поставьте кампанию на паузу, затем продолжите: выбираются оставшиеся pending, текст и успешные результаты сохраняются."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверки с поддельным транспортом подтверждают логику состояний. Реальную очередь, Redis-lock между процессами и доставку Telegram проверьте отдельно в своём тестовом окружении до включения аудитории."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sources",
+        "label": "Документация",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Документация"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Telegram: рекомендации по рассылкам",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/faq#broadcasting-to-users"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Laravel: очереди и таймауты",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://laravel.com/docs/12.x/queues"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Laravel: планировщик и задачи чаще раза в минуту",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://laravel.com/docs/12.x/scheduling#sub-minute-scheduled-tasks"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Laravel: атомарные блокировки cache",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://laravel.com/docs/12.x/cache#atomic-locks"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "BotGate для Laravel",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://github.com/Alexby8/botgate-laravel"
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

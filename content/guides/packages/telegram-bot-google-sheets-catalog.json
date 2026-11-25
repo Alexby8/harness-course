@@ -1,0 +1,2158 @@
+[
+  {
+    "slug": "telegram-bot-google-sheets-catalog",
+    "title": "Как управлять каталогом Telegram-бота через Google Таблицы",
+    "seo_title": "Как управлять каталогом Telegram-бота через Google Таблицы",
+    "description": "Как связать каталог Telegram-бота с Google Таблицами: настройка доступа, чтение на PHP, проверка товаров, обновление цен и сохранение рабочей версии при сбое.",
+    "card_description": "Менеджер меняет таблицу, бот показывает актуальный каталог. Разбираем PHP-код, постоянные ID, ошибки данных и обновление без потери рабочей версии.",
+    "category": "Практика",
+    "topics": "Telegram Bot API, PHP, Google Sheets",
+    "reading_time": "18 минут",
+    "published_at": "2026-11-24",
+    "is_published": true,
+    "sort_order": 81,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Менеджеру удобно менять товары, цены и доступность в Google Таблицах, а клиенту — смотреть каталог в Telegram. Свяжем эти части: PHP прочитает таблицу, проверит строки и обновит рабочую копию, из которой отвечает бот. Разберём основной код по шагам и проверим, что произойдёт при неверной цене или недоступности Google."
+            }
+          ]
+        },
+        {
+          "type": "customBlock",
+          "attrs": {
+            "id": "guide-example",
+            "config": {
+              "title": "Каталог бота из Google Таблиц",
+              "description": "Чтение таблицы, проверка товаров и обновление каталога с сохранением последней рабочей версии.",
+              "language": "PHP",
+              "url": "https://github.com/Alexby8/botgate-examples/tree/main/examples/telegram-bot-google-sheets-catalog"
+            }
+          }
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": []
+    },
+    "sections": [
+      {
+        "id": "scenario",
+        "label": "Когда Google Таблица подходит для каталога",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Когда Google Таблица подходит для каталога"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Такой способ удобен для небольшого каталога, который обновляет один менеджер или небольшая команда. Не нужно разрабатывать отдельную панель: человек редактирует знакомые ячейки, а приложение забирает согласованный набор данных. Если каталог уже ведётся в CRM или системе учёта, лучше получать товары из неё, чтобы не поддерживать ещё один прайс вручную."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для примера возьмём магазин с термокружкой, сумкой и снятой с продажи бутылкой. Бот будет показывать список по команде /catalog и карточку по /item mug-450. Менеджер сможет поменять цену, отметить отсутствие товара или скрыть позицию."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Таблица здесь отвечает за описание и отображаемое наличие. Она не резервирует последнюю единицу товара при двух одновременных покупках. Если добавляете оформление заказа, цена и остаток должны проверяться в основной системе продаж; этот материал сосредоточен на управлении каталогом."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "quickstart",
+        "label": "Как изменения попадут из таблицы в бот",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как изменения попадут из таблицы в бот"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Схема состоит из двух независимых действий. По расписанию PHP читает таблицу, проверяет её и сохраняет новую версию в своей базе. Когда клиент пишет боту, обработчик берёт уже проверенный каталог из базы и формирует ответ."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Так каждый пользовательский запрос не зависит от доступности Google. Ошибка одной ячейки не оставит клиента с половиной нового прайса: либо принимается весь набор, либо остаётся предыдущий. При этом старые данные нужно явно помечать, если обновление давно не удаётся."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-image",
+                "config": {
+                  "src": "/images/guides/telegram-bot-google-sheets-catalog/lifecycle.jpg",
+                  "alt": "Каталог меняется целиком: mug-450 → Все строки → Один снимок → /item mug-450. Google недоступен или данные неверны → сохраняем последнюю рабочую версию. Для отключения товара: active = FALSE.",
+                  "caption": "Схема состояний учебного примера. Это не снимок интерфейса Telegram или Google.",
+                  "width": 1080,
+                  "height": 772,
+                  "mobile_src": "/images/guides/telegram-bot-google-sheets-catalog/lifecycle-mobile.jpg",
+                  "mobile_width": 390,
+                  "mobile_height": 1117
+                }
+              }
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что происходит"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Что получает пользователь"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Менеджер изменил ячейку"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Изменение ещё должно пройти синхронизацию"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Все строки проверены"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Следующий запрос боту использует новый каталог"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Google недоступен или цена неверна"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сохраняется последняя рабочая версия"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Успешной загрузки ещё не было"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сообщение о временной недоступности каталога"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Все позиции корректно отключены"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сообщение, что доступных товаров сейчас нет"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сначала настроим формат и доступ, затем разберём чтение, проверку и переключение версии. Полный PHP-пример с подключением Telegram доступен на GitHub; к конкретным файлам будем обращаться по мере необходимости."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sheet",
+        "label": "Подготовьте таблицу с постоянными ID",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подготовьте таблицу с постоянными ID"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Создайте Google Таблицу, назовите вкладку Catalog и добавьте следующие колонки в указанном порядке. Значения ниже учебные. Можно скопировать "
+                },
+                {
+                  "type": "text",
+                  "text": "готовый TSV-шаблон",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/fixtures/catalog.tsv"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " в ячейку A1 или импортировать его с разделителем «табуляция»."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "id"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "title"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "price_minor"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "active"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "stock"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "mug-450"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Термокружка 450 мл"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "149000"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "TRUE"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "12"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "bag-small"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Сумка малая"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "89000"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "TRUE"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "bottle-old"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Бутылка прежней серии"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "99000"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "FALSE"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "0"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "id связывает товар с командами бота и будущими заказами. Он остаётся прежним при сортировке, переименовании или изменении цены. Номер строки для этого не подходит: после сортировки строка 2 может содержать другой товар. В примере ID начинается с латинской буквы и содержит 3–40 строчных букв, цифр, дефисов или подчёркиваний. Защитите колонку от случайного редактирования."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "price_minor — цена в целых копейках: 149000 означает 1490 ₽. В price_minor и stock должны быть числа, без вписанных символов валюты. Ноль в stock — корректное отсутствие товара, пустая ячейка — ошибка заполнения."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "active определяет видимость. Для этой колонки используйте стандартные флажки с логическими значениями TRUE/FALSE; не задавайте свои текстовые значения «да» и «нет». Снятый флажок скрывает товар. Нулевой остаток при включённом флажке оставляет его в каталоге с пометкой «нет в наличии»."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Чтобы отключить товар, снимайте active, сохраняя строку. В примере удаление уже известного ID отклоняется: случайно вырезанный диапазон не должен выглядеть как намеренное удаление ассортимента. Для действительно нужного удаления потребуется отдельное явное правило."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "access",
+        "label": "Дайте PHP-приложению доступ к таблице",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Дайте PHP-приложению доступ к таблице"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для одной таблицы, которой управляет ваша команда, подойдёт service account — служебная учётная запись приложения. В Google Cloud создайте или выберите проект, включите Google Sheets API и создайте service account. Если политика организации разрешает JSON-ключи, создайте ключ и сохраните его на сервере как google-reader.json вне публичного каталога."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Откройте файл ключа и найдите client_email. В настройках доступа Google Таблицы добавьте этот адрес с ролью читателя. Делать таблицу общедоступной не требуется. ID документа — часть URL между /d/ и /edit; число gid в конце ссылки обозначает вкладку и вместо ID документа не подходит."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для авторизации используем "
+                },
+                {
+                  "type": "text",
+                  "text": "официальную Google Auth Library для PHP",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/googleapis/google-auth-library-php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Она получает access token для scope spreadsheets.readonly. Этот scope разрешает чтение; доступ к конкретному документу определяется его настройками. Если ваша организация запрещает JSON-ключи, используйте разрешённый в ней способ авторизации: просто скачанного файла тогда будет недостаточно."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Такой вариант рассчитан на вашу таблицу. Сервис, в котором каждый клиент подключает собственные Google-документы, потребует отдельного пользовательского OAuth-процесса."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "setup",
+        "label": "Разделите чтение, каталог и Telegram-обработчик",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Разделите чтение, каталог и Telegram-обработчик"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Примеры ниже написаны на PHP 8.3+ в 64-битной среде, с расширениями pdo_sqlite, mbstring, curl и openssl. Composer нужен для Google Auth. SQLite выбрана для небольшого приложения на одном сервере; существующий бот может использовать свою базу."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Файл"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Его задача"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "google.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/google.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Авторизация Google и чтение диапазона"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "catalog.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/catalog.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Проверка строк, сохранение версии, текст ответа"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "schema.sql",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/schema.sql"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Таблицы рабочего каталога и состояния синхронизации"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "sync.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/sync.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Запуск обновления; используется и вручную, и по расписанию"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "domain.php",
+                              "marks": [
+                                {
+                                  "type": "link",
+                                  "attrs": {
+                                    "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/domain.php"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Вызов каталога при получении команды Telegram"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В "
+                },
+                {
+                  "type": "text",
+                  "text": "common.php",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/common.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " находятся короткие служебные функции: database открывает SQLite, run выполняет подготовленный SQL-запрос, row возвращает строку, atomic оборачивает изменения в транзакцию. envRequired читает окружение процесса или config.local.php. Они вынесены отдельно, чтобы в catalog.php была видна работа с товарами."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для полного запуска используйте PHP-папку репозитория из заключительного раздела. Скопируйте config.example.php в config.local.php и заполните SHEET_ID. Путь к ключу и базе задан относительно этой папки. Токен Telegram понадобится позже; чтение Google его не использует."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · настройки чтения и хранения в config.local.php",
+                  "code": "<?php\nreturn [\n    'APP_DB' => __DIR__.'/var/app.sqlite',\n    'SHEET_ID' => 'REPLACE_WITH_SPREADSHEET_ID',\n    'GOOGLE_CREDENTIALS' => __DIR__.'/google-reader.json',\n];"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Обычный PHP сам не загружает .env. Здесь конфигурацию явно читает envRequired, а заданное окружение имеет приоритет. CLI и веб-процесс должны читать одну базу и настройки. Конфигурация и ключ остаются выше public; процессу PHP нужен доступ на запись в var."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "read",
+        "label": "Прочитайте значения через Google Sheets API",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Прочитайте значения через Google Sheets API"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В google.php функция googleToken получает токен по ключу service account. В ней нет ручной сборки JWT: подпись и обмен выполняет Google Auth. Таймауты ограничивают время ожидания, а ошибку нужно передать вызывающему коду, не превращая её в пустой массив."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · google.php · googleToken",
+                  "code": "function googleToken(?GuzzleHttp\\ClientInterface $client = null): string\n{\n    $raw = file_get_contents(envRequired('GOOGLE_CREDENTIALS'));\n    if ($raw === false) {\n        throw new RuntimeException('CREDENTIALS_READ');\n    }\n    $key = objectValue(json_decode($raw, true, 512, JSON_THROW_ON_ERROR));\n    if (($key['type'] ?? '') !== 'service_account') {\n        throw new RuntimeException('Expected your service account key');\n    }\n    $credentials = new Google\\Auth\\Credentials\\ServiceAccountCredentials(\n        'https://www.googleapis.com/auth/spreadsheets.readonly',\n        $key,\n    );\n    $handler = Google\\Auth\\HttpHandler\\HttpHandlerFactory::build($client ?? new GuzzleHttp\\Client([\n        'connect_timeout' => 5, 'timeout' => 20, 'allow_redirects' => false,\n    ]), false);\n    $result = $credentials->fetchAuthToken($handler);\n    return stringValue($result['access_token'] ?? null);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "readSheet вызывает spreadsheets.values.get для вкладки Catalog. googleRequest — HTTP-функция из того же "
+                },
+                {
+                  "type": "text",
+                  "text": "google.php",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/google.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ": она проверяет успешный HTTP-ответ, ограничивает его размер и разбирает JSON. Ошибка сети, статуса или JSON прерывает синхронизацию."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · google.php · readSheet",
+                  "code": "function readSheet(): array\n{\n    $id = envRequired('SHEET_ID');\n    if (!preg_match('/^[A-Za-z0-9_-]+$/D', $id)) {\n        throw new RuntimeException('SHEET_ID');\n    }\n    // Лишняя строка — сторож: переполнение не должно обрезать каталог молча.\n    return googleRequest('https://sheets.googleapis.com/v4/spreadsheets/'.$id.'/values/'.rawurlencode(\"'Catalog'!A1:E1002\").\n        '?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE', ['Authorization: Bearer '.googleToken()]);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "majorDimension=ROWS означает массив строк. UNFORMATTED_VALUE возвращает вычисленные значения без отображаемого форматирования ячеек. Приложение получает числовую цену и логический флаг, а не строку с символом валюты. Пустые ячейки в конце строки могут отсутствовать в ответе — поэтому проверка ниже дополняет строку отсутствующими значениями. Подробности — в "
+                },
+                {
+                  "type": "text",
+                  "text": "документации чтения значений",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/sheets/api/guides/values"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Наш контракт — до 1000 товарных строк. Диапазон A1:E1002 включает шапку, эти строки и одну дополнительную для обнаружения переполнения. Это ограничение примера, не лимит Google. Не размещайте продолжение каталога за большим пустым разрывом вне диапазона: его такой запрос не увидит. Для большего объёма расширяйте диапазон и проверки вместе."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "validation",
+        "label": "Проверьте весь набор до изменения каталога",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверьте весь набор до изменения каталога"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "parseCatalog в catalog.php превращает ответ Google в словарь товаров по ID. Она проверяет заголовки, обязательные поля, типы, границы чисел и повторяющиеся ID. Ошибка сообщает номер строки в таблице. Неверные строки не пропускаются молча: менеджер должен понимать, почему новый прайс не принят."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · catalog.php · parseCatalog",
+                  "code": "function parseCatalog(array $response): array\n{\n    $rows = $response['values'] ?? null;\n    if (! is_array($rows) || ! array_is_list($rows) || count($rows) < 2 || count($rows) > 1001\n        || $rows[0] !== ['id', 'title', 'price_minor', 'active', 'stock']) {\n        throw new DomainException('Неверная шапка, пустая таблица или больше 1000 строк');\n    }\n    $products = [];\n    foreach (array_slice($rows, 1) as $offset => $cells) {\n        $line = $offset + 2;\n        if (! is_array($cells) || ! array_is_list($cells)) {\n            throw new DomainException('Строка '.$line.': неверный формат');\n        }\n        if ($cells === [] || count(array_filter($cells, fn (mixed $v): bool => $v !== '')) === 0) {\n            continue;\n        }\n        [$id, $title, $price, $active, $stock] = array_pad($cells, 5, null);\n        if (count($cells) > 5 || ! is_string($id) || ! preg_match('/^[a-z][a-z0-9_-]{2,39}$/D', $id)\n            || isset($products[$id]) || ! is_string($title) || trim($title) === '' || mb_strlen($title) > 120\n            || ! is_int($price) || $price < 1 || $price > 100000000\n            || ! is_bool($active) || ! is_int($stock) || $stock < 0 || $stock > 1000000) {\n            throw new DomainException('Строка '.$line.': ID, цена, флаг или остаток неверны');\n        }\n        $products[$id] = ['id' => $id, 'title' => trim($title), 'price_minor' => $price, 'active' => $active, 'stock' => $stock];\n    }\n    if ($products === []) {\n        throw new DomainException('Каталог не содержит товаров');\n    }\n    ksort($products);\n\n    return $products;\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Число 0 в остатке и отсутствие остатка дают разные результаты. Цена проверяется как положительное целое число в копейках; строка «1490 руб.» или ошибка формулы не станет бесплатным товаром. Формула в ячейке допустима, если её вычисленный результат проходит те же проверки."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Пустые строки внутри диапазона пропускаются, но полностью пустой каталог отклоняется. Корректно выключить все товары можно через active=false: записи сохранятся, а список доступных позиций будет пустым. Это осознанное изменение, которое отличается от сбоя доступа или случайного удаления таблицы."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "snapshot",
+        "label": "Замените рабочую версию одной транзакцией",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Замените рабочую версию одной транзакцией"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Храним каталог целиком в одной записи SQLite. Для небольшого набора это делает смену версии наглядной. Вторая таблица хранит результат последней попытки обновления."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "SQL · schema.sql",
+                  "code": "CREATE TABLE catalog (id INTEGER PRIMARY KEY CHECK(id=1), version TEXT NOT NULL, checked_at INTEGER NOT NULL, products TEXT NOT NULL);\nCREATE TABLE sync_state (id INTEGER PRIMARY KEY CHECK(id=1), attempted_at INTEGER NOT NULL, error_code TEXT);"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "replaceCatalog сначала проверяет полученные данные, затем открывает транзакцию. Она сверяет старые ID, сохраняет новый JSON и обновляет время успешной проверки. Если шаг завершился исключением, atomic откатит изменения."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · catalog.php · replaceCatalog",
+                  "code": "function replaceCatalog(PDO $db, array $response, int $now): void\n{\n    $products = parseCatalog($response);\n    atomic($db, function () use ($db, $products, $now): void {\n        $old = row($db, 'SELECT products FROM catalog WHERE id=1');\n        if ($old !== null) {\n            $before = objectValue(json_decode(stringValue($old['products']), true, 512, JSON_THROW_ON_ERROR));\n            if (array_diff(array_keys($before), array_keys($products)) !== []) {\n                throw new DomainException('Удалён ID. Для отключения верните строку и снимите active');\n            }\n        }\n        $json = json_encode($products, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);\n        run(\n            $db,\n            'INSERT INTO catalog VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,checked_at=excluded.checked_at,products=excluded.products',\n            [hash('sha256', $json), $now, $json]\n        );\n        run($db, 'INSERT INTO sync_state VALUES(1,?,NULL) ON CONFLICT(id) DO UPDATE SET attempted_at=excluded.attempted_at,error_code=NULL', [$now]);\n    });\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Бот увидит целиком старую или целиком новую версию. Если одинаковая таблица загружена повторно, хеш version останется прежним, а checked_at обновится: мы снова убедились, что данные актуальны. attempted_at в sync_state означает последнюю попытку, которая могла быть неуспешной."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проверка удалённых ID действует после первой загрузки. Если менеджер случайно удалил товар, верните строку с тем же ID, выключите active и повторите синхронизацию. Если вы разрешаете настоящее удаление, продумайте отдельно ссылки из старых заказов и уже отправленных сообщений."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохранённый заказ не должен пересчитываться по текущему каталогу. В заказе фиксируют ID товара, согласованную цену и при необходимости версию прайса. Локальный снимок нужен для показа текущего ассортимента, а не для изменения прошлых договорённостей."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "sync",
+        "label": "Запустите обновление и проверьте его результат",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Запустите обновление и проверьте его результат"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "sync.php связывает чтение Google с replaceCatalog. Файловая блокировка не даёт двум процессам на одном сервере установить версии в обратном порядке. Сетевой запрос выполняется до транзакции базы; при ошибке каталог остаётся прежним, а причина попадает в sync_state и stderr."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · sync.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\nrequire __DIR__.'/catalog.php';\nrequire __DIR__.'/google.php';\n$lock = fopen(envRequired('APP_DB').'.sync.lock', 'c');\nif ($lock === false) {\n    throw new RuntimeException('Cannot open sync lock');\n}\nif (! flock($lock, LOCK_EX | LOCK_NB)) {\n    fclose($lock);\n    exit(0);\n}\n$db = database();\ntry {\n    replaceCatalog($db, readSheet(), time());\n    echo \"Catalog checked and installed\\n\";\n} catch (Throwable $e) {\n    $code = $e instanceof DomainException ? $e->getMessage() : 'Ошибка доступа, сети или ответа Google';\n    run($db, 'INSERT INTO sync_state VALUES(1,?,?) ON CONFLICT(id) DO UPDATE SET attempted_at=excluded.attempted_at,error_code=excluded.error_code', [time(), $code]);\n    fwrite(STDERR, $code.\"\\n\");\n    exit(1);\n} finally {\n    flock($lock, LOCK_UN);\n    fclose($lock);\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В PHP-папке полного примера установите зависимости, создайте новую базу и выполните синхронизацию. init.php запускается один раз для новой базы. inspect.php покажет тот же текст, который затем получит пользователь бота; сообщений в Telegram эта проверка не отправляет."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash / PowerShell · из языковой папки php",
+                  "code": "composer install --no-dev\nphp init.php\nphp sync.php\nphp inspect.php /item mug-450"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Ожидаются Catalog checked and installed и карточка «Термокружка 450 мл — 1490,00 ₽». Если вместо этого ошибка, сначала исправьте доступ или указанную строку. Не подключайте расписание к заведомо неработающему чтению."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Cron · пример для Linux",
+                  "code": "*/5 * * * * cd /srv/catalog-bot && php sync.php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Подставьте свой путь и сохраняйте stderr планировщика в доступный вам журнал. Интервал пять минут — настройка примера. У Sheets API есть квоты; при 429 используйте отложенный повтор с увеличивающейся задержкой, а не частый бесконечный цикл. В нашем варианте неудачная попытка завершится, следующую выполнит расписание. "
+                },
+                {
+                  "type": "text",
+                  "text": "Квоты Google Sheets API",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://developers.google.com/workspace/sheets/api/limits"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "webhook",
+        "label": "Используйте локальный каталог в ответе бота",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Используйте локальный каталог в ответе бота"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В catalog.php функция catalogText принимает соединение с базой, текст команды и текущее время. Она не обращается к Google и не отправляет сообщения. /catalog показывает по десять активных товаров, /item ID — одну карточку. Благодаря этому форматирование можно проверить отдельно от webhook."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · вызов из inspect.php или обработчика бота",
+                  "code": "require __DIR__.'/catalog.php';\n\n$text = catalogText(database(), '/item mug-450', time());\necho $text;"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Основную проверку карточки можно увидеть в "
+                },
+                {
+                  "type": "text",
+                  "text": "catalogText",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/catalog.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ": сначала ищется товар, затем проверяется active. Цена берётся из сохранённого снимка, а stock=0 выводится как «нет в наличии». Через 15 минут без успешной синхронизации добавляется просьба уточнить цену и наличие. Это выбранный нами срок допустимой давности данных."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В Telegram-обработчике остаётся связать сообщение с этой функцией. Вот полный handle из domain.php: он работает с личным чатом и сохраняет сформированный ответ в очередь."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "PHP · domain.php · handle",
+                  "code": "function handle(PDO $db, array $u): array\n{\n    $message = objectValue($u['message'] ?? []);\n    $chat = objectValue($message['chat'] ?? []);\n    if (($chat['type'] ?? '') !== 'private') {\n        return [];\n    }\n    $user = intValue($chat['id']);\n    if ($user !== intValue(objectValue($message['from'])['id'])) {\n        return [];\n    }\n    $text = catalogText($db, stringValue($message['text'] ?? ''), time());\n    enqueue($db, 'catalog:'.intValue($u['update_id']), 'sendMessage', [\n        'chat_id' => $user, 'text' => $text,\n    ]);\n\n    return [];\n}"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для существующего бота вызовите catalogText в своей обработке /catalog и /item и отправьте результат привычным транспортом. Если нужен отдельный тестовый бот, "
+                },
+                {
+                  "type": "text",
+                  "text": "public/webhook.php",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/public/webhook.php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " уже проверяет секрет Telegram и повтор update_id. Подключение, включая параметры BOT_TOKEN, WEBHOOK_URL и WEBHOOK_SECRET, разобрано в "
+                },
+                {
+                  "type": "text",
+                  "text": "README",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/README.md"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". При регистрации webhook используйте тестового бота: новый адрес заменяет прежний."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Кнопки и переходы между страницами можно добавить по "
+                },
+                {
+                  "type": "text",
+                  "text": "руководству о каталоге с пагинацией",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/guides/telegram-bot-product-catalog-pagination"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Проверка таблицы и локальное хранение от способа навигации не меняются."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "delivery",
+        "label": "Отделите доставку ответа от обновления данных",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отделите доставку ответа от обновления данных"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В полном примере получение команды сохраняет ответ в outbox, а worker.php отправляет его в Telegram. Поэтому сбой отправки сообщения не откатывает уже проверенный каталог. Для первого теста после команды /catalog вручную запустите php worker.php; затем можно настроить запуск раз в минуту."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Не путайте постановку ответа в очередь с доставкой. sent означает успешный ответ Telegram, failed — явный отказ. При сетевом таймауте результат может остаться unknown: сообщение уже могло попасть в чат. Такие случаи, а также оставшийся после аварии sending, требуют проверки перед повтором."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Если ваше приложение уже отправляет сообщения через очередь, используйте её. Подключать вторую очередь из учебного проекта не нужно. Для запросов через BotGate учитывайте авторизацию и обработку ошибок из "
+                },
+                {
+                  "type": "text",
+                  "text": "документации",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "/docs"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "; чтение Google и данные каталога остаются в вашем приложении."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "launch",
+        "label": "Проведите изменения как менеджер",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Проведите изменения как менеджер"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "После первого успешного чтения и подключения тестового бота выполните эти действия по порядку. После каждого запускайте sync, отправляйте новую команду боту и запускайте worker. Старое сообщение в чате само не редактируется."
+                }
+              ]
+            },
+            {
+              "type": "table",
+              "content": [
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Действие в таблице"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableHeader",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Ожидаемый результат"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Цена mug-450: 149000 → 159000"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Следующая карточка показывает 1590,00 ₽"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Выключить active у mug-450"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Товар исчезает из списка, карточка сообщает об отключении"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Включить active и поставить отрицательную цену"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Обновление отклонено, товар остаётся скрытым в последней принятой версии"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Исправить цену и повторить sync"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Новая версия принята, товар снова виден"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Очистить stock или повторить ID в другой строке"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Отказ с номером строки; рабочий снимок не повреждён"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "tableRow",
+                  "content": [
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Выключить active у всех строк"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "tableCell",
+                      "content": [
+                        {
+                          "type": "paragraph",
+                          "content": [
+                            {
+                              "type": "text",
+                              "text": "Корректное сообщение об отсутствии доступных товаров"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Отдельно проверьте отзыв доступа service account: чтение завершится ошибкой, но последняя рабочая версия сохранится. После восстановления доступа следующая успешная синхронизация очистит ошибку. Если прошло больше выбранных 15 минут, бот должен предупредить о давности данных."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При неверной шапке проверьте имя вкладки, порядок и написание колонок. При 403 или 404 — включённый API, SHEET_ID и доступ для client_email. При could not find driver включите pdo_sqlite именно в том PHP, который запускает sync. Если CLI видит товары, а бот нет, проверьте, что веб-процесс читает ту же базу и конфигурацию."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для диагностики нужны время последней успешной проверки, время последней попытки и причина ошибки. Просматривайте их закрытым инструментом работы с базой; публичная SQL-консоль для примера не требуется."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "adapt",
+        "label": "Как адаптировать схему под свой ассортимент",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как адаптировать схему под свой ассортимент"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Новые поля добавляйте согласованно: колонка таблицы → проверка в parseCatalog → отображение в catalogText. Например, категория может понадобиться для фильтра, а ссылка на фотографию — для карточки. Не считайте содержимое ячеек готовым HTML: в примере сообщения отправляются обычным текстом, без parse_mode."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для удобного ввода цены в рублях потребуется явное преобразование в копейки и проверка десятичных знаков. Не умножайте произвольную текстовую ячейку на 100 с молчаливым округлением. Сначала определите допустимый формат и показывайте менеджеру ошибку при отклонении от него."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "При нескольких редакторах используйте отдельную вкладку подготовки, а в Catalog переносите согласованный набор. Проверка типов не определяет, закончил ли менеджер редактировать весь прайс. Для более сложного процесса добавляют явное действие публикации и ревизии."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "SQLite и файловая блокировка подходят одному серверу. Для нескольких серверов используйте общую базу и общий механизм блокировки. Если появляются заказы, резервирование и частые изменения остатков, источником этих данных должна стать система продаж."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "github",
+        "label": "Исходники и запуск PHP-примера на GitHub",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Исходники и запуск PHP-примера на GitHub"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Откройте "
+                },
+                {
+                  "type": "text",
+                  "text": "папку PHP-примера",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/tree/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ": файлы можно читать прямо в браузере. "
+                },
+                {
+                  "type": "text",
+                  "text": "README",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://github.com/Alexby8/botgate-examples/blob/0a8ef3505a83641106dd1f6e382fb279b64b3fad/examples/telegram-bot-google-sheets-catalog/php/README.md"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " содержит точные шаги получения кода, настройки ключа, запуска синхронизации и подключения тестового бота. Ссылки в статье закреплены за проверенной версией."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Bash / PowerShell · получение проверенной версии",
+                  "code": "git clone https://github.com/Alexby8/botgate-examples.git\ncd botgate-examples\ngit checkout 0a8ef3505a83641106dd1f6e382fb279b64b3fad\ncd examples/telegram-bot-google-sheets-catalog/php"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "На уровень выше расположен README статьи со списком языков. Сейчас есть реализация php; будущие варианты можно добавить рядом. Устанавливайте зависимости из языковой папки: общей установки из корня репозитория нет."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Для проверки без Google и Telegram есть php demo.php с учебным ответом API и SQLite в памяти. Она показывает карточку и проверяет сохранность каталога при неверной цене. Это дополнительная проверка логики; реальную связь с вашей таблицей подтверждают sync.php и проход с тестовым ботом."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]
