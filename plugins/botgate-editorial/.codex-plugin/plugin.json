@@ -1,0 +1,10 @@
+{
+  "name": "botgate-editorial",
+  "version": "1.0.2",
+  "description": "Темы и технические руководства для редакции BotGate.",
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Редакция BotGate",
+    "shortDescription": "Подбор тем и подготовка проверенного JSON-пакета"
+  }
+}

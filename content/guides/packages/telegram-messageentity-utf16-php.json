@@ -1,0 +1,653 @@
+[
+  {
+    "slug": "telegram-messageentity-utf16-php",
+    "title": "Как на PHP извлечь текст MessageEntity из сообщения Telegram с эмодзи",
+    "seo_title": "Telegram MessageEntity в PHP — извлекаем текст по смещениям UTF-16",
+    "description": "Как извлечь текст MessageEntity из входящего сообщения Telegram по offset и length в UTF-16. Пример на PHP с эмодзи перед упоминанием и внутри выделенного текста.",
+    "card_description": "Извлеките упоминание после эмодзи и выделенный текст с эмодзи внутри, используя смещения Telegram Bot API.",
+    "category": "Практика",
+    "topics": "Telegram Bot API, PHP, UTF-16",
+    "reading_time": "4 минуты",
+    "published_at": "2026-11-25",
+    "is_published": true,
+    "sort_order": 82,
+    "intro": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "В сообщении «😺 Привет @bot и 🚀 старт!» Telegram передаёт диапазон упоминания отдельно от текста. На PHP из этого диапазона можно получить ровно "
+            },
+            {
+              "type": "text",
+              "text": "@bot",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": ". Второй диапазон вернёт "
+            },
+            {
+              "type": "text",
+              "text": "🚀 старт",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " вместе с эмодзи."
+            }
+          ]
+        }
+      ]
+    },
+    "preamble": {
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Для проверки нужны PHP с расширением "
+            },
+            {
+              "type": "text",
+              "text": "mbstring",
+              "marks": [
+                {
+                  "type": "code"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "text": " и один локальный файл. В примере входящий JSON уже получен. Токен, вебхук и запросы к Telegram для запуска не нужны."
+            }
+          ]
+        }
+      ]
+    },
+    "sections": [
+      {
+        "id": "offset-units",
+        "label": "В каких единицах Telegram передаёт диапазон",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В каких единицах Telegram передаёт диапазон"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В "
+                },
+                {
+                  "type": "text",
+                  "text": "message.text",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " приходит исходный текст в UTF-8. В "
+                },
+                {
+                  "type": "text",
+                  "text": "message.entities",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " объект "
+                },
+                {
+                  "type": "text",
+                  "text": "MessageEntity",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " задаёт начало "
+                },
+                {
+                  "type": "text",
+                  "text": "offset",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " от нуля и длину "
+                },
+                {
+                  "type": "text",
+                  "text": "length",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " в кодовых единицах UTF-16. "
+                },
+                {
+                  "type": "text",
+                  "text": "Описание Message",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#message",
+                        "target": "_blank"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "MessageEntity",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://core.telegram.org/bots/api#messageentity",
+                        "target": "_blank"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Эмодзи 😺 занимает две кодовые единицы UTF-16. Пробел, каждая из шести букв в «Привет» и следующий пробел занимают по одной. Поэтому начало "
+                },
+                {
+                  "type": "text",
+                  "text": "@bot",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " находится на позиции "
+                },
+                {
+                  "type": "text",
+                  "text": "2 + 1 + 6 + 1 = 10",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". У фрагмента "
+                },
+                {
+                  "type": "text",
+                  "text": "🚀 старт",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " длина равна "
+                },
+                {
+                  "type": "text",
+                  "text": "2 + 1 + 5 = 8",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "php-slice",
+        "label": "Как вырезать диапазон в PHP",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Как вырезать диапазон в PHP"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Перекодируйте исходную строку в "
+                },
+                {
+                  "type": "text",
+                  "text": "UTF-16LE",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". В этой кодировке каждая кодовая единица занимает два байта. Умножьте "
+                },
+                {
+                  "type": "text",
+                  "text": "offset",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "length",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " на два и передайте их в "
+                },
+                {
+                  "type": "text",
+                  "text": "substr()",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": ". Перекодируйте полученный фрагмент обратно в UTF-8. "
+                },
+                {
+                  "type": "text",
+                  "text": "Документация mb_convert_encoding()",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/ru/function.mb-convert-encoding.php",
+                        "target": "_blank"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " и "
+                },
+                {
+                  "type": "text",
+                  "text": "substr()",
+                  "marks": [
+                    {
+                      "type": "link",
+                      "attrs": {
+                        "href": "https://www.php.net/manual/ru/function.substr.php",
+                        "target": "_blank"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": "."
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Сохраните код в файл "
+                },
+                {
+                  "type": "text",
+                  "text": "entity-text.php",
+                  "marks": [
+                    {
+                      "type": "code"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "text": " в UTF-8. JSON внутри файла содержит поля уже полученного обновления, нужные для разбора."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "entity-text.php",
+                  "code": "<?php\n\ndeclare(strict_types=1);\n\nfunction entityText(string $text, int $offset, int $length): string\n{\n    $utf16 = mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');\n    $fragment = substr($utf16, $offset * 2, $length * 2);\n\n    return mb_convert_encoding($fragment, 'UTF-8', 'UTF-16LE');\n}\n\n$json = <<<'JSON'\n{\n    \"message\": {\n        \"text\": \"😺 Привет @bot и 🚀 старт!\",\n        \"entities\": [\n            {\"type\": \"mention\", \"offset\": 10, \"length\": 4},\n            {\"type\": \"bold\", \"offset\": 17, \"length\": 8}\n        ]\n    }\n}\nJSON;\n\n$update = json_decode($json, true, 512, JSON_THROW_ON_ERROR);\n$message = $update['message'];\n\nforeach ($message['entities'] ?? [] as $entity) {\n    $fragment = entityText($message['text'], $entity['offset'], $entity['length']);\n\n    printf(\n        \"%s (offset=%d, length=%d) → %s\\n\",\n        $entity['type'],\n        $entity['offset'],\n        $entity['length'],\n        $fragment,\n    );\n}"
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": "local-check",
+        "label": "Что должен вывести локальный пример",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что должен вывести локальный пример"
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "В каталоге с файлом запустите PHP из командной строки."
+                }
+              ]
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Команда",
+                  "code": "php entity-text.php"
+                }
+              }
+            },
+            {
+              "type": "customBlock",
+              "attrs": {
+                "id": "guide-code",
+                "config": {
+                  "label": "Ожидаемый вывод",
+                  "code": "mention (offset=10, length=4) → @bot\nbold (offset=17, length=8) → 🚀 старт"
+                }
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Первая строка подтверждает смещение после 😺. Во второй строке 🚀 целиком входит в диапазон, а завершающий восклицательный знак остаётся за его пределами."
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "pitfalls",
+        "label": "Что проверить, если фрагмент сместился",
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "heading",
+              "attrs": {
+                "level": 2
+              },
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Что проверить, если фрагмент сместился"
+                }
+              ]
+            },
+            {
+              "type": "bulletList",
+              "content": [
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Передавайте в функцию исходный "
+                        },
+                        {
+                          "type": "text",
+                          "text": "message.text",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ". Если до извлечения удалить пробелы, заменить переносы строк или изменить текст, смещения могут стать неверными."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "substr()",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " на исходной UTF-8-строке считает байты. "
+                        },
+                        {
+                          "type": "text",
+                          "text": "mb_substr()",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " с UTF-8 считает символы, и 😺 занимает в таком подсчёте одну позицию. Данные Telegram требуют подсчёта кодовых единиц UTF-16. "
+                        },
+                        {
+                          "type": "text",
+                          "text": "Документация mb_substr()",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://www.php.net/manual/ru/function.mb-substr.php",
+                                "target": "_blank"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "listItem",
+                  "content": [
+                    {
+                      "type": "paragraph",
+                      "content": [
+                        {
+                          "type": "text",
+                          "text": "Если разбираете подпись к медиа, используйте вместе "
+                        },
+                        {
+                          "type": "text",
+                          "text": "message.caption",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": " и "
+                        },
+                        {
+                          "type": "text",
+                          "text": "message.caption_entities",
+                          "marks": [
+                            {
+                              "type": "code"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": ". Смещения привязаны к соответствующей строке. "
+                        },
+                        {
+                          "type": "text",
+                          "text": "Поля сообщения Telegram",
+                          "marks": [
+                            {
+                              "type": "link",
+                              "attrs": {
+                                "href": "https://core.telegram.org/bots/api#message",
+                                "target": "_blank"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "text": "."
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "paragraph",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Чтобы проверить получение такого сообщения в своём обработчике, отправьте его реальному боту и примените функцию к полям из полученного обновления. Локальный пример проверяет извлечение по уже заданным диапазонам."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  }
+]
